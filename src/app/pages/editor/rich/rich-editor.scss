@@ -1,0 +1,258 @@
+@use 'sass:list';
+@use 'sass:string';
+
+app-rich-editor {
+  display: block;
+  height: 100vh;
+}
+
+.re {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--canvas);
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+  background-size: 18px 18px;
+  animation: fade-in 0.4s var(--ease) both;
+}
+
+.re-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 60px;
+  padding: 0 14px;
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+  animation: rise-in 0.5s var(--ease-out) both;
+}
+
+.doc-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--grad-brand);
+  box-shadow: 0 8px 18px -8px rgba(139, 92, 246, 0.9);
+  display: grid;
+  place-items: center;
+}
+
+.re-name {
+  border: 1px solid transparent;
+  background: transparent;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  outline: none;
+  width: min(360px, 34vw);
+  &:hover {
+    background: var(--surface-2);
+  }
+  &:focus {
+    border-color: var(--primary);
+  }
+}
+
+.re-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-3);
+  &[data-state='saved'] {
+    color: var(--success);
+  }
+  .spinner {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+.re-body {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  padding-bottom: 40px;
+}
+
+.re-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  z-index: 5;
+}
+
+.re-page {
+  width: min(210mm, calc(100% - 32px));
+  margin: 0 auto;
+  animation: rise-in 0.7s var(--ease-out) 0.1s both;
+
+  /* Quill draws its toolbar icons in #444 — recolour them for both themes. */
+  .ql-snow .ql-stroke {
+    stroke: var(--text-2);
+  }
+  .ql-snow .ql-fill,
+  .ql-snow .ql-stroke.ql-fill {
+    fill: var(--text-2);
+  }
+  .ql-snow .ql-picker,
+  .ql-snow .ql-picker-label {
+    color: var(--text-2);
+  }
+  .ql-snow.ql-toolbar button:hover .ql-stroke,
+  .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+  .ql-snow.ql-toolbar .ql-picker-label:hover .ql-stroke,
+  .ql-snow.ql-toolbar .ql-picker-label.ql-active .ql-stroke {
+    stroke: var(--primary-700);
+  }
+  .ql-snow.ql-toolbar button:hover .ql-fill,
+  .ql-snow.ql-toolbar button.ql-active .ql-fill {
+    fill: var(--primary-700);
+  }
+  .ql-snow.ql-toolbar button:hover,
+  .ql-snow.ql-toolbar button.ql-active,
+  .ql-snow.ql-toolbar .ql-picker-label:hover,
+  .ql-snow.ql-toolbar .ql-picker-label.ql-active,
+  .ql-snow.ql-toolbar .ql-picker-item:hover,
+  .ql-snow.ql-toolbar .ql-picker-item.ql-selected {
+    color: var(--primary-700);
+  }
+  .ql-snow .ql-picker-options {
+    background: var(--surface);
+    border-color: var(--border-strong) !important;
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+  }
+  .ql-snow .ql-tooltip {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border-strong);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    input[type='text'] {
+      background: var(--input-bg);
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+  }
+
+  .ql-toolbar.ql-snow {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: var(--surface-glass);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid var(--border);
+    border-radius: 0 0 14px 14px;
+    border-top: 0;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 18px;
+    font-family: var(--font);
+    padding: 8px;
+  }
+
+  .ql-container.ql-snow {
+    border: 0;
+    background: #fff;
+    min-height: 297mm;
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.12),
+      0 30px 70px -20px rgba(0, 0, 0, 0.45);
+    font-family: Inter, Arial, sans-serif;
+    font-size: 11pt;
+  }
+
+  .ql-editor {
+    min-height: 297mm;
+    padding: 20mm 20mm 24mm;
+    line-height: 1.6;
+    color: #1f2937;
+    h1 {
+      font-size: 2em;
+      margin-bottom: 0.4em;
+    }
+    h2 {
+      font-size: 1.5em;
+      margin: 0.8em 0 0.35em;
+    }
+    h3 {
+      font-size: 1.2em;
+      margin: 0.7em 0 0.3em;
+    }
+    p {
+      margin-bottom: 0.45em;
+    }
+    img {
+      max-width: 100%;
+    }
+    &.ql-blank::before {
+      left: 20mm;
+      font-style: normal;
+      color: #94a3b8;
+    }
+  }
+
+  /* Font picker labels + font classes */
+  $fonts: (
+    inter: ('Inter', 'Inter, sans-serif'),
+    roboto: ('Roboto', 'Roboto, sans-serif'),
+    lato: ('Lato', 'Lato, sans-serif'),
+    poppins: ('Poppins', 'Poppins, sans-serif'),
+    lora: ('Lora', 'Lora, serif'),
+    merriweather: ('Merriweather', 'Merriweather, serif'),
+    playfair: ('Playfair', "'Playfair Display', serif"),
+    garamond: ('Garamond', "'EB Garamond', serif"),
+    mono: ('Mono', "'JetBrains Mono', monospace"),
+  );
+  @each $key, $value in $fonts {
+    .ql-picker.ql-font .ql-picker-label[data-value='#{$key}']::before,
+    .ql-picker.ql-font .ql-picker-item[data-value='#{$key}']::before {
+      content: list.nth($value, 1);
+      font-family: string.unquote(list.nth($value, 2));
+    }
+    .ql-font-#{$key} {
+      font-family: string.unquote(list.nth($value, 2));
+    }
+  }
+  .ql-picker.ql-font {
+    width: 128px;
+  }
+  .ql-picker.ql-size {
+    width: 76px;
+  }
+  .ql-picker.ql-size .ql-picker-label[data-value]::before,
+  .ql-picker.ql-size .ql-picker-item[data-value]::before {
+    content: attr(data-value);
+  }
+}
+
+.re-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .re-status span:last-child,
+  .re-save {
+    display: none;
+  }
+  .re-page .ql-editor {
+    padding: 12mm 10mm;
+  }
+}

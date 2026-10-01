@@ -1,0 +1,162 @@
+@if (loading()) {
+  <div class="center-state">
+    <div class="loader" aria-hidden="true"><i></i><i></i><i></i></div>
+    <p>Opening your resume…</p>
+  </div>
+} @else if (loadError()) {
+  <div class="center-state">
+    <span class="i xl">error</span>
+    <h3>{{ loadError() }}</h3>
+    <a class="btn btn-primary" routerLink="/app/dashboard">Back to dashboard</a>
+  </div>
+} @else {
+  <div class="builder" [class.show-preview]="mobileView() === 'preview'">
+    <!-- ======================== Top bar ======================== -->
+    <header class="topbar">
+      <button class="btn btn-ghost btn-icon" type="button" (click)="back()" title="Back to dashboard"><span class="i">arrow_back</span></button>
+      <div class="title-wrap">
+        <input class="title-input" [ngModel]="store.title()" (ngModelChange)="store.setTitle($event)" aria-label="Resume title" />
+        <span class="save-state" [attr.data-state]="store.saveState()">
+          @switch (store.saveState()) {
+            @case ('saving') {
+              <span class="spinner"></span> Saving…
+            }
+            @case ('dirty') {
+              <span class="i sm">edit</span> Unsaved
+            }
+            @case ('error') {
+              <button class="link" type="button" (click)="store.flush()"><span class="i sm">sync_problem</span> Save failed — retry</button>
+            }
+            @default {
+              <span class="i sm">cloud_done</span> Saved
+            }
+          }
+        </span>
+      </div>
+
+      <div class="grow"></div>
+
+      <div class="tool-group">
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" [disabled]="!store.canUndo()" (click)="store.undo()" title="Undo (Ctrl+Z)"><span class="i">undo</span></button>
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" [disabled]="!store.canRedo()" (click)="store.redo()" title="Redo (Ctrl+Y)"><span class="i">redo</span></button>
+      </div>
+
+      <button class="btn btn-sm hide-sm" type="button" (click)="pickerOpen.set(true)"><span class="i">palette</span> Templates</button>
+      <button class="btn btn-sm hide-sm" type="button" (click)="openAts()">
+        <span class="i">fact_check</span> ATS
+        @if (store.atsScore() !== null) {
+          <span class="badge success">{{ store.atsScore() }}</span>
+        }
+      </button>
+
+      <div class="menu-wrap" (appClickOutside)="downloadMenu.set(false)">
+        <button class="btn btn-primary btn-sm" type="button" (click)="downloadMenu.set(!downloadMenu())" [disabled]="!!exporting()">
+          @if (exporting()) {
+            <span class="spinner"></span>
+          } @else {
+            <span class="i">download</span>
+          }
+          Download
+          <span class="i sm">expand_more</span>
+        </button>
+        @if (downloadMenu()) {
+          <div class="menu" animate.leave="is-leaving">
+            <div class="menu-label">Export resume</div>
+            <button type="button" (click)="downloadPdf()">
+              <span class="i">picture_as_pdf</span>
+              <span>PDF <small>Best for applying — ATS readable</small></span>
+            </button>
+            <button type="button" (click)="downloadDocx()">
+              <span class="i">description</span>
+              <span>Word (.docx) <small>Clean ATS-optimised layout</small></span>
+            </button>
+            <button type="button" (click)="downloadText()">
+              <span class="i">notes</span>
+              <span>Plain text (.txt) <small>For copy-paste job portals</small></span>
+            </button>
+            <div class="menu-sep"></div>
+            <button type="button" (click)="print()">
+              <span class="i">print</span>
+              <span>Print / Save as PDF <small>Uses your browser</small></span>
+            </button>
+          </div>
+        }
+      </div>
+    </header>
+
+    <!-- ======================== Editor ======================== -->
+    <aside class="editor">
+      <nav class="editor-tabs" [attr.data-tab]="tab()">
+        <span class="tab-pill" aria-hidden="true"></span>
+        <button type="button" [class.active]="tab() === 'content'" (click)="tab.set('content')"><span class="i">edit_note</span> Content</button>
+        <button type="button" [class.active]="tab() === 'design'" (click)="tab.set('design')"><span class="i">palette</span> Design</button>
+        <button type="button" [class.active]="tab() === 'ai'" (click)="tab.set('ai')"><span class="i">auto_awesome</span> AI Tools</button>
+      </nav>
+      <div class="editor-body thin-scroll">
+        @switch (tab()) {
+          @case ('content') {
+            <app-content-editor class="tab-panel" />
+          }
+          @case ('design') {
+            <app-design-panel class="tab-panel" (changeTemplate)="pickerOpen.set(true)" />
+          }
+          @case ('ai') {
+            <app-ai-panel class="tab-panel" />
+          }
+        }
+      </div>
+    </aside>
+
+    <!-- ======================== Preview ======================== -->
+    <section class="preview" #previewArea>
+      <div class="preview-bar">
+        <span class="pages"><span class="i sm">article</span> {{ pageCount() }} page{{ pageCount() > 1 ? 's' : '' }} · {{ store.design().pageSize }}</span>
+        <div class="zoom">
+          <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="zoomBy(-0.1)" title="Zoom out"><span class="i">remove</span></button>
+          <span class="zoom-val">{{ (zoom() * 100).toFixed(0) }}%</span>
+          <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="zoomBy(0.1)" title="Zoom in"><span class="i">add</span></button>
+          <button class="btn btn-ghost btn-xs" type="button" [class.active]="zoomMode() === 'fit'" (click)="fit()">Fit</button>
+        </div>
+      </div>
+      <div class="canvas thin-scroll">
+        <div class="paper-wrap" [style.width.px]="pageWidthPx() * zoom()" [style.height.px]="resumeHeight() * zoom()">
+          <div #paper class="paper" [style.transform]="'scale(' + zoom() + ')'">
+            <app-resume-renderer [content]="store.content()" [design]="store.design()" mode="preview" />
+            @for (y of pageBreaks(); track $index) {
+              <div class="page-break" [style.top.px]="y">
+                <span>Page {{ $index + 2 }}</span>
+              </div>
+            }
+          </div>
+        </div>
+        @if (pageCount() > 2) {
+          <p class="tip"><span class="i sm">lightbulb</span> Most recruiters prefer 1–2 pages. Try reducing margins, font size or trimming older roles.</p>
+        }
+      </div>
+    </section>
+
+    <!-- Mobile toggle -->
+    <div class="mobile-switch">
+      <div class="segmented">
+        <button type="button" [class.active]="mobileView() === 'edit'" (click)="mobileView.set('edit')"><span class="i">edit</span> Edit</button>
+        <button type="button" [class.active]="mobileView() === 'preview'" (click)="mobileView.set('preview')"><span class="i">visibility</span> Preview</button>
+      </div>
+    </div>
+  </div>
+
+  @if (pickerOpen()) {
+    <div class="modal-backdrop" animate.leave="is-leaving" (click)="pickerOpen.set(false)">
+      <div class="modal xwide" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><span class="i">grid_view</span> Choose a template</h3>
+          <span class="subtle small grow">Previews use your own content · switching keeps everything you wrote</span>
+          <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="pickerOpen.set(false)"><span class="i">close</span></button>
+        </div>
+        <div class="modal-body thin-scroll">
+          <app-template-gallery [content]="store.content()" [compact]="true" actionLabel="Apply template"
+            [currentId]="store.templateId()" (selected)="applyTemplate($event)" />
+        </div>
+      </div>
+    </div>
+  }
+}

@@ -1,0 +1,227 @@
+<div class="page narrow">
+  <header class="page-header">
+    <div>
+      <span class="eyebrow"><span class="i sm">workspace_premium</span> One-time · no subscription</span>
+      <h1>Plan & billing</h1>
+      <p>Your plan, today's usage and lifetime access.</p>
+    </div>
+  </header>
+
+  @if (billing.isLifetime()) {
+    <section class="card plan-card border-anim">
+      <div class="confetti" aria-hidden="true">
+        @for (c of confetti; track $index) {
+          <i [style.left.%]="c.x" [style.background]="c.color" [style.animation-delay.s]="c.delay" [style.--r]="c.r + 'deg'"></i>
+        }
+      </div>
+      <div class="plan-top">
+        <div>
+          <span class="badge success">Lifetime</span>
+          <h2>You have lifetime access</h2>
+          <p class="muted">Unlimited resumes, cover letters and document edits. Thank you for your support.</p>
+        </div>
+        <span class="big"><span class="i fill">workspace_premium</span></span>
+      </div>
+      @if (payment(); as p) {
+        @if (p.status === 'approved') {
+          <dl class="details">
+            <div><dt>Amount</dt><dd>{{ p.currency }} {{ p.amount }}</dd></div>
+            <div><dt>Paid via</dt><dd>{{ methodLabels[p.method] }}</dd></div>
+            <div><dt>Transaction ID</dt><dd class="mono">{{ p.transactionId }}</dd></div>
+            <div><dt>Activated</dt><dd>{{ (p.reviewedAt ?? p.createdAt) | date: 'mediumDate' }}</dd></div>
+          </dl>
+        }
+      }
+    </section>
+  } @else {
+    <section class="card">
+      <div class="card-header">
+        <h3>Free plan · today's usage</h3>
+        @if (billing.summary(); as s) {
+          <span class="subtle small">Resets at {{ s.resetsAt | date: 'shortTime' }}</span>
+        }
+      </div>
+      <div class="card-pad meters">
+        @for (m of usage(); track m.kind) {
+          <div class="meter">
+            <div class="meter-head">
+              <span>{{ m.label }}</span>
+              <b [class.full]="m.full">{{ m.used }}/{{ m.limitLabel }}</b>
+            </div>
+            <div class="progress" [class.full]="m.full"><div [style.width.%]="m.percent"></div></div>
+          </div>
+        } @empty {
+          <div class="skeleton sk-line"></div>
+        }
+      </div>
+    </section>
+
+    @if (billing.pendingPayment(); as p) {
+      <section class="card pending">
+        <div class="card-pad stack">
+          <div class="row">
+            <span class="spinner subtle"></span>
+            <h3 class="grow">Your payment is being verified</h3>
+            <span class="badge warning">Pending</span>
+          </div>
+          <p class="muted">
+            We received your payment details and will activate lifetime access as soon as the transaction is confirmed —
+            usually within a few hours. This page updates automatically.
+          </p>
+          <dl class="details">
+            <div><dt>Amount</dt><dd>{{ p.currency }} {{ p.amount }}</dd></div>
+            <div><dt>Method</dt><dd>{{ methodLabels[p.method] }}</dd></div>
+            <div><dt>Transaction ID</dt><dd class="mono">{{ p.transactionId }}</dd></div>
+            <div><dt>Submitted</dt><dd>{{ p.createdAt | date: 'medium' }}</dd></div>
+          </dl>
+          @if (whatsappLink(); as link) {
+            <a class="btn btn-sm align-start" [href]="link" target="_blank" rel="noopener">
+              <span class="i">chat</span> Contact support on WhatsApp
+            </a>
+          }
+        </div>
+      </section>
+    } @else {
+      <section class="card checkout">
+        <div class="offer">
+          <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+          <span class="badge primary">One-time payment</span>
+          <h2>Lifetime access</h2>
+          <p class="price">PKR <span [appCountUp]="billing.price()" [countDuration]="1200"></span></p>
+          <ul>
+            <li><span class="i">check</span> Unlimited resumes</li>
+            <li><span class="i">check</span> Unlimited cover letters</li>
+            <li><span class="i">check</span> Unlimited document edits</li>
+            <li><span class="i">check</span> No subscription — pay once</li>
+          </ul>
+        </div>
+
+        <div class="pay">
+          @if (rejected(); as r) {
+            <div class="alert danger">
+              <span class="i">error</span>
+              <span>
+                Your last payment (TID <b class="mono">{{ r.transactionId }}</b>) could not be verified{{ r.adminNote ? ': ' + r.adminNote : '.' }}
+                Please check the details and submit again.
+              </span>
+            </div>
+          }
+
+          @if (!methods().length) {
+            <div class="alert">
+              <span class="i">info</span>
+              <span>
+                Online payment details are being set up. Please check back soon.
+                @if (auth.user()?.isAdmin) {
+                  <br /><b>Admin:</b> add PAYMENT_JAZZCASH_NUMBER, PAYMENT_EASYPAISA_NUMBER or PAYMENT_BANK_ACCOUNT (with titles) to
+                  <code>backend/.env</code> and restart the backend.
+                }
+              </span>
+            </div>
+          } @else {
+            <ol class="steps">
+              <li>
+                <h4><span class="num">1</span> Send PKR {{ billing.price() }}</h4>
+                @if (methods().length > 1) {
+                  <div class="segmented block">
+                    @for (m of methods(); track m.key) {
+                      <button type="button" [class.active]="method()?.key === m.key" (click)="methodKey.set(m.key)">{{ m.label }}</button>
+                    }
+                  </div>
+                }
+                @if (method(); as m) {
+                  <div class="account">
+                    <div class="acc-row">
+                      <span class="subtle small">{{ m.key === 'bank' ? 'Bank' : 'Wallet' }}</span>
+                      <b>{{ m.label }}</b>
+                    </div>
+                    @if (m.accountTitle) {
+                      <div class="acc-row">
+                        <span class="subtle small">Account title</span>
+                        <b>{{ m.accountTitle }}</b>
+                      </div>
+                    }
+                    <div class="acc-row">
+                      <span class="subtle small">{{ m.key === 'bank' ? 'Account / IBAN' : 'Mobile number' }}</span>
+                      <span class="copy">
+                        <b class="mono">{{ m.accountNumber }}</b>
+                        <button class="btn btn-ghost btn-xs" type="button" (click)="copy(m.accountNumber)" aria-label="Copy account number">
+                          <span class="i">content_copy</span>
+                        </button>
+                      </span>
+                    </div>
+                    <div class="acc-row">
+                      <span class="subtle small">Amount</span>
+                      <b>PKR {{ billing.price() }}</b>
+                    </div>
+                  </div>
+                }
+              </li>
+
+              <li>
+                <h4><span class="num">2</span> Submit your payment details</h4>
+                <form class="stack" (ngSubmit)="submit()" novalidate>
+                  <div class="grid-2">
+                    <div class="field">
+                      <label for="tid">Transaction ID (TID)</label>
+                      <input id="tid" class="input mono" name="tid" autocomplete="off" placeholder="e.g. 01234567890"
+                        [ngModel]="transactionId()" (ngModelChange)="transactionId.set($event)" />
+                    </div>
+                    <div class="field">
+                      <label for="sender">Paid from (number / account)</label>
+                      <input id="sender" class="input" name="sender" inputmode="tel" autocomplete="off" placeholder="03xx xxxxxxx"
+                        [ngModel]="senderNumber()" (ngModelChange)="senderNumber.set($event)" />
+                    </div>
+                  </div>
+                  <div class="field">
+                    <label for="sender-name">Account holder name <span class="hint">optional</span></label>
+                    <input id="sender-name" class="input" name="senderName" autocomplete="off"
+                      [ngModel]="senderName()" (ngModelChange)="senderName.set($event)" />
+                  </div>
+                  <div class="field">
+                    <span class="label">Receipt screenshot <span class="hint">optional, speeds up verification</span></span>
+                    @if (screenshotUrl(); as url) {
+                      <div class="shot">
+                        <img [src]="url" alt="Payment receipt preview" />
+                        <div class="grow">
+                          <b>{{ screenshot()?.name }}</b>
+                          <button class="btn btn-ghost btn-xs" type="button" (click)="clearScreenshot()">Remove</button>
+                        </div>
+                      </div>
+                    } @else {
+                      <label class="upload">
+                        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickScreenshot($event)" />
+                        <span class="i">upload</span> Choose image (PNG, JPG or WebP, max 5 MB)
+                      </label>
+                    }
+                  </div>
+
+                  @if (formError()) {
+                    <div class="alert danger"><span class="i">error</span><span>{{ formError() }}</span></div>
+                  }
+
+                  <button class="btn btn-primary btn-lg" type="submit" [disabled]="submitting()">
+                    @if (submitting()) {
+                      <span class="spinner"></span>
+                    }
+                    Submit payment
+                  </button>
+                  <p class="subtle small">
+                    Your account is upgraded after we match the transaction ID with the payment we received.
+                    @if (whatsappLink(); as link) {
+                      Questions? <a [href]="link" target="_blank" rel="noopener">Message us on WhatsApp</a>.
+                    }
+                  </p>
+                </form>
+              </li>
+            </ol>
+          }
+        </div>
+      </section>
+    }
+  }
+
+  <p class="subtle small footnote">
+    Need help? See the <a routerLink="/" fragment="faq">FAQ</a>.
+  </p>
+</div>

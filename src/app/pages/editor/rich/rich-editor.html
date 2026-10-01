@@ -1,0 +1,85 @@
+<div class="re">
+  <header class="re-top">
+    <button class="btn btn-ghost btn-icon" type="button" (click)="back()" title="Back to documents"><span class="i">arrow_back</span></button>
+    <span class="doc-ic"><span class="i">article</span></span>
+    <input class="re-name" [ngModel]="name()" (ngModelChange)="rename($event)" aria-label="Document name" />
+    <span class="re-save" [attr.data-state]="saveState()">
+      @switch (saveState()) {
+        @case ('saving') {
+          <span class="spinner"></span> Saving…
+        }
+        @case ('dirty') {
+          Unsaved changes
+        }
+        @case ('error') {
+          <button class="btn btn-ghost btn-xs" type="button" (click)="save()">Save failed — retry</button>
+        }
+        @case ('limit') {
+          <button class="btn btn-danger-soft btn-xs" type="button" (click)="save()" title="Free plan: 1 document edit per day">Not saved · daily limit</button>
+        }
+        @default {
+          <span class="i sm">cloud_done</span> Saved
+        }
+      }
+    </span>
+    <div class="grow"></div>
+
+    <div class="menu-wrap" (appClickOutside)="aiMenu.set(false)">
+      <button class="btn btn-soft btn-sm" type="button" (click)="aiMenu.set(!aiMenu())" [disabled]="aiBusy()">
+        @if (aiBusy()) {
+          <span class="spinner"></span>
+        } @else {
+          <span class="i">auto_awesome</span>
+        }
+        AI assist
+      </button>
+      @if (aiMenu()) {
+        <div class="menu" animate.leave="is-leaving">
+          <div class="menu-label">Rewrite selected text</div>
+          <button type="button" (click)="aiRewrite('professional')"><span class="i">workspace_premium</span> Make professional</button>
+          <button type="button" (click)="aiRewrite('grammar')"><span class="i">spellcheck</span> Fix grammar & spelling</button>
+          <button type="button" (click)="aiRewrite('shorten')"><span class="i">compress</span> Make shorter</button>
+          <button type="button" (click)="aiRewrite('expand')"><span class="i">expand</span> Expand with detail</button>
+          <button type="button" (click)="aiRewrite('simplify')"><span class="i">auto_fix_high</span> Simplify</button>
+          <div class="menu-sep"></div>
+          <button type="button" (click)="aiRewrite('custom')"><span class="i">chat</span> Custom instruction… <small>Translate, change tone…</small></button>
+        </div>
+      }
+    </div>
+
+    <div class="menu-wrap" (appClickOutside)="exportMenu.set(false)">
+      <button class="btn btn-primary btn-sm" type="button" (click)="exportMenu.set(!exportMenu())" [disabled]="exporting()">
+        @if (exporting()) {
+          <span class="spinner"></span>
+        } @else {
+          <span class="i">download</span>
+        }
+        Export
+      </button>
+      @if (exportMenu()) {
+        <div class="menu" animate.leave="is-leaving">
+          <button type="button" (click)="exportAs('pdf')"><span class="i">picture_as_pdf</span> PDF document</button>
+          <button type="button" (click)="exportAs('docx')"><span class="i">description</span> Word (.docx)</button>
+          <button type="button" (click)="exportAs('html')"><span class="i">code</span> Web page (.html)</button>
+          <button type="button" (click)="exportAs('txt')"><span class="i">notes</span> Plain text (.txt)</button>
+          <div class="menu-sep"></div>
+          <button type="button" (click)="print()"><span class="i">print</span> Print</button>
+        </div>
+      }
+    </div>
+  </header>
+
+  <div class="re-body thin-scroll">
+    @if (!ready()) {
+      <div class="re-loading"><span class="spinner lg"></span></div>
+    }
+    <div class="re-page">
+      <div #editor></div>
+    </div>
+  </div>
+
+  <footer class="re-status">
+    <span>{{ words() }} words · {{ chars() }} characters</span>
+    <span>Tip: select text and use <b>AI assist</b> to rewrite, translate or fix grammar</span>
+  </footer>
+</div>

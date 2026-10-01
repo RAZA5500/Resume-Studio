@@ -1,0 +1,234 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <span class="eyebrow"><span class="i sm">admin_panel_settings</span> Payments · users</span>
+      <h1>Admin</h1>
+      <p>Verify JazzCash, Easypaisa and bank payments and manage user plans.</p>
+    </div>
+    <button class="btn btn-sm" type="button" (click)="reload()"><span class="i">refresh</span> Refresh</button>
+  </header>
+
+  <div class="stats">
+    @if (stats(); as s) {
+      <div class="stat card" style="--tone: #f59e0b">
+        <span class="stat-ic"><span class="i">pending_actions</span></span>
+        <span>Pending payments</span>
+        <b [class.attention]="s.pendingPayments > 0" [appCountUp]="s.pendingPayments"></b>
+      </div>
+      <div class="stat card" style="--tone: #10b981">
+        <span class="stat-ic"><span class="i">payments</span></span>
+        <span>Revenue</span>
+        <b [appCountUp]="s.revenue" [countPrefix]="s.currency + ' '"></b>
+      </div>
+      <div class="stat card" style="--tone: #8b5cf6">
+        <span class="stat-ic"><span class="i">workspace_premium</span></span>
+        <span>Lifetime users</span>
+        <b [appCountUp]="s.lifetimeUsers"></b>
+      </div>
+      <div class="stat card" style="--tone: #06b6d4">
+        <span class="stat-ic"><span class="i">group</span></span>
+        <span>Total users</span>
+        <b [appCountUp]="s.totalUsers"></b>
+      </div>
+      <div class="stat card" style="--tone: #ec4899">
+        <span class="stat-ic"><span class="i">person_add</span></span>
+        <span>New in 24 h</span>
+        <b [appCountUp]="s.newUsers24h"></b>
+      </div>
+    } @else {
+      @for (n of [1, 2, 3, 4, 5]; track n) {
+        <div class="skeleton sk-stat"></div>
+      }
+    }
+  </div>
+
+  <nav class="tabs">
+    <button type="button" [class.active]="tab() === 'payments'" (click)="tab.set('payments')">
+      Payments
+      @if (stats()?.pendingPayments) {
+        <span class="badge warning">{{ stats()?.pendingPayments }}</span>
+      }
+    </button>
+    <button type="button" [class.active]="tab() === 'users'" (click)="tab.set('users')">Users</button>
+  </nav>
+
+  @if (tab() === 'payments') {
+    <div class="toolbar">
+      <div class="segmented">
+        @for (f of filters; track f.key) {
+          <button type="button" [class.active]="status() === f.key" (click)="setStatus(f.key)">{{ f.label }}</button>
+        }
+      </div>
+    </div>
+
+    <div class="card table-wrap">
+      @if (loadingPayments()) {
+        <div class="card-pad"><div class="skeleton sk-table"></div></div>
+      } @else if (!payments().length) {
+        <div class="empty-state">
+          <span class="i">receipt_long</span>
+          <h3>{{ status() === 'pending' ? 'No payments waiting' : 'No payments' }}</h3>
+          <p>{{ status() === 'pending' ? 'New payment submissions will appear here.' : 'Nothing matches this filter yet.' }}</p>
+        </div>
+      } @else {
+        <table class="table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Method</th>
+              <th>Transaction ID</th>
+              <th>Paid from</th>
+              <th class="num">Amount</th>
+              <th>Submitted</th>
+              <th>Receipt</th>
+              <th class="right">{{ status() === 'pending' ? 'Action' : 'Status' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of payments(); track p.id) {
+              <tr>
+                <td>
+                  <div class="cell-user">
+                    <b>{{ p.user?.fullName || '—' }}</b>
+                    <small>{{ p.user?.email }}</small>
+                  </div>
+                </td>
+                <td>{{ methodLabels[p.method] }}</td>
+                <td>
+                  <span class="copy">
+                    <span class="mono">{{ p.transactionId }}</span>
+                    <button class="btn btn-ghost btn-xs btn-icon" type="button" (click)="copy(p.transactionId)" aria-label="Copy transaction ID">
+                      <span class="i">content_copy</span>
+                    </button>
+                  </span>
+                </td>
+                <td>
+                  <div class="cell-user">
+                    <span class="mono">{{ p.senderNumber }}</span>
+                    @if (p.senderName) {
+                      <small>{{ p.senderName }}</small>
+                    }
+                  </div>
+                </td>
+                <td class="num">{{ p.currency }} {{ p.amount }}</td>
+                <td class="nowrap">{{ p.createdAt | date: 'MMM d, h:mm a' }}</td>
+                <td>
+                  @if (p.hasScreenshot) {
+                    <button class="btn btn-xs" type="button" (click)="viewReceipt(p)" [disabled]="busy() === p.id">View</button>
+                  } @else {
+                    <span class="subtle">—</span>
+                  }
+                </td>
+                <td class="right">
+                  @if (p.status === 'pending') {
+                    <div class="actions">
+                      <button class="btn btn-xs btn-danger-soft" type="button" (click)="reject(p)" [disabled]="busy() === p.id">Reject</button>
+                      <button class="btn btn-xs btn-primary" type="button" (click)="approve(p)" [disabled]="busy() === p.id">
+                        @if (busy() === p.id) {
+                          <span class="spinner"></span>
+                        }
+                        Approve
+                      </button>
+                    </div>
+                  } @else {
+                    <div class="cell-status">
+                      <span class="badge" [class.success]="p.status === 'approved'" [class.danger]="p.status === 'rejected'">{{ p.status }}</span>
+                      @if (p.reviewedAt) {
+                        <small>{{ p.reviewedAt | date: 'MMM d' }}{{ p.reviewedBy ? ' · ' + p.reviewedBy : '' }}</small>
+                      }
+                      @if (p.adminNote) {
+                        <small class="note" [title]="p.adminNote">{{ p.adminNote }}</small>
+                      }
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+    <p class="subtle small">
+      Before approving, open your JazzCash / Easypaisa / bank app and match the transaction ID and amount with a payment you actually received.
+    </p>
+  } @else {
+    <div class="toolbar">
+      <div class="input-group search">
+        <span class="i">search</span>
+        <input class="input input-sm" type="search" placeholder="Search by name or email" [ngModel]="search()" (ngModelChange)="search.set($event)" />
+      </div>
+      @if (loadingUsers()) {
+        <span class="spinner subtle"></span>
+      }
+    </div>
+
+    <div class="card table-wrap">
+      @if (!users().length && !loadingUsers()) {
+        <div class="empty-state">
+          <span class="i">group</span>
+          <h3>No users found</h3>
+        </div>
+      } @else {
+        <table class="table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Plan</th>
+              <th>Joined</th>
+              <th class="right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr>
+                <td>
+                  <div class="cell-user">
+                    <b>{{ u.fullName }}</b>
+                    <small>{{ u.email }}</small>
+                  </div>
+                </td>
+                <td>
+                  @if (u.plan === 'lifetime') {
+                    <span class="badge success">Lifetime</span>
+                    @if (u.planActivatedAt) {
+                      <small class="subtle"> since {{ u.planActivatedAt | date: 'mediumDate' }}</small>
+                    }
+                  } @else {
+                    <span class="badge">Free</span>
+                  }
+                </td>
+                <td class="nowrap">{{ u.createdAt | date: 'mediumDate' }}</td>
+                <td class="right">
+                  @if (u.plan === 'lifetime') {
+                    <button class="btn btn-xs btn-danger-soft" type="button" (click)="setPlan(u, 'free')" [disabled]="busy() === u.id">Revoke lifetime</button>
+                  } @else {
+                    <button class="btn btn-xs" type="button" (click)="setPlan(u, 'lifetime')" [disabled]="busy() === u.id">Grant lifetime</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+    <p class="subtle small">Shows the 100 most recent matches.</p>
+  }
+</div>
+
+@if (receipt(); as r) {
+  <div class="modal-backdrop" animate.leave="is-leaving" (click)="closeReceipt()">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Receipt · <span class="mono">{{ r.payment.transactionId }}</span></h3>
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="closeReceipt()" aria-label="Close"><span class="i">close</span></button>
+      </div>
+      <div class="modal-body receipt-body">
+        <img [src]="r.url" alt="Payment receipt" />
+      </div>
+      <div class="modal-footer">
+        <span class="grow small muted">{{ r.payment.user?.email }} · {{ methodLabels[r.payment.method] }} · {{ r.payment.currency }} {{ r.payment.amount }}</span>
+        <button class="btn" type="button" (click)="closeReceipt()">Close</button>
+      </div>
+    </div>
+  </div>
+}

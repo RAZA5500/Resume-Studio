@@ -1,0 +1,370 @@
+<div [class]="rootClass()" [style]="cssVars()">
+  @switch (family()) {
+    @case ('band') {
+      <div class="rz-band"><ng-container [ngTemplateOutlet]="stackedHeader" /></div>
+      <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: mainKeys(), aside: false }" />
+    }
+    @case ('split') {
+      <header class="rz-split">
+        <ng-container [ngTemplateOutlet]="photoTpl" />
+        <div class="rz-htext"><ng-container [ngTemplateOutlet]="identity" /></div>
+        <ng-container [ngTemplateOutlet]="contactTpl" />
+      </header>
+      <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: mainKeys(), aside: false }" />
+    }
+    @case ('sidebar') {
+      <aside class="rz-aside">
+        <ng-container [ngTemplateOutlet]="photoTpl" />
+        @if (contacts().length) {
+          <section class="rz-sec rz-sec-contact">
+            <h2 class="rz-h">Contact</h2>
+            <ng-container [ngTemplateOutlet]="contactTpl" />
+          </section>
+        }
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: asideKeys(), aside: true }" />
+      </aside>
+      <main class="rz-main">
+        <header class="rz-header">
+          <div class="rz-htext"><ng-container [ngTemplateOutlet]="identity" /></div>
+        </header>
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: mainKeys(), aside: false }" />
+      </main>
+    }
+    @case ('banner') {
+      <header class="rz-banner">
+        <ng-container [ngTemplateOutlet]="photoTpl" />
+        <div class="rz-htext">
+          <ng-container [ngTemplateOutlet]="identity" />
+          <ng-container [ngTemplateOutlet]="contactTpl" />
+        </div>
+      </header>
+      <aside class="rz-aside">
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: asideKeys(), aside: true }" />
+      </aside>
+      <main class="rz-main">
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: mainKeys(), aside: false }" />
+      </main>
+    }
+    @case ('creative') {
+      <aside class="rz-aside">
+        <div class="rz-ident">
+          <ng-container [ngTemplateOutlet]="photoTpl" />
+          <ng-container [ngTemplateOutlet]="identity" />
+        </div>
+        @if (contacts().length) {
+          <section class="rz-sec rz-sec-contact">
+            <h2 class="rz-h">Contact</h2>
+            <ng-container [ngTemplateOutlet]="contactTpl" />
+          </section>
+        }
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: asideKeys(), aside: true }" />
+      </aside>
+      <main class="rz-main">
+        <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: mainKeys(), aside: false }" />
+      </main>
+    }
+    @default {
+      <ng-container [ngTemplateOutlet]="stackedHeader" />
+      <ng-container [ngTemplateOutlet]="sections" [ngTemplateOutletContext]="{ $implicit: mainKeys(), aside: false }" />
+    }
+  }
+</div>
+
+<ng-template #stackedHeader>
+  <header class="rz-header">
+    <ng-container [ngTemplateOutlet]="photoTpl" />
+    <div class="rz-htext">
+      <ng-container [ngTemplateOutlet]="identity" />
+      <ng-container [ngTemplateOutlet]="contactTpl" />
+    </div>
+  </header>
+</ng-template>
+
+<ng-template #identity>
+  @if (name()) {
+    <h1 class="rz-name">{{ name() }}</h1>
+  } @else if (placeholders()) {
+    <h1 class="rz-name rz-ph">Your Name</h1>
+  }
+  @if (jobTitle()) {
+    <div class="rz-title">{{ jobTitle() }}</div>
+  } @else if (placeholders()) {
+    <div class="rz-title rz-ph">Professional Title</div>
+  }
+</ng-template>
+
+<ng-template #photoTpl>
+  @if (photo(); as p) {
+    <img class="rz-photo" [class.rz-ph]="p.placeholder" [src]="p.src" alt="" />
+  }
+</ng-template>
+
+<ng-template #contactTpl>
+  @if (contacts().length) {
+    <div class="rz-contact">
+      @for (item of contacts(); track item.key) {
+        <span class="rz-ci">
+          @switch (item.key) {
+            @case ('email') {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+            }
+            @case ('phone') {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+            }
+            @case ('location') {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+            }
+            @case ('linkedin') {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>
+            }
+            @case ('github') {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" /></svg>
+            }
+            @default {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+            }
+          }
+          @if (item.href) {
+            <a [href]="item.href">{{ item.value }}</a>
+          } @else {
+            <span>{{ item.value }}</span>
+          }
+        </span>
+      }
+    </div>
+  }
+</ng-template>
+
+<ng-template #sections let-keys let-aside="aside">
+  @for (key of keys; track key) {
+    <section [class]="'rz-sec rz-sec-' + sectionType(key)">
+      <h2 class="rz-h">{{ title(key) }}</h2>
+      @switch (sectionType(key)) {
+        @case ('summary') {
+          <p class="rz-p">{{ c().summary }}</p>
+        }
+        @case ('experience') {
+          @for (e of vm().experience; track e.id) {
+            <div class="rz-entry">
+              <div class="rz-ehead">
+                <div class="rz-emain">
+                  <div class="rz-etitle">{{ e.jobTitle }}</div>
+                  @if (e.company || e.location) {
+                    <div class="rz-esub">{{ e.company }}@if (e.location) {<span class="rz-loc">{{ e.company ? ' · ' : '' }}{{ e.location }}</span>}</div>
+                  }
+                </div>
+                @if (e.range) {
+                  <div class="rz-emeta">{{ e.range }}</div>
+                }
+              </div>
+              @if (e.lines.length) {
+                <ul class="rz-bul">
+                  @for (line of e.lines; track $index) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        }
+        @case ('education') {
+          @for (e of vm().education; track e.id) {
+            <div class="rz-entry">
+              <div class="rz-ehead">
+                <div class="rz-emain">
+                  <div class="rz-etitle">{{ e.degree }}</div>
+                  @if (e.institution || e.location) {
+                    <div class="rz-esub">{{ e.institution }}@if (e.location) {<span class="rz-loc">{{ e.institution ? ' · ' : '' }}{{ e.location }}</span>}</div>
+                  }
+                </div>
+                @if (e.range) {
+                  <div class="rz-emeta">{{ e.range }}</div>
+                }
+              </div>
+              @if (e.gpa) {
+                <div class="rz-edesc">GPA: {{ e.gpa }}</div>
+              }
+              @if (e.lines.length) {
+                <ul class="rz-bul">
+                  @for (line of e.lines; track $index) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        }
+        @case ('projects') {
+          @for (p of vm().projects; track p.id) {
+            <div class="rz-entry">
+              <div class="rz-ehead">
+                <div class="rz-emain">
+                  <div class="rz-etitle">{{ p.name }}@if (p.role) {<span class="rz-loc"> · {{ p.role }}</span>}</div>
+                  @if (p.link) {
+                    <div class="rz-esub">{{ p.link }}</div>
+                  }
+                </div>
+                @if (p.range) {
+                  <div class="rz-emeta">{{ p.range }}</div>
+                }
+              </div>
+              @if (p.lines.length) {
+                <ul class="rz-bul">
+                  @for (line of p.lines; track $index) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        }
+        @case ('skills') {
+          @switch (d().skillStyle) {
+            @case ('tags') {
+              <div class="rz-sk-tags">
+                @for (s of c().skills; track s.id) {
+                  <span class="rz-tag">{{ s.name }}</span>
+                }
+              </div>
+            }
+            @case ('bars') {
+              <div class="rz-sk-bars">
+                @for (s of c().skills; track s.id) {
+                  <div>
+                    <div class="rz-bar-name"><span>{{ s.name }}</span></div>
+                    <div class="rz-bar"><i [style.width]="levelWidth(s.level)"></i></div>
+                  </div>
+                }
+              </div>
+            }
+            @case ('dots') {
+              <div class="rz-sk-dots">
+                @for (s of c().skills; track s.id) {
+                  <div class="rz-dotrow">
+                    <span>{{ s.name }}</span>
+                    <span class="rz-dots">
+                      @for (on of dots(s.level); track $index) {
+                        <i [class.on]="on"></i>
+                      }
+                    </span>
+                  </div>
+                }
+              </div>
+            }
+            @case ('list') {
+              <ul class="rz-sk-list">
+                @for (s of c().skills; track s.id) {
+                  <li>{{ s.name }}</li>
+                }
+              </ul>
+            }
+            @case ('columns') {
+              <ul class="rz-sk-columns">
+                @for (s of c().skills; track s.id) {
+                  <li>{{ s.name }}</li>
+                }
+              </ul>
+            }
+            @default {
+              <div class="rz-sk-inline">
+                @for (s of c().skills; track s.id) {
+                  <span>{{ s.name }}</span>
+                }
+              </div>
+            }
+          }
+        }
+        @case ('languages') {
+          <div class="rz-langs">
+            @for (l of c().languages; track l.id) {
+              <div class="rz-lang">
+                <b>{{ l.name }}</b>
+                @if (l.proficiency) {
+                  <span>{{ aside ? '' : ' — ' }}{{ l.proficiency }}</span>
+                }
+              </div>
+            }
+          </div>
+        }
+        @case ('certifications') {
+          <div class="rz-items">
+            @for (x of vm().certifications; track x.id) {
+              <div class="rz-item">
+                <div>
+                  <b>{{ x.name }}</b>
+                  @if (x.issuer) {
+                    <span class="rz-item-sub"> · {{ x.issuer }}</span>
+                  }
+                </div>
+                @if (x.when) {
+                  <span class="rz-emeta">{{ x.when }}</span>
+                }
+              </div>
+            }
+          </div>
+        }
+        @case ('awards') {
+          <div class="rz-items">
+            @for (x of vm().awards; track x.id) {
+              <div class="rz-entry">
+                <div class="rz-item">
+                  <div>
+                    <b>{{ x.title }}</b>
+                    @if (x.issuer) {
+                      <span class="rz-item-sub"> · {{ x.issuer }}</span>
+                    }
+                  </div>
+                  @if (x.when) {
+                    <span class="rz-emeta">{{ x.when }}</span>
+                  }
+                </div>
+                @if (x.description) {
+                  <div class="rz-edesc">{{ x.description }}</div>
+                }
+              </div>
+            }
+          </div>
+        }
+        @case ('interests') {
+          @if (aside || d().skillStyle === 'tags') {
+            <div class="rz-sk-tags">
+              @for (i of c().interests; track i.id) {
+                <span class="rz-tag">{{ i.name }}</span>
+              }
+            </div>
+          } @else {
+            <div class="rz-sk-inline">
+              @for (i of c().interests; track i.id) {
+                <span>{{ i.name }}</span>
+              }
+            </div>
+          }
+        }
+        @case ('custom') {
+          @for (item of vm().custom.get(key) ?? []; track item.id) {
+            <div class="rz-entry">
+              <div class="rz-ehead">
+                <div class="rz-emain">
+                  <div class="rz-etitle">{{ item.title }}</div>
+                  @if (item.subtitle) {
+                    <div class="rz-esub">{{ item.subtitle }}</div>
+                  }
+                </div>
+                @if (item.date) {
+                  <div class="rz-emeta">{{ item.date }}</div>
+                }
+              </div>
+              @if (item.lines.length) {
+                <ul class="rz-bul">
+                  @for (line of item.lines; track $index) {
+                    <li>{{ line }}</li>
+                  }
+                </ul>
+              }
+            </div>
+          }
+        }
+      }
+    </section>
+  }
+</ng-template>

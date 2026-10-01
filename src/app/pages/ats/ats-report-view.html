@@ -1,0 +1,251 @@
+@let r = report();
+@let res = result();
+
+@if (r.warnings?.length) {
+  <div class="stack warnings">
+    @for (w of r.warnings; track $index) {
+      <div class="alert warning"><span class="i">warning</span> {{ w }}</div>
+    }
+  </div>
+}
+
+<!-- ================= Score overview ================= -->
+<section class="card overview">
+  <div class="scores">
+    <div class="score-box">
+      <app-score-ring [score]="r.score" [size]="148" label="ATS score" />
+      <strong [style.color]="scoreColor(r.score)">{{ r.grade }}</strong>
+    </div>
+    @if (ai(); as a) {
+      <div class="score-box">
+        <app-score-ring [score]="a.overallScore" [size]="148" label="AI review" />
+        <strong [style.color]="scoreColor(a.overallScore)">{{ a.verdict }}</strong>
+      </div>
+    }
+    @if (res.keywords.matchRate !== null) {
+      <div class="score-box">
+        <app-score-ring [score]="res.keywords.matchRate" [size]="148" label="Job match" />
+        <strong>{{ res.keywords.matched.length }}/{{ res.keywords.matched.length + res.keywords.missing.length }} keywords</strong>
+      </div>
+    }
+  </div>
+  <div class="overview-text">
+    <h2>{{ r.fileName || 'Resume scan' }}</h2>
+    <p class="muted">{{ r.jobTitle ? 'Target: ' + r.jobTitle + ' · ' : '' }}Scanned {{ r.createdAt | date: 'medium' }}</p>
+    <p class="summary">{{ res.summary }}</p>
+    @if (ai(); as a) {
+      <p class="ai-summary"><span class="i">auto_awesome</span> {{ a.summary }}</p>
+    }
+    <div class="stats">
+      <div><b>{{ res.stats.wordCount }}</b><span>words</span></div>
+      <div><b>{{ res.stats.bulletCount }}</b><span>bullets</span></div>
+      <div><b>{{ res.stats.actionVerbCount }}</b><span>action verbs</span></div>
+      <div><b>{{ res.stats.quantifiedCount }}</b><span>metrics</span></div>
+      <div><b>{{ res.stats.pages ?? '—' }}</b><span>pages</span></div>
+      <div><b>{{ res.stats.readingTimeSec }}s</b><span>read time</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="cols">
+  <!-- ================= Breakdown ================= -->
+  <section class="card">
+    <div class="card-header"><h3>Score breakdown</h3></div>
+    <div class="breakdown">
+      @for (cat of res.breakdown; track cat.key) {
+        <div class="cat">
+          <div class="cat-head">
+            <span class="cat-ic" [attr.data-status]="cat.status"><span class="i">{{ icon(cat.key) }}</span></span>
+            <strong class="grow">{{ cat.label }}</strong>
+            <span class="cat-score">{{ cat.score | number: '1.0-1' }}<small>/{{ cat.max }}</small></span>
+          </div>
+          <div class="progress"><div [style.width.%]="pct(cat.score, cat.max)" [attr.data-status]="cat.status"></div></div>
+          @if (cat.details.length) {
+            <ul>
+              @for (d of cat.details; track $index) {
+                <li>{{ d }}</li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- ================= Keywords + issues ================= -->
+  <div class="stack">
+    <section class="card">
+      <div class="card-header">
+        <h3>Keywords</h3>
+        <span class="badge">{{ res.keywords.source === 'job-description' ? 'From job description' : 'Detected skills' }}</span>
+      </div>
+      <div class="card-pad stack">
+        @if (res.keywords.source === 'job-description') {
+          <div>
+            <div class="kw-label"><span class="i sm">check_circle</span> Found in your resume</div>
+            <div class="chips">
+              @for (k of res.keywords.matched; track k) {
+                <span class="chip success">{{ k }}</span>
+              } @empty {
+                <span class="subtle small">None of the key terms were found.</span>
+              }
+            </div>
+          </div>
+          <div>
+            <div class="kw-label missing"><span class="i sm">cancel</span> Missing — add if they apply to you</div>
+            <div class="chips">
+              @for (k of res.keywords.missing; track k) {
+                <button class="chip danger" type="button" (click)="copy(k)" title="Click to copy">{{ k }}</button>
+              } @empty {
+                <span class="subtle small">Great — every important keyword is covered.</span>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="chips">
+            @for (k of res.keywords.detectedSkills; track k) {
+              <span class="chip success">{{ k }}</span>
+            } @empty {
+              <span class="subtle small">No recognised skills found. Add a dedicated skills section.</span>
+            }
+          </div>
+          <p class="subtle small">Tip: paste a job description to get an exact keyword match score for that role.</p>
+        }
+        @if (ai()?.missingKeywords?.length) {
+          <div>
+            <div class="kw-label ai"><span class="i sm">auto_awesome</span> AI suggested keywords</div>
+            <div class="chips">
+              @for (k of ai()!.missingKeywords; track k) {
+                <button class="chip" type="button" (click)="copy(k)">{{ k }}</button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h3>Issues to fix</h3>
+        <div class="segmented">
+          <button type="button" [class.active]="issueFilter() === 'all'" (click)="issueFilter.set('all')">All {{ res.issues.length }}</button>
+          <button type="button" [class.active]="issueFilter() === 'critical'" (click)="issueFilter.set('critical')">Critical {{ counts().critical }}</button>
+          <button type="button" [class.active]="issueFilter() === 'warning'" (click)="issueFilter.set('warning')">Warn {{ counts().warning }}</button>
+          <button type="button" [class.active]="issueFilter() === 'info'" (click)="issueFilter.set('info')">Tips {{ counts().info }}</button>
+        </div>
+      </div>
+      <ul class="issues">
+        @for (issue of issues(); track $index) {
+          <li [attr.data-severity]="issue.severity">
+            <span class="i fill">{{ issue.severity === 'critical' ? 'error' : issue.severity === 'warning' ? 'warning' : 'lightbulb' }}</span>
+            <div>
+              <strong>{{ issue.message }}</strong>
+              <p>{{ issue.fix }}</p>
+            </div>
+          </li>
+        } @empty {
+          <li class="none"><span class="i fill">celebration</span> No issues in this category.</li>
+        }
+      </ul>
+    </section>
+  </div>
+</div>
+
+<!-- ================= AI deep analysis ================= -->
+@if (ai(); as a) {
+  <section class="card ai-card">
+    <div class="card-header">
+      <h3>AI recruiter review</h3>
+      @if (a.jobMatch) {
+        <span class="badge" [style.background]="scoreColor(a.jobMatch.score)" style="color: #fff">Job fit {{ a.jobMatch.score }}%</span>
+      }
+    </div>
+    <div class="card-pad stack">
+      @if (a.jobMatch) {
+        <div class="alert"><span class="i">work</span><div><b>{{ a.jobMatch.verdict }}</b>
+          @if (a.jobMatch.gaps.length) {
+            <ul class="tight">
+              @for (g of a.jobMatch.gaps; track $index) {
+                <li>{{ g }}</li>
+              }
+            </ul>
+          }
+        </div></div>
+      }
+      <div class="two">
+        <div>
+          <h4 class="good"><span class="i">thumb_up</span> Strengths</h4>
+          <ul class="tight">
+            @for (s of a.strengths; track $index) {
+              <li>{{ s }}</li>
+            }
+          </ul>
+        </div>
+        <div>
+          <h4 class="bad"><span class="i">thumb_down</span> Weaknesses</h4>
+          <ul class="tight">
+            @for (s of a.weaknesses; track $index) {
+              <li>{{ s }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+
+      <h4>Prioritised suggestions</h4>
+      <div class="suggestions">
+        @for (s of a.suggestions; track $index) {
+          <div class="sug" [attr.data-priority]="s.priority">
+            <span class="badge">{{ s.priority }}</span>
+            <div>
+              <b>{{ s.section }}: {{ s.issue }}</b>
+              <p>{{ s.suggestion }}</p>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (a.bulletRewrites.length) {
+        <h4>Bullet point rewrites</h4>
+        @for (b of a.bulletRewrites; track $index) {
+          <div class="rewrite">
+            <p class="before"><span class="i sm">close</span> {{ b.original }}</p>
+            <p class="after"><span class="i sm">check</span> {{ b.improved }}
+              <button class="btn btn-ghost btn-xs" type="button" (click)="copy(b.improved)"><span class="i">content_copy</span></button>
+            </p>
+          </div>
+        }
+      }
+
+      @if (a.rewrittenSummary) {
+        <h4>Suggested professional summary</h4>
+        <div class="rewrite">
+          <p class="after">{{ a.rewrittenSummary }}
+            <button class="btn btn-ghost btn-xs" type="button" (click)="copy(a.rewrittenSummary)"><span class="i">content_copy</span></button>
+          </p>
+        </div>
+      }
+
+      @if (a.recommendedRoles.length) {
+        <h4>Roles you are a strong fit for</h4>
+        <div class="chips">
+          @for (role of a.recommendedRoles; track role) {
+            <span class="chip">{{ role }}</span>
+          }
+        </div>
+      }
+    </div>
+  </section>
+}
+
+<!-- ================= What the ATS sees ================= -->
+@if (r.extractedText) {
+  <section class="card">
+    <div class="card-header">
+      <h3><span class="i">visibility</span> What the ATS sees</h3>
+      <button class="btn btn-ghost btn-sm" type="button" (click)="showText.set(!showText())">{{ showText() ? 'Hide' : 'Show' }} extracted text</button>
+    </div>
+    @if (showText()) {
+      <pre class="extracted thin-scroll">{{ r.extractedText }}</pre>
+    }
+  </section>
+}

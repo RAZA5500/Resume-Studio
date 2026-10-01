@@ -1,0 +1,125 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <span class="eyebrow"><span class="i sm">radar</span> 100-point scan · 7 categories</span>
+      <h1>ATS Resume Checker</h1>
+      <p>See your resume the way applicant tracking systems do — score, keyword match, formatting issues and AI feedback.</p>
+    </div>
+    @if (reportId()) {
+      <a class="btn btn-primary btn-pill" routerLink="/app/ats"><span class="i">add</span> New scan</a>
+    }
+  </div>
+
+  <div class="layout">
+    <div class="main">
+      @if (reportId()) {
+        @if (loadingReport()) {
+          <div class="card loading">
+            <div class="radar small" aria-hidden="true"><i></i><i></i><i></i><span class="sweep"></span></div>
+            <span class="muted">Loading report…</span>
+          </div>
+        } @else if (report()) {
+          <app-ats-report-view [report]="report()!" />
+        }
+      } @else {
+        <section class="card form">
+          <div class="step-title"><span>1</span> Your resume</div>
+          <div class="segmented block">
+            <button type="button" [class.active]="source() === 'file'" (click)="source.set('file')"><span class="i">upload_file</span> Upload file</button>
+            <button type="button" [class.active]="source() === 'resume'" (click)="source.set('resume')"><span class="i">description</span> My resumes</button>
+            <button type="button" [class.active]="source() === 'text'" (click)="source.set('text')"><span class="i">content_paste</span> Paste text</button>
+          </div>
+
+          @switch (source()) {
+            @case ('file') {
+              @if (file(); as f) {
+                <div class="picked">
+                  <span class="picked-ic"><span class="i">{{ f.type.includes('pdf') ? 'picture_as_pdf' : f.type.startsWith('image') ? 'image' : 'description' }}</span></span>
+                  <div class="grow">
+                    <strong>{{ f.name }}</strong>
+                    <small>{{ formatBytes(f.size) }} · ready to scan</small>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" type="button" (click)="file.set(null)"><span class="i">swap_horiz</span> Change</button>
+                </div>
+              } @else {
+                <app-file-drop accept=".pdf,.docx,.doc,.txt,.rtf,.md,.html,.png,.jpg,.jpeg,.webp,.bmp"
+                  title="Drop your resume here or click to upload" hint="PDF, Word (.docx/.doc), TXT, RTF or image (OCR) — up to 25 MB"
+                  (files)="onFiles($event)" />
+              }
+            }
+            @case ('resume') {
+              @if (resumes().length) {
+                <select class="select" [ngModel]="resumeId()" (ngModelChange)="resumeId.set($event)">
+                  @for (r of resumes(); track r.id) {
+                    <option [value]="r.id">{{ r.title }}</option>
+                  }
+                </select>
+              } @else {
+                <div class="alert"><span class="i">info</span><span>You have no resumes yet. <a routerLink="/app/templates">Create one</a> or upload a file.</span></div>
+              }
+            }
+            @case ('text') {
+              <textarea class="textarea" rows="10" placeholder="Paste the full text of your resume…" [ngModel]="text()" (ngModelChange)="text.set($event)"></textarea>
+            }
+          }
+
+          <div class="step-title"><span>2</span> Target job <em>(recommended)</em></div>
+          <input class="input" placeholder="Job title, e.g. Senior Data Analyst" [ngModel]="jobTitle()" (ngModelChange)="jobTitle.set($event)" />
+          <textarea class="textarea" rows="7" placeholder="Paste the job description to get a keyword match score and tailored feedback…" [ngModel]="jobDescription()" (ngModelChange)="jobDescription.set($event)"></textarea>
+
+          <div class="footer">
+            <label class="switch" [class.off]="!ai.enabled()" [title]="ai.enabled() ? '' : 'AI deep analysis is not available right now'">
+              <input type="checkbox" [disabled]="!ai.enabled()" [ngModel]="useAi()" (ngModelChange)="useAi.set($event)" /><span></span>
+              AI deep analysis {{ ai.enabled() ? '' : '(unavailable)' }}
+            </label>
+            <button class="btn btn-primary btn-lg btn-pill" type="button" (click)="analyze()" [disabled]="analyzing()">
+              @if (analyzing()) {
+                <span class="spinner"></span> Scanning…
+              } @else {
+                <span class="i">radar</span> Check my ATS score
+              }
+            </button>
+          </div>
+
+          @if (analyzing()) {
+            <div class="scanning" animate.leave="is-leaving" role="status">
+              <div class="radar" aria-hidden="true"><i></i><i></i><i></i><span class="sweep"></span><span class="i doc">description</span></div>
+              <strong>{{ steps[step()] }}</strong>
+              <div class="dots" aria-hidden="true">
+                @for (s of steps; track $index) {
+                  <span [class.done]="$index < step()" [class.on]="$index === step()"></span>
+                }
+              </div>
+            </div>
+          }
+        </section>
+
+        <section class="explain">
+          <div class="exp" style="--i: 0"><span class="exp-ic"><span class="i">key</span></span><div><b>Keyword match</b><p>We compare your resume with the job post the way recruiters' search filters do.</p></div></div>
+          <div class="exp" style="--i: 1"><span class="exp-ic cyan"><span class="i">document_scanner</span></span><div><b>Parseability</b><p>Detects image-only PDFs, icon fonts, tables and multi-column text that break ATS parsing.</p></div></div>
+          <div class="exp" style="--i: 2"><span class="exp-ic green"><span class="i">trending_up</span></span><div><b>Impact</b><p>Checks action verbs, measurable results, weak phrases and clichés in every bullet.</p></div></div>
+        </section>
+      }
+    </div>
+
+    <aside class="card history">
+      <div class="card-header"><h3><span class="i">history</span> Scan history</h3></div>
+      <ul>
+        @for (h of history(); track h.id; let i = $index) {
+          <li [style.--i]="i">
+            <a [routerLink]="['/app/ats', h.id]" [class.active]="h.id === reportId()">
+              <span class="score" [style.color]="scoreColor(h.score)" [style.border-color]="scoreColor(h.score)">{{ h.score }}</span>
+              <span class="grow">
+                <strong>{{ h.fileName || 'Pasted text' }}</strong>
+                <small>{{ h.jobTitle || h.grade }} · {{ h.createdAt | date: 'MMM d, h:mm a' }}</small>
+              </span>
+              <button class="btn btn-ghost btn-icon btn-xs del" type="button" (click)="removeReport(h, $event)" aria-label="Delete scan"><span class="i">delete</span></button>
+            </a>
+          </li>
+        } @empty {
+          <li class="empty"><span class="i">radar</span> Your scans will appear here.</li>
+        }
+      </ul>
+    </aside>
+  </div>
+</div>

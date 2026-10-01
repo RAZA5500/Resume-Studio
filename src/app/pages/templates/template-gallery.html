@@ -1,0 +1,196 @@
+<div class="gallery" [class.compact]="compact()">
+  <div class="toolbar">
+    <div class="input-group search">
+      <span class="i">search</span>
+      <input class="input" placeholder="Search templates — e.g. executive, navy, serif…" [ngModel]="search()"
+        (ngModelChange)="search.set($event); page.set(1)" />
+    </div>
+    <label class="switch ats-toggle">
+      <input type="checkbox" [ngModel]="atsOnly()" (ngModelChange)="atsOnly.set($event); page.set(1)" />
+      <span></span> ATS-friendly only
+    </label>
+    <button class="btn" type="button" (click)="showFilters.set(!showFilters())" [class.active]="showFilters() || activeFilterCount()">
+      <span class="i">tune</span> Filters
+      @if (activeFilterCount()) {
+        <span class="badge primary">{{ activeFilterCount() }}</span>
+      }
+    </button>
+    <select class="select sort" [ngModel]="sort()" (ngModelChange)="sort.set($event); page.set(1)" aria-label="Sort">
+      <option value="popular">Most popular</option>
+      <option value="featured">Featured first</option>
+      <option value="name">Name A–Z</option>
+    </select>
+  </div>
+
+  <div class="categories">
+    <button type="button" class="chip" [class.active]="category() === 'all'" (click)="category.set('all'); page.set(1)">
+      All <span class="count">{{ meta()?.total ?? '' }}</span>
+    </button>
+    @for (cat of meta()?.categories ?? []; track cat.key) {
+      <button type="button" class="chip" [class.active]="category() === cat.key" (click)="category.set(cat.key); page.set(1)">
+        {{ cat.label }} <span class="count">{{ cat.count }}</span>
+      </button>
+    }
+  </div>
+
+  @if (showFilters()) {
+    <div class="filters card" animate.leave="is-leaving">
+      <div class="field">
+        <label>Layout</label>
+        <select class="select" [ngModel]="layout()" (ngModelChange)="layout.set($event); page.set(1)">
+          <option value="">All layouts</option>
+          @for (l of meta()?.layouts ?? []; track l.key) {
+            <option [value]="l.key">{{ l.name }}{{ l.ats ? ' (ATS)' : '' }}</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label>Font pairing</label>
+        <select class="select" [ngModel]="font()" (ngModelChange)="font.set($event); page.set(1)">
+          <option value="">All fonts</option>
+          @for (f of meta()?.fonts ?? []; track f.key) {
+            <option [value]="f.key">{{ f.name }} ({{ f.style }})</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label>Columns</label>
+        <div class="segmented">
+          <button type="button" [class.active]="columns() === ''" (click)="columns.set(''); page.set(1)">Any</button>
+          <button type="button" [class.active]="columns() === '1'" (click)="columns.set('1'); page.set(1)">One</button>
+          <button type="button" [class.active]="columns() === '2'" (click)="columns.set('2'); page.set(1)">Two</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Photo</label>
+        <div class="segmented">
+          <button type="button" [class.active]="photo() === ''" (click)="photo.set(''); page.set(1)">Any</button>
+          <button type="button" [class.active]="photo() === 'true'" (click)="photo.set('true'); page.set(1)">With</button>
+          <button type="button" [class.active]="photo() === 'false'" (click)="photo.set('false'); page.set(1)">Without</button>
+        </div>
+      </div>
+      <div class="field colors">
+        <label>Color</label>
+        <div class="swatches">
+          <button type="button" class="swatch any" [class.active]="!color()" (click)="color.set(''); page.set(1)" title="Any color">
+            <span class="i sm">block</span>
+          </button>
+          @for (family of meta()?.colorFamilies ?? []; track family) {
+            <button type="button" class="swatch" [style.background]="swatches[family]" [class.active]="color() === family"
+              (click)="color.set(family); page.set(1)" [title]="family"></button>
+          }
+        </div>
+      </div>
+      <button class="btn btn-ghost reset" type="button" (click)="resetFilters()"><span class="i">restart_alt</span> Reset</button>
+    </div>
+  }
+
+  <div class="summary-line">
+    @if (result(); as r) {
+      <span><strong>{{ r.total.toLocaleString() }}</strong> templates</span>
+    }
+    @if (loading()) {
+      <span class="spinner"></span>
+    }
+  </div>
+
+  @if (failed() && !result()) {
+    <div class="empty-state card">
+      <span class="i">cloud_off</span>
+      <h3>Could not load templates</h3>
+      <p>Make sure the backend is running on port 3000, then try again.</p>
+    </div>
+  } @else if (result()?.items?.length === 0) {
+    <div class="empty-state card">
+      <span class="i">search_off</span>
+      <h3>No templates match these filters</h3>
+      <button class="btn btn-soft" type="button" (click)="resetFilters()">Clear filters</button>
+    </div>
+  }
+
+  <div class="grid" [class.dim]="loading()">
+    @for (t of result()?.items ?? []; track t.id; let i = $index) {
+      <article class="tcard" [class.current]="t.id === currentId()" [style.--i]="i % 12">
+        <div class="thumb" (click)="previewing.set(t)">
+          @defer (on viewport) {
+            <app-scaled-resume [content]="content()" [design]="t.config" />
+          } @placeholder {
+            <div class="thumb-ph skeleton"></div>
+          }
+          <div class="overlay">
+            <button class="btn btn-primary btn-pill" type="button" (click)="$event.stopPropagation(); choose(t)">{{ actionLabel() }} <span class="i">arrow_forward</span></button>
+            <button class="btn btn-glass btn-pill" type="button"><span class="i">zoom_in</span> Preview</button>
+          </div>
+          <div class="flags">
+            @if (t.atsFriendly) {
+              <span class="badge success"><span class="i">verified</span> ATS</span>
+            }
+            @if (t.featured) {
+              <span class="badge warning"><span class="i fill">star</span></span>
+            }
+          </div>
+        </div>
+        <div class="meta">
+          <div class="grow">
+            <h4>{{ t.name }}</h4>
+            <p>{{ t.columns === 2 ? 'Two column' : 'One column' }}{{ t.hasPhoto ? ' · Photo' : '' }} · {{ t.config.headingFont }}</p>
+          </div>
+          <span class="dot" [style.background]="t.config.primaryColor"></span>
+        </div>
+      </article>
+    }
+  </div>
+
+  @if ((result()?.pages ?? 1) > 1) {
+    <div class="pager">
+      <button class="btn btn-sm" type="button" [disabled]="page() <= 1" (click)="goTo(page() - 1)"><span class="i">chevron_left</span> Prev</button>
+      @for (p of pages(); track p; let i = $index) {
+        @if (i > 0 && p - pages()[i - 1] > 1) {
+          <span class="gap">…</span>
+        }
+        <button class="btn btn-sm btn-icon" type="button" [class.active]="p === page()" (click)="goTo(p)">{{ p }}</button>
+      }
+      <button class="btn btn-sm" type="button" [disabled]="page() >= (result()?.pages ?? 1)" (click)="goTo(page() + 1)">Next <span class="i">chevron_right</span></button>
+    </div>
+  }
+</div>
+
+@if (previewing(); as t) {
+  <div class="modal-backdrop" animate.leave="is-leaving" (click)="previewing.set(null)">
+    <div class="modal wide preview-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ t.name }}</h3>
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="previewing.set(null)"><span class="i">close</span></button>
+      </div>
+      <div class="modal-body preview-body">
+        <div class="big">
+          <app-scaled-resume [content]="content()" [design]="t.config" />
+        </div>
+        <div class="details stack">
+          <p class="muted">{{ t.description }}</p>
+          <div class="row row-wrap">
+            @if (t.atsFriendly) {
+              <span class="badge success"><span class="i">verified</span> ATS-friendly</span>
+            } @else {
+              <span class="badge warning"><span class="i">info</span> Creative (2-column)</span>
+            }
+            <span class="badge">{{ t.config.headingFont }}{{ t.config.headingFont !== t.config.bodyFont ? ' + ' + t.config.bodyFont : '' }}</span>
+            @if (t.hasPhoto) {
+              <span class="badge">Photo</span>
+            }
+          </div>
+          <div class="palette">
+            <span [style.background]="t.config.primaryColor"></span>
+            <span [style.background]="t.config.accentColor"></span>
+            <span [style.background]="t.config.sidebarColor"></span>
+          </div>
+          @if (!t.atsFriendly) {
+            <div class="alert warning small"><span class="i">lightbulb</span> Two-column designs look great for networking and email. For online job portals prefer an ATS-friendly template.</div>
+          }
+          <button class="btn btn-primary btn-lg" type="button" (click)="choose(t)">{{ actionLabel() }}</button>
+          <p class="subtle small">Everything is customizable afterwards: colors, fonts, spacing, layout and sections.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+}

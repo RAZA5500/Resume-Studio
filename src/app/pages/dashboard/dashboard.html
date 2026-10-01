@@ -1,0 +1,290 @@
+<div class="page">
+  <!-- ================= Welcome ================= -->
+  <section class="welcome" appPointer>
+    <div class="welcome-bg" aria-hidden="true">
+      <div class="aurora"><i></i><i></i><i></i></div>
+      <div class="grid-bg"></div>
+      <div class="glow"></div>
+    </div>
+    <div class="welcome-copy">
+      <span class="date"><span class="pulse-dot"></span> {{ today | date: 'EEEE, d MMMM' }}</span>
+      <h1>{{ greeting() }}, {{ auth.firstName() || 'there' }} <span class="wave" aria-hidden="true">👋</span></h1>
+      <p>Create a resume, check it against a job post or edit a document.</p>
+      <div class="welcome-cta">
+        <a class="btn btn-white btn-lg btn-pill" routerLink="/app/templates"><span class="i">add</span> New resume</a>
+        <button class="btn btn-glass btn-lg btn-pill" type="button" (click)="aiModal.set(true)"><span class="i">auto_awesome</span> Write with AI</button>
+        <button class="btn btn-ghost btn-lg btn-pill light" type="button" (click)="importResume()" [disabled]="!!busy()">
+          @if (busy() === 'import') {
+            <span class="spinner"></span>
+          } @else {
+            <span class="i">upload_file</span>
+          }
+          Import
+        </button>
+      </div>
+    </div>
+    <div class="welcome-stats">
+      <div class="ws">
+        <span class="ws-ic"><span class="i">description</span></span>
+        <b [appCountUp]="resumes().length" [countDuration]="1200"></b>
+        <span>Resumes</span>
+      </div>
+      <div class="ws">
+        <span class="ws-ic green"><span class="i">verified</span></span>
+        <b [appCountUp]="bestScore()" [countDuration]="1400"></b>
+        <span>Best ATS score</span>
+      </div>
+      <div class="ws">
+        <span class="ws-ic pink"><span class="i">folder_open</span></span>
+        <b [appCountUp]="documentCount()" [countDuration]="1200"></b>
+        <span>Documents</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Free plan usage ================= -->
+  @if (usage(); as u) {
+    <section class="usage card">
+      <div class="usage-intro">
+        <span class="usage-ic"><span class="i fill">bolt</span></span>
+        <div>
+          <strong>Free plan</strong>
+          <span class="muted small">Resets at {{ u.resetsAt | date: 'shortTime' }}</span>
+        </div>
+      </div>
+      @for (m of u.meters; track m.kind) {
+        <div class="meter">
+          <div class="meter-head">
+            <span>{{ m.label }}</span>
+            <b [class.full]="m.full">{{ m.used }}/{{ m.limitLabel }}</b>
+          </div>
+          <div class="progress" [class.full]="m.full"><div [style.width.%]="m.percent"></div></div>
+        </div>
+      }
+      <a class="btn btn-primary btn-sm" routerLink="/app/billing"><span class="i">bolt</span> Lifetime · PKR {{ billing.price() }}</a>
+    </section>
+  }
+
+  <!-- ================= Quick actions ================= -->
+  <div class="actions spot-group" appPointer="spots">
+    <a class="action spot" data-spot routerLink="/app/templates" style="--tone: #8b5cf6; --i: 0">
+      <span class="action-ic"><span class="i">grid_view</span></span>
+      <strong>Choose a template</strong>
+      <small>4,608 ATS-friendly designs</small>
+      <span class="i go">arrow_outward</span>
+    </a>
+    <button class="action spot" data-spot type="button" (click)="aiModal.set(true)" style="--tone: #d946ef; --i: 1">
+      <span class="action-ic"><span class="i">auto_awesome</span></span>
+      <strong>Write with AI</strong>
+      <small>Describe yourself, get a draft</small>
+      <span class="i go">arrow_outward</span>
+    </button>
+    <a class="action spot" data-spot routerLink="/app/ats" style="--tone: #10b981; --i: 2">
+      <span class="action-ic"><span class="i">fact_check</span></span>
+      <strong>Check ATS score</strong>
+      <small>Scan against a job post</small>
+      <span class="i go">arrow_outward</span>
+    </a>
+    <a class="action spot" data-spot routerLink="/app/cover-letter" style="--tone: #f59e0b; --i: 3">
+      <span class="action-ic"><span class="i">mail</span></span>
+      <strong>Write a cover letter</strong>
+      <small>Tailored to the job</small>
+      <span class="i go">arrow_outward</span>
+    </a>
+    <a class="action spot" data-spot routerLink="/app/documents" style="--tone: #06b6d4; --i: 4">
+      <span class="action-ic"><span class="i">description</span></span>
+      <strong>Edit a document</strong>
+      <small>PDF, image or Word</small>
+      <span class="i go">arrow_outward</span>
+    </a>
+  </div>
+
+  <!-- ================= Resumes ================= -->
+  <div class="section-head">
+    <h2 class="section-title"><span class="i">article</span> My resumes
+      @if (resumes().length) {
+        <span class="badge primary">{{ resumes().length }}</span>
+      }
+    </h2>
+    <div class="row">
+      <button class="btn btn-sm btn-ghost" type="button" (click)="createSample()" [disabled]="!!busy()">
+        @if (busy() === 'sample') {
+          <span class="spinner"></span>
+        } @else {
+          <span class="i">auto_stories</span>
+        }
+        Start from example
+      </button>
+      <button class="btn btn-sm" type="button" (click)="createBlank()" [disabled]="!!busy()">
+        @if (busy() === 'blank') {
+          <span class="spinner"></span>
+        } @else {
+          <span class="i">add</span>
+        }
+        Blank resume
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="resume-grid">
+      @for (n of [1, 2, 3, 4]; track n) {
+        <div class="skeleton sk-card"></div>
+      }
+    </div>
+  } @else if (!resumes().length) {
+    <div class="empty-state card">
+      <span class="i">note_add</span>
+      <h3>No resumes yet</h3>
+      <p>Start from a template, let the AI assistant write a first draft, or import the resume you already have.</p>
+      <div class="row" style="justify-content: center">
+        <a class="btn btn-primary" routerLink="/app/templates"><span class="i">grid_view</span> Browse templates</a>
+        <button class="btn" type="button" (click)="aiModal.set(true)"><span class="i">auto_awesome</span> Write with AI</button>
+      </div>
+    </div>
+  } @else {
+    <div class="resume-grid">
+      @for (resume of resumes(); track resume.id; let i = $index) {
+        <article class="rcard" appReveal [revealDelay]="(i % 6) * 70">
+          <a class="rthumb" [routerLink]="['/builder', resume.id]" appTilt [tiltScale]="1.03">
+            @defer (on viewport) {
+              <app-scaled-resume [content]="resume.content" [design]="resume.design" />
+            } @placeholder {
+              <div class="skeleton sk-thumb"></div>
+            }
+            @if (resume.atsScore !== null) {
+              <span class="ats"><span class="dot" [style.background]="scoreColor(resume.atsScore)"></span>ATS {{ resume.atsScore }}</span>
+            }
+            <span class="open-hint"><span class="i sm">edit</span> Open editor</span>
+          </a>
+          <div class="rmeta">
+            <div class="grow">
+              <h4 [title]="resume.title">{{ resume.title }}</h4>
+              <small>Edited {{ timeAgo(resume.updatedAt) }}</small>
+            </div>
+            <div class="menu-wrap" (appClickOutside)="closeMenu(resume.id)">
+              <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="menuFor.set(menuFor() === resume.id ? null : resume.id)" aria-label="Resume actions">
+                <span class="i">more_horiz</span>
+              </button>
+              @if (menuFor() === resume.id) {
+                <div class="menu" animate.leave="is-leaving">
+                  <a [routerLink]="['/builder', resume.id]"><span class="i">edit</span> Open editor</a>
+                  <button type="button" (click)="rename(resume)"><span class="i">drive_file_rename_outline</span> Rename</button>
+                  <button type="button" (click)="duplicate(resume)"><span class="i">content_copy</span> Duplicate</button>
+                  <a routerLink="/app/ats" [queryParams]="{ resume: resume.id }"><span class="i">fact_check</span> Check ATS score</a>
+                  <a routerLink="/app/cover-letter" [queryParams]="{ resume: resume.id }"><span class="i">mail</span> Write cover letter</a>
+                  <div class="menu-sep"></div>
+                  <button type="button" class="danger" (click)="remove(resume)"><span class="i">delete</span> Delete</button>
+                </div>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  <!-- ================= Recent activity ================= -->
+  <div class="bottom">
+    <section class="card" appReveal="left">
+      <div class="card-header">
+        <h3><span class="i">radar</span> Recent ATS scans</h3>
+        <a class="btn btn-ghost btn-sm" routerLink="/app/ats">New scan <span class="i">arrow_forward</span></a>
+      </div>
+      @if (reports().length) {
+        <ul class="list">
+          @for (r of reports(); track r.id; let i = $index) {
+            <li [style.--i]="i">
+              <a [routerLink]="['/app/ats', r.id]">
+                <span class="score" [style.color]="scoreColor(r.score)" [style.border-color]="scoreColor(r.score)">{{ r.score }}</span>
+                <span class="grow">
+                  <strong>{{ r.fileName || 'Pasted resume text' }}</strong>
+                  <small>{{ r.jobTitle || (r.sourceType === 'resume' ? 'Builder resume' : 'General scan') }} · {{ r.createdAt | date: 'mediumDate' }}</small>
+                </span>
+                <span class="i sm chev">chevron_right</span>
+              </a>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="card-pad muted">No scans yet. Upload a resume and a job description to see how ATS software reads it.</p>
+      }
+    </section>
+
+    <section class="card" appReveal="right">
+      <div class="card-header">
+        <h3><span class="i">folder_open</span> Recent documents</h3>
+        <a class="btn btn-ghost btn-sm" routerLink="/app/documents">All documents <span class="i">arrow_forward</span></a>
+      </div>
+      @if (documents().length) {
+        <ul class="list">
+          @for (d of documents(); track d.id; let i = $index) {
+            <li [style.--i]="i">
+              <a [routerLink]="['/editor', d.id]">
+                <span class="doc-ic" [attr.data-kind]="d.kind"><span class="i">{{ docIcon(d) }}</span></span>
+                <span class="grow">
+                  <strong>{{ d.name }}</strong>
+                  <small>{{ d.kind | uppercase }} · {{ timeAgo(d.updatedAt) }}</small>
+                </span>
+                <span class="i sm chev">chevron_right</span>
+              </a>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="card-pad muted">Upload a PDF, image or Word file to edit, sign or convert it.</p>
+      }
+    </section>
+  </div>
+</div>
+
+@if (aiModal()) {
+  <div class="modal-backdrop" animate.leave="is-leaving" (click)="aiModal.set(false)">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><span class="ai-ic"><span class="i fill">auto_awesome</span></span> Write my resume with AI</h3>
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="aiModal.set(false)" aria-label="Close"><span class="i">close</span></button>
+      </div>
+      <div class="modal-body stack">
+        <p class="muted">Describe your background in your own words — roles, companies, years, skills, education and achievements. The more detail, the better the draft. Unknown numbers become placeholders like [X%] that you can fill in.</p>
+        <div class="field">
+          <label for="ai-about">About you</label>
+          <textarea id="ai-about" class="textarea" rows="7" [ngModel]="aiPrompt()" (ngModelChange)="aiPrompt.set($event)"
+            placeholder="e.g. I'm Sara Khan, a frontend developer with 4 years of experience at Systems Ltd building Angular dashboards for banking clients. I led a migration to Angular 17, improved load time by 40%, mentor 2 juniors. BS Computer Science from FAST (2020). Skills: Angular, TypeScript, RxJS, NgRx, Jest."></textarea>
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="ai-role">Target role (optional)</label>
+            <input id="ai-role" class="input" [ngModel]="aiRole()" (ngModelChange)="aiRole.set($event)" placeholder="Senior Frontend Engineer" />
+          </div>
+          <div class="field">
+            <label for="ai-level">Experience level</label>
+            <select id="ai-level" class="select" [ngModel]="aiLevel()" (ngModelChange)="aiLevel.set($event)">
+              <option value="student">Student / Intern</option>
+              <option value="entry">Entry level (0-2 yrs)</option>
+              <option value="mid">Mid level (3-6 yrs)</option>
+              <option value="senior">Senior (7+ yrs)</option>
+              <option value="executive">Executive / Director</option>
+            </select>
+          </div>
+        </div>
+        @if (!ai.enabled() && auth.user()?.isAdmin) {
+          <div class="alert"><span class="i">info</span><span>Offline mode (admin note): drafts are built with rule-based templates. Add ANTHROPIC_API_KEY to backend/.env for full AI writing.</span></div>
+        }
+        @if (billing.remaining('resume') === 0) {
+          <div class="alert warning"><span class="i">schedule</span><span>You've used today's free resume. Upgrade to lifetime access to create more today.</span></div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" type="button" (click)="aiModal.set(false)">Cancel</button>
+        <button class="btn btn-primary" type="button" (click)="generateWithAi()" [disabled]="busy() === 'ai'">
+          @if (busy() === 'ai') {
+            <span class="spinner"></span> Writing your resume…
+          } @else {
+            <span class="i">auto_awesome</span> Generate resume
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

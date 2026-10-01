@@ -1,0 +1,94 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <span class="eyebrow"><span class="i sm">auto_awesome</span> Tailored to every job</span>
+      <h1>Cover letter writer</h1>
+      <p>Write a cover letter tailored to the job, based on your resume.</p>
+    </div>
+    @if (billing.remaining('cover_letter'); as left) {
+      <span class="badge">{{ left }} free cover letter{{ left === 1 ? '' : 's' }} left today</span>
+    } @else if (billing.remaining('cover_letter') === 0) {
+      <span class="badge warning">Today's free cover letter is used</span>
+    }
+  </div>
+
+  <div class="layout">
+    <section class="card form">
+      <div class="field">
+        <label>Based on resume</label>
+        @if (list().length) {
+          <select class="select" [ngModel]="resumeId()" (ngModelChange)="resumeId.set($event)">
+            @for (r of list(); track r.id) {
+              <option [value]="r.id">{{ r.title }}</option>
+            }
+          </select>
+        } @else {
+          <div class="alert"><span class="i">info</span> <span>No resumes yet. <a routerLink="/app/templates">Create one</a> first.</span></div>
+        }
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Company</label>
+          <input class="input" [ngModel]="company()" (ngModelChange)="company.set($event)" placeholder="e.g. Systems Ltd" />
+        </div>
+        <div class="field">
+          <label>Hiring manager (optional)</label>
+          <input class="input" [ngModel]="hiringManager()" (ngModelChange)="hiringManager.set($event)" placeholder="e.g. Ms. Ayesha Malik" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Tone</label>
+        <div class="segmented">
+          @for (t of ['professional', 'confident', 'friendly', 'formal', 'enthusiastic']; track t) {
+            <button type="button" [class.active]="tone() === t" (click)="tone.set(t)">{{ t }}</button>
+          }
+        </div>
+      </div>
+      <div class="field">
+        <label>Job description</label>
+        <textarea class="textarea" rows="11" [ngModel]="jobDescription()" (ngModelChange)="jobDescription.set($event)" placeholder="Paste the full job post here…"></textarea>
+      </div>
+      <button class="btn btn-primary btn-lg btn-pill" type="button" (click)="generate()" [disabled]="generating()">
+        @if (generating()) {
+          <span class="spinner"></span> Writing your letter…
+        } @else {
+          <span class="i">auto_awesome</span> Generate cover letter
+        }
+      </button>
+    </section>
+
+    <section class="card result" [class.writing]="generating()">
+      @if (generating()) {
+        <div class="writing-overlay" animate.leave="is-leaving" aria-hidden="true">
+          <span class="pen"><span class="i fill">edit</span></span>
+          <div class="lines"><i></i><i></i><i></i><i></i><i class="short"></i></div>
+        </div>
+      }
+      @if (body()) {
+        <div class="card-header">
+          <div class="grow">
+            <small class="subtle">Email subject</small>
+            <input class="subject" [ngModel]="subject()" (ngModelChange)="subject.set($event)" />
+          </div>
+        </div>
+        <div class="paper-wrap">
+          <textarea class="letter" [ngModel]="body()" (ngModelChange)="body.set($event)"></textarea>
+        </div>
+        <div class="actions">
+          <button class="btn btn-sm" type="button" (click)="copy()"><span class="i">content_copy</span> Copy</button>
+          <button class="btn btn-sm" type="button" (click)="download('pdf')" [disabled]="exporting()"><span class="i">picture_as_pdf</span> PDF</button>
+          <button class="btn btn-sm" type="button" (click)="download('docx')" [disabled]="exporting()"><span class="i">description</span> Word</button>
+          <button class="btn btn-sm" type="button" (click)="download('txt')"><span class="i">notes</span> TXT</button>
+          <button class="btn btn-sm btn-soft" type="button" (click)="openInEditor()"><span class="i">edit_document</span> Open in editor</button>
+          <button class="btn btn-sm btn-ghost" type="button" (click)="generate()" [disabled]="generating()"><span class="i">refresh</span> Regenerate</button>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <span class="i">mail</span>
+          <h3>Your letter will appear here</h3>
+          <p>Choose a resume, paste the job description and click generate. You can edit the result freely before downloading.</p>
+        </div>
+      }
+    </section>
+  </div>
+</div>

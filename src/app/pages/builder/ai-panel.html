@@ -1,0 +1,149 @@
+<div class="status" [class.on]="ai.enabled()">
+  <span class="i">auto_awesome</span>
+  <div class="grow">
+    <strong>{{ ai.enabled() ? 'Claude AI is active' : 'Offline AI assistant' }}</strong>
+    <small>{{ ai.enabled() ? ai.status()?.model : 'Rule-based writing help.' }}</small>
+  </div>
+</div>
+
+<!-- ATS quick check -->
+<section class="tool">
+  <div class="tool-head">
+    <span class="ic"><span class="i">fact_check</span></span>
+    <div>
+      <h4>ATS score check</h4>
+      <p>See how applicant tracking systems read this resume.</p>
+    </div>
+  </div>
+  <textarea class="textarea" rows="3" placeholder="Optional: paste a job description for keyword matching" [ngModel]="atsJd()" (ngModelChange)="atsJd.set($event)"></textarea>
+  <div class="row between">
+    <label class="switch" [class.disabled]="!ai.enabled()">
+      <input type="checkbox" [disabled]="!ai.enabled()" [ngModel]="atsUseAi()" (ngModelChange)="atsUseAi.set($event)" /><span></span> AI deep review
+    </label>
+    <button class="btn btn-primary btn-sm" type="button" (click)="checkAts()" [disabled]="busy() === 'ats'">
+      @if (busy() === 'ats') {
+        <span class="spinner"></span> Scanning…
+      } @else {
+        <span class="i">radar</span> Check score
+      }
+    </button>
+  </div>
+  @if (report(); as r) {
+    <div class="ats-result">
+      <div class="row">
+        <app-score-ring [score]="r.score" [size]="84" label="ATS" />
+        <div class="grow">
+          <strong class="grade">{{ r.grade }}</strong>
+          <p class="small muted">{{ r.result?.summary }}</p>
+          @if (r.aiScore !== null) {
+            <span class="badge primary"><span class="i">auto_awesome</span> AI score {{ r.aiScore }}</span>
+          }
+        </div>
+      </div>
+      @if (r.result?.keywords?.missing?.length) {
+        <div class="kw">
+          <span class="small subtle">Missing keywords</span>
+          <div class="chips">
+            @for (k of r.result!.keywords.missing.slice(0, 10); track k) {
+              <span class="chip danger">{{ k }}</span>
+            }
+          </div>
+        </div>
+      }
+      <ul class="issues">
+        @for (issue of (r.result?.issues ?? []).slice(0, 5); track $index) {
+          <li [class]="issue.severity">
+            <span class="i">{{ issue.severity === 'critical' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info' }}</span>
+            <div>
+              <b>{{ issue.message }}</b>
+              <small>{{ issue.fix }}</small>
+            </div>
+          </li>
+        }
+      </ul>
+      <a class="btn btn-soft btn-sm btn-block" [routerLink]="['/app/ats', r.id]"><span class="i">open_in_new</span> Open full report</a>
+    </div>
+  }
+</section>
+
+<!-- Tailor -->
+<section class="tool">
+  <div class="tool-head">
+    <span class="ic"><span class="i">ads_click</span></span>
+    <div>
+      <h4>Tailor to a job</h4>
+      <p>Rewrite summary, skills and bullets for a specific posting.</p>
+    </div>
+  </div>
+  <textarea class="textarea" rows="4" placeholder="Paste the job description here…" [ngModel]="jobDescription()" (ngModelChange)="jobDescription.set($event)"></textarea>
+  <button class="btn btn-primary btn-sm" type="button" (click)="tailor()" [disabled]="busy() === 'tailor'">
+    @if (busy() === 'tailor') {
+      <span class="spinner"></span> Tailoring…
+    } @else {
+      <span class="i">auto_awesome</span> Tailor my resume
+    }
+  </button>
+  @if (tailorResult(); as t) {
+    <div class="tailor-result">
+      <strong>Proposed changes</strong>
+      <ul>
+        @for (change of t.changes; track $index) {
+          <li>{{ change }}</li>
+        }
+      </ul>
+      @if (t.addedKeywords.length) {
+        <div class="chips">
+          @for (k of t.addedKeywords; track k) {
+            <span class="chip success">+ {{ k }}</span>
+          }
+        </div>
+      }
+      <div class="row">
+        <button class="btn btn-primary btn-sm" type="button" (click)="applyTailor()"><span class="i">check</span> Apply changes</button>
+        <button class="btn btn-ghost btn-sm" type="button" (click)="tailorResult.set(null)">Discard</button>
+      </div>
+    </div>
+  }
+</section>
+
+<!-- Generate -->
+<section class="tool">
+  <div class="tool-head">
+    <span class="ic"><span class="i">edit_note</span></span>
+    <div>
+      <h4>Generate full resume</h4>
+      <p>Describe yourself — AI drafts every section.</p>
+    </div>
+  </div>
+  <textarea class="textarea" rows="4" placeholder="e.g. 5 years as a digital marketer at Daraz, SEO + Google Ads, grew organic traffic 3x, MBA from IBA…" [ngModel]="prompt()" (ngModelChange)="prompt.set($event)"></textarea>
+  <input class="input input-sm" placeholder="Target role (optional)" [ngModel]="targetRole()" (ngModelChange)="targetRole.set($event)" />
+  <button class="btn btn-primary btn-sm" type="button" (click)="generate()" [disabled]="busy() === 'generate'">
+    @if (busy() === 'generate') {
+      <span class="spinner"></span> Writing…
+    } @else {
+      <span class="i">auto_awesome</span> Generate draft
+    }
+  </button>
+</section>
+
+<!-- More -->
+<section class="tool">
+  <div class="tool-head">
+    <span class="ic"><span class="i">more_horiz</span></span>
+    <div>
+      <h4>More tools</h4>
+      <p>Import an old resume or write a matching cover letter.</p>
+    </div>
+  </div>
+  <div class="row row-wrap">
+    <button class="btn btn-sm" type="button" (click)="importFile()" [disabled]="busy() === 'import'">
+      @if (busy() === 'import') {
+        <span class="spinner"></span>
+      } @else {
+        <span class="i">upload_file</span>
+      }
+      Import from PDF / Word
+    </button>
+    <a class="btn btn-sm" routerLink="/app/cover-letter" [queryParams]="{ resume: store.id() }"><span class="i">mail</span> Cover letter</a>
+  </div>
+</section>

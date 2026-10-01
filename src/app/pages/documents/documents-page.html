@@ -1,0 +1,129 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <span class="eyebrow"><span class="i sm">edit_document</span> Edit · sign · convert</span>
+      <h1>PDF & document editor</h1>
+      <p>Edit PDFs, images and Word files — change text, sign, annotate, convert and export.</p>
+    </div>
+    @if (billing.remaining('document'); as left) {
+      <span class="badge">{{ left }} free document edit{{ left === 1 ? '' : 's' }} left today</span>
+    } @else if (billing.remaining('document') === 0) {
+      <span class="badge warning">Today's free document edit is used</span>
+    }
+  </div>
+
+  <div class="top">
+    <app-file-drop class="drop" [multiple]="true" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.gif,.docx,.doc,.txt,.md,.rtf,.html,.htm"
+      icon="cloud_upload" title="Drop PDFs, images or Word files to edit" hint="PDF · JPG · PNG · WEBP · DOCX · DOC · TXT · RTF · HTML · MD — up to 25 MB"
+      (files)="upload($event)" />
+    <div class="create card">
+      <h3><span class="i">note_add</span> Start from blank</h3>
+      <button class="new" type="button" (click)="createBlank('rich')" style="--tone: #8b5cf6">
+        <span class="ic"><span class="i">article</span></span>
+        <span><b>Text document</b><small>Word-style rich text editor</small></span>
+      </button>
+      <button class="new" type="button" (click)="createBlank('canvas', 'a4')" style="--tone: #ec4899">
+        <span class="ic"><span class="i">draw</span></span>
+        <span><b>A4 design canvas</b><small>Flyers, certificates, letterheads</small></span>
+      </button>
+      <button class="new" type="button" (click)="createBlank('canvas', 'custom')" style="--tone: #06b6d4">
+        <span class="ic"><span class="i">aspect_ratio</span></span>
+        <span><b>Custom size canvas</b><small>Social posts, banners, cards</small></span>
+      </button>
+    </div>
+  </div>
+
+  @if (uploading()) {
+    <div class="alert"><span class="spinner"></span> Uploading…</div>
+  }
+
+  <h2 class="section-title"><span class="i">construction</span> PDF &amp; file tools</h2>
+  <div class="tools spot-group" appPointer="spots">
+    @for (tool of tools; track tool.key; let i = $index) {
+      <button class="tool spot" data-spot type="button" (click)="runTool(tool.key)" [disabled]="!!busyTool()" [style.--i]="i">
+        <span class="ic">
+          @if (busyTool() === tool.key) {
+            <span class="spinner"></span>
+          } @else {
+            <span class="i">{{ tool.icon }}</span>
+          }
+        </span>
+        <b>{{ tool.title }}</b>
+        <small>{{ tool.description }}</small>
+      </button>
+    }
+  </div>
+
+  <h2 class="section-title"><span class="i">folder_open</span> My documents</h2>
+  @if (loading()) {
+    <div class="doc-grid">
+      @for (n of [1, 2, 3, 4]; track n) {
+        <div class="skeleton sk"></div>
+      }
+    </div>
+  } @else if (!list().length) {
+    <div class="empty-state card">
+      <span class="i">folder_open</span>
+      <h3>No documents yet</h3>
+      <p>Upload a PDF, image or Word file above, or start with a blank document.</p>
+    </div>
+  } @else {
+    <div class="doc-grid">
+      @for (doc of list(); track doc.id; let i = $index) {
+        <article class="doc" appReveal [revealDelay]="(i % 6) * 70">
+          <a class="thumb" [routerLink]="['/editor', doc.id]">
+            @if (doc.thumbnail) {
+              <img [src]="doc.thumbnail" alt="" />
+            } @else {
+              <span class="i placeholder" [attr.data-kind]="doc.kind">{{ icon(doc) }}</span>
+            }
+            <span class="badge kind">{{ (doc.sourceFormat ?? doc.kind) | uppercase }}</span>
+          </a>
+          <div class="meta">
+            <div class="grow">
+              <h4 [title]="doc.name">{{ doc.name }}</h4>
+              <small>{{ timeAgo(doc.updatedAt) }}{{ doc.size ? ' · ' + formatBytes(doc.size) : '' }}{{ doc.pageCount ? ' · ' + doc.pageCount + ' pg' : '' }}</small>
+            </div>
+            <div class="menu-wrap" (appClickOutside)="closeMenu(doc.id)">
+              <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="menuFor.set(menuFor() === doc.id ? null : doc.id)" aria-label="Document actions">
+                <span class="i">more_horiz</span>
+              </button>
+              @if (menuFor() === doc.id) {
+                <div class="menu" animate.leave="is-leaving">
+                  <a [routerLink]="['/editor', doc.id]"><span class="i">edit</span> Open editor</a>
+                  <button type="button" (click)="rename(doc)"><span class="i">drive_file_rename_outline</span> Rename</button>
+                  @if (doc.sourceFormat) {
+                    <button type="button" (click)="downloadOriginal(doc)"><span class="i">download</span> Download original</button>
+                  }
+                  <div class="menu-sep"></div>
+                  <button type="button" class="danger" (click)="remove(doc)"><span class="i">delete</span> Delete</button>
+                </div>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</div>
+
+@if (ocrResult(); as r) {
+  <div class="modal-backdrop" animate.leave="is-leaving" (click)="ocrResult.set(null)">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><span class="i">document_scanner</span> Extracted text</h3>
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="ocrResult.set(null)"><span class="i">close</span></button>
+      </div>
+      <div class="modal-body stack">
+        <div class="row small muted">
+          <span class="badge">{{ r.method === 'ocr' ? 'OCR' : 'Text layer' }}</span> {{ r.name }} · {{ r.text.length }} characters
+        </div>
+        <pre class="ocr-text thin-scroll">{{ r.text }}</pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" type="button" (click)="copyOcr()"><span class="i">content_copy</span> Copy</button>
+        <button class="btn btn-primary" type="button" (click)="saveOcrAsDocument()"><span class="i">edit_document</span> Edit as document</button>
+      </div>
+    </div>
+  </div>
+}

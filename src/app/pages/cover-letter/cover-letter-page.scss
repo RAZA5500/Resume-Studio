@@ -1,0 +1,193 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.form {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  .segmented button {
+    text-transform: capitalize;
+  }
+  > .btn-lg {
+    margin-top: 4px;
+  }
+}
+
+.result {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 580px;
+}
+
+.card-header {
+  background: var(--input-bg);
+  small {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
+.subject {
+  width: 100%;
+  border: 0;
+  outline: none;
+  padding: 2px 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 15.5px;
+}
+
+/* The letter reads like a sheet of paper in both themes. */
+.paper-wrap {
+  flex: 1;
+  display: flex;
+  padding: 18px;
+  background-color: var(--canvas);
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+.letter {
+  flex: 1;
+  min-height: 460px;
+  border: 0;
+  border-radius: 6px;
+  outline: none;
+  resize: vertical;
+  padding: 30px 32px;
+  background: #fff;
+  color: #1f2937;
+  font-family: Lora, Georgia, serif;
+  font-size: 15px;
+  line-height: 1.8;
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.5);
+  animation: letter-in 0.8s var(--ease-out) both;
+  &:focus {
+    box-shadow:
+      0 0 0 3px var(--primary-100),
+      0 24px 60px -24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--input-bg);
+  .btn {
+    animation: rise-in 0.45s var(--ease-out) backwards;
+    @for $n from 1 through 6 {
+      &:nth-child(#{$n}) {
+        animation-delay: #{200 + $n * 50}ms;
+      }
+    }
+  }
+}
+
+/* ---------- "writing…" overlay */
+.writing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fade-in 0.3s var(--ease) both;
+  &.is-leaving {
+    animation: fade-out 0.3s var(--ease) both;
+  }
+}
+
+.pen {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  background: var(--grad-brand);
+  box-shadow: 0 16px 36px -12px rgba(139, 92, 246, 0.95);
+  animation: pen-write 1.2s var(--ease-in-out) infinite;
+  .i {
+    font-size: 28px;
+  }
+}
+
+.lines {
+  width: min(320px, 70%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  i {
+    display: block;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--primary-100), var(--primary-50));
+    transform-origin: left center;
+    animation: line-write 2.2s var(--ease-in-out) infinite;
+    @for $n from 2 through 5 {
+      &:nth-child(#{$n}) {
+        animation-delay: #{($n - 1) * 0.25}s;
+      }
+    }
+    &.short {
+      width: 60%;
+    }
+  }
+}
+
+@keyframes letter-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes pen-write {
+  0%,
+  100% {
+    transform: translate(-10px, 0) rotate(-6deg);
+  }
+  50% {
+    transform: translate(10px, -4px) rotate(6deg);
+  }
+}
+
+@keyframes line-write {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.4;
+  }
+  60%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1000px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

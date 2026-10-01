@@ -1,0 +1,400 @@
+<div class="ce">
+  <!-- ======================= Top bar ======================= -->
+  <header class="ce-top">
+    <button class="btn btn-ghost btn-icon" type="button" (click)="back()" title="Back to documents"><span class="i">arrow_back</span></button>
+    <span class="doc-ic" [attr.data-kind]="doc().kind">
+      <span class="i">{{ doc().kind === 'pdf' ? 'picture_as_pdf' : doc().kind === 'image' ? 'image' : 'draw' }}</span>
+    </span>
+    <input class="ce-name" [ngModel]="name()" (ngModelChange)="rename($event)" aria-label="Document name" />
+    <span class="ce-save" [attr.data-state]="saveState()">
+      @switch (saveState()) {
+        @case ('saving') {
+          <span class="spinner"></span> Saving…
+        }
+        @case ('dirty') {
+          Unsaved
+        }
+        @case ('error') {
+          <button class="btn btn-ghost btn-xs" type="button" (click)="save()">Save failed — retry</button>
+        }
+        @case ('limit') {
+          <button class="btn btn-danger-soft btn-xs" type="button" (click)="save()" title="Free plan: 1 document edit per day">Not saved · daily limit</button>
+        }
+        @default {
+          <span class="i sm">cloud_done</span> Saved
+        }
+      }
+    </span>
+    <div class="grow"></div>
+
+    <div class="group">
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" [disabled]="!canUndo()" (click)="undo()" title="Undo (Ctrl+Z)"><span class="i">undo</span></button>
+      <button class="btn btn-ghost btn-icon btn-sm" type="button" [disabled]="!canRedo()" (click)="redo()" title="Redo (Ctrl+Y)"><span class="i">redo</span></button>
+    </div>
+    <div class="group zoom">
+      <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="zoomBy(-0.1)" title="Zoom out"><span class="i">remove</span></button>
+      <span>{{ (zoom() * 100).toFixed(0) }}%</span>
+      <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="zoomBy(0.1)" title="Zoom in"><span class="i">add</span></button>
+      <button class="btn btn-ghost btn-xs" type="button" (click)="fitZoom()">Fit</button>
+    </div>
+    @if (doc().kind !== 'canvas') {
+      <button class="btn btn-sm hide-sm" type="button" (click)="extractText()" [disabled]="busy() === 'ocr'" title="Extract text (OCR)">
+        @if (busy() === 'ocr') {
+          <span class="spinner"></span>
+        } @else {
+          <span class="i">document_scanner</span>
+        }
+        Extract text
+      </button>
+    }
+    <div class="menu-wrap" (appClickOutside)="exportMenu.set(false)">
+      <button class="btn btn-primary btn-sm" type="button" (click)="exportMenu.set(!exportMenu())" [disabled]="busy() === 'export'">
+        @if (busy() === 'export') {
+          <span class="spinner"></span>
+        } @else {
+          <span class="i">download</span>
+        }
+        Export
+      </button>
+      @if (exportMenu()) {
+        <div class="menu" animate.leave="is-leaving">
+          @if (isPdf()) {
+            <button type="button" (click)="exportPdf(false)"><span class="i">picture_as_pdf</span><span>PDF <small>Text stays real &amp; selectable (ATS friendly)</small></span></button>
+            <button type="button" (click)="exportPdf(true)"><span class="i">layers</span><span>Flattened PDF <small>Everything baked in (secure redaction)</small></span></button>
+          } @else {
+            <button type="button" (click)="exportPdf(true)"><span class="i">picture_as_pdf</span><span>PDF document</span></button>
+          }
+          <div class="menu-sep"></div>
+          <button type="button" (click)="exportImage('png')"><span class="i">image</span><span>PNG <small>This page</small></span></button>
+          <button type="button" (click)="exportImage('jpeg')"><span class="i">photo</span><span>JPG <small>This page</small></span></button>
+          <button type="button" (click)="exportImage('webp')"><span class="i">photo_size_select_large</span><span>WebP <small>This page</small></span></button>
+          @if (pages().length > 1) {
+            <button type="button" (click)="exportImage('png', true)"><span class="i">collections</span><span>All pages as PNG</span></button>
+          }
+          @if (isPdf()) {
+            <div class="menu-sep"></div>
+            <button type="button" (click)="saveAsCopy()"><span class="i">save_as</span><span>Save as new PDF <small>Adds a copy to My Documents</small></span></button>
+          }
+        </div>
+      }
+    </div>
+  </header>
+
+  <div class="ce-body">
+    <!-- ======================= Tools ======================= -->
+    <nav class="ce-tools">
+      <button type="button" [class.active]="tool() === 'select'" (click)="setTool('select')" title="Select / move (V)"><span class="i">arrow_selector_tool</span></button>
+      <button type="button" [class.active]="tool() === 'text'" (click)="setTool('text')" title="Add text (T)"><span class="i">title</span></button>
+      @if (isPdf()) {
+        <button type="button" [class.active]="tool() === 'edit-text'" (click)="setTool('edit-text')" title="Edit existing PDF text (E)"><span class="i">edit_note</span></button>
+      }
+      <span class="sep"></span>
+      <button type="button" [class.active]="tool() === 'draw'" (click)="setTool('draw')" title="Draw (P)"><span class="i">draw</span></button>
+      <button type="button" [class.active]="tool() === 'highlight'" (click)="setTool('highlight')" title="Highlighter (H)"><span class="i">ink_highlighter</span></button>
+      <button type="button" [class.active]="tool() === 'whiteout'" (click)="setTool('whiteout')" title="Whiteout / eraser (W)"><span class="i">ink_eraser</span></button>
+      <span class="sep"></span>
+      <button type="button" [class.active]="tool() === 'rect'" (click)="setTool('rect')" title="Rectangle (R)"><span class="i">rectangle</span></button>
+      <button type="button" [class.active]="tool() === 'ellipse'" (click)="setTool('ellipse')" title="Ellipse (O)"><span class="i">circle</span></button>
+      <button type="button" [class.active]="tool() === 'line'" (click)="setTool('line')" title="Line (L)"><span class="i">horizontal_rule</span></button>
+      <button type="button" [class.active]="tool() === 'arrow'" (click)="setTool('arrow')" title="Arrow (A)"><span class="i">arrow_right_alt</span></button>
+      <span class="sep"></span>
+      <button type="button" (click)="insertImage()" title="Insert image"><span class="i">add_photo_alternate</span></button>
+      <button type="button" (click)="signatureOpen.set(true)" title="Signature"><span class="i">signature</span></button>
+      <div class="menu-wrap" (appClickOutside)="stampMenu.set(false)">
+        <button type="button" (click)="stampMenu.set(!stampMenu())" title="Stamps"><span class="i">approval</span></button>
+        @if (stampMenu()) {
+          <div class="menu left stamp-menu" animate.leave="is-leaving">
+            @for (s of stamps; track s.label) {
+              <button type="button" (click)="addStamp(s.label, s.color)"><span class="stamp-chip" [style.color]="s.color" [style.border-color]="s.color">{{ s.label }}</span></button>
+            }
+            <button type="button" (click)="addDateStamp()"><span class="i">calendar_today</span> Today's date</button>
+          </div>
+        }
+      </div>
+    </nav>
+
+    <!-- ======================= Pages ======================= -->
+    <aside class="ce-pages thin-scroll">
+      @for (p of pages(); track $index; let i = $index) {
+        <button type="button" class="page-thumb" [class.active]="i === current()" (click)="goToPage(i)">
+          <span class="pt-img" [style.aspect-ratio]="p.width + ' / ' + p.height" [style.background]="p.state.background ?? '#fff'">
+            @if (p.thumb) {
+              <img [src]="p.thumb" alt="" />
+            }
+          </span>
+          <span class="pt-num">{{ i + 1 }}</span>
+        </button>
+      }
+      <div class="page-actions">
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="addPage()" title="Add blank page after"><span class="i">note_add</span></button>
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="duplicatePage()" title="Duplicate page"><span class="i">file_copy</span></button>
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="movePage(-1)" [disabled]="current() === 0" title="Move up"><span class="i">arrow_upward</span></button>
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="movePage(1)" [disabled]="current() === pages().length - 1" title="Move down"><span class="i">arrow_downward</span></button>
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="rotatePage(90)" title="Rotate page"><span class="i">rotate_right</span></button>
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="deletePage()" [disabled]="pages().length <= 1" title="Delete page"><span class="i">delete</span></button>
+      </div>
+    </aside>
+
+    <!-- ======================= Stage ======================= -->
+    <main class="ce-stage" #stage (wheel)="onWheel($event)">
+      @if (loading()) {
+        <div class="ce-loading"><span class="spinner lg"></span><p>{{ loadingText() }}</p></div>
+      }
+      @if (tool() === 'edit-text') {
+        <div class="hint-bar"><span class="i">info</span> Click any highlighted line of text to edit it. Press <span class="kbd">Esc</span> when done.</div>
+      }
+      @if (cropping()) {
+        <div class="hint-bar crop-bar">
+          <span class="i">crop</span> Drag the handles to choose the area
+          <button class="btn btn-primary btn-xs" type="button" (click)="applyCrop()"><span class="i">check</span> Apply crop</button>
+          <button class="btn btn-xs" type="button" (click)="cancelCrop()">Cancel</button>
+        </div>
+      }
+      <div class="ce-canvas-wrap">
+        <canvas #canvasEl></canvas>
+      </div>
+    </main>
+
+    <!-- ======================= Properties ======================= -->
+    <aside class="ce-props thin-scroll">
+      @if (sel(); as o) {
+        <div class="panel">
+          <div class="panel-head">
+            <h4>{{ selIsMulti() ? 'Selection' : selIsText() ? 'Text' : selIsImage() ? 'Image' : 'Shape' }}</h4>
+            <div class="row">
+              <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="duplicateSelection()" title="Duplicate (Ctrl+D)"><span class="i">content_copy</span></button>
+              <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="toggleLock()" [title]="prop('lockMovementX') ? 'Unlock' : 'Lock'"><span class="i">{{ prop('lockMovementX') ? 'lock' : 'lock_open' }}</span></button>
+              <button class="btn btn-ghost btn-icon btn-xs danger" type="button" (click)="deleteSelection()" title="Delete (Del)"><span class="i">delete</span></button>
+            </div>
+          </div>
+
+          @if (selIsText()) {
+            <div class="field">
+              <label>Font</label>
+              <select class="select select-sm" [ngModel]="prop('fontFamily')" (ngModelChange)="setFont($event)">
+                @for (f of fonts; track f) {
+                  <option [value]="f" [style.font-family]="f">{{ f }}</option>
+                }
+              </select>
+            </div>
+            <div class="row">
+              <div class="field grow">
+                <label>Size</label>
+                <input class="input input-sm" type="number" min="6" max="400" [ngModel]="prop('fontSize')" (ngModelChange)="setProp('fontSize', +$event)" />
+              </div>
+              <div class="field">
+                <label>Color</label>
+                <input type="color" class="color-input" [ngModel]="toHex(prop('fill'))" (ngModelChange)="setProp('fill', $event)" />
+              </div>
+              <div class="field">
+                <label>Fill</label>
+                <input type="color" class="color-input" [ngModel]="toHex(prop('backgroundColor'), '#ffffff')" (ngModelChange)="setProp('backgroundColor', $event)" />
+              </div>
+            </div>
+            <div class="segmented">
+              <button type="button" [class.active]="prop('fontWeight') === 'bold'" (click)="toggleProp('fontWeight', 'bold', 'normal')" title="Bold"><span class="i">format_bold</span></button>
+              <button type="button" [class.active]="prop('fontStyle') === 'italic'" (click)="toggleProp('fontStyle', 'italic', 'normal')" title="Italic"><span class="i">format_italic</span></button>
+              <button type="button" [class.active]="prop('underline') === true" (click)="toggleProp('underline', true, false)" title="Underline"><span class="i">format_underlined</span></button>
+              <button type="button" [class.active]="prop('linethrough') === true" (click)="toggleProp('linethrough', true, false)" title="Strikethrough"><span class="i">strikethrough_s</span></button>
+              <button type="button" (click)="setProp('backgroundColor', '')" title="Clear text background"><span class="i">format_color_reset</span></button>
+            </div>
+            <div class="segmented">
+              <button type="button" [class.active]="prop('textAlign') === 'left'" (click)="setProp('textAlign', 'left')"><span class="i">format_align_left</span></button>
+              <button type="button" [class.active]="prop('textAlign') === 'center'" (click)="setProp('textAlign', 'center')"><span class="i">format_align_center</span></button>
+              <button type="button" [class.active]="prop('textAlign') === 'right'" (click)="setProp('textAlign', 'right')"><span class="i">format_align_right</span></button>
+              <button type="button" [class.active]="prop('textAlign') === 'justify'" (click)="setProp('textAlign', 'justify')"><span class="i">format_align_justify</span></button>
+            </div>
+            <div class="slider">
+              <label>Line height <b>{{ prop('lineHeight') }}</b></label>
+              <input class="range" type="range" min="0.8" max="3" step="0.05" [ngModel]="prop('lineHeight')" (ngModelChange)="setProp('lineHeight', +$event)" />
+            </div>
+            <div class="slider">
+              <label>Letter spacing <b>{{ prop('charSpacing') }}</b></label>
+              <input class="range" type="range" min="-100" max="800" step="10" [ngModel]="prop('charSpacing')" (ngModelChange)="setProp('charSpacing', +$event)" />
+            </div>
+            <div class="menu-wrap" (appClickOutside)="aiMenu.set(false)">
+              <button class="btn btn-soft btn-sm btn-block" type="button" (click)="aiMenu.set(!aiMenu())" [disabled]="busy() === 'ai'">
+                @if (busy() === 'ai') {
+                  <span class="spinner"></span>
+                } @else {
+                  <span class="i">auto_awesome</span>
+                }
+                Rewrite with AI
+              </button>
+              @if (aiMenu()) {
+                <div class="menu left" animate.leave="is-leaving">
+                  <button type="button" (click)="rewriteText('professional')"><span class="i">workspace_premium</span> Professional</button>
+                  <button type="button" (click)="rewriteText('grammar')"><span class="i">spellcheck</span> Fix grammar</button>
+                  <button type="button" (click)="rewriteText('shorten')"><span class="i">compress</span> Shorter</button>
+                  <button type="button" (click)="rewriteText('expand')"><span class="i">expand</span> Longer</button>
+                </div>
+              }
+            </div>
+          } @else if (!selIsImage()) {
+            <div class="row">
+              <div class="field">
+                <label>Stroke</label>
+                <input type="color" class="color-input" [ngModel]="toHex(prop('stroke'))" (ngModelChange)="setProp('stroke', $event)" />
+              </div>
+              <div class="field">
+                <label>Fill</label>
+                <input type="color" class="color-input" [ngModel]="toHex(prop('fill'), '#ffffff')" (ngModelChange)="setProp('fill', $event)" />
+              </div>
+              <button class="btn btn-ghost btn-xs no-fill" type="button" (click)="setProp('fill', 'transparent')">No fill</button>
+            </div>
+            <div class="slider">
+              <label>Stroke width <b>{{ prop('strokeWidth') }}</b></label>
+              <input class="range" type="range" min="0" max="30" step="1" [ngModel]="prop('strokeWidth')" (ngModelChange)="setProp('strokeWidth', +$event)" />
+            </div>
+            <label class="switch"><input type="checkbox" [ngModel]="!!prop('strokeDashArray')" (ngModelChange)="setProp('strokeDashArray', $event ? [10, 6] : null)" /><span></span> Dashed line</label>
+          }
+
+          <div class="slider">
+            <label>Opacity <b>{{ ((+(prop('opacity') ?? 1)) * 100).toFixed(0) }}%</b></label>
+            <input class="range" type="range" min="0.05" max="1" step="0.05" [ngModel]="prop('opacity')" (ngModelChange)="setProp('opacity', +$event)" />
+          </div>
+          <div class="slider">
+            <label>Rotation <b>{{ (+(prop('angle') ?? 0)).toFixed(0) }}°</b></label>
+            <input class="range" type="range" min="-180" max="180" step="1" [ngModel]="prop('angle')" (ngModelChange)="setProp('angle', +$event)" />
+          </div>
+
+          <div class="sub">Arrange</div>
+          <div class="icon-grid">
+            <button type="button" (click)="arrange('front')" title="Bring to front"><span class="i">flip_to_front</span></button>
+            <button type="button" (click)="arrange('forward')" title="Bring forward"><span class="i">arrow_upward</span></button>
+            <button type="button" (click)="arrange('backward')" title="Send backward"><span class="i">arrow_downward</span></button>
+            <button type="button" (click)="arrange('back')" title="Send to back"><span class="i">flip_to_back</span></button>
+            <button type="button" (click)="toggleProp('flipX', true, false)" title="Flip horizontal"><span class="i">flip</span></button>
+            <button type="button" (click)="toggleProp('flipY', true, false)" title="Flip vertical"><span class="i" style="transform: rotate(90deg)">flip</span></button>
+          </div>
+          <div class="sub">Align to page</div>
+          <div class="icon-grid">
+            <button type="button" (click)="align('left')" title="Left"><span class="i">align_horizontal_left</span></button>
+            <button type="button" (click)="align('center')" title="Center"><span class="i">align_horizontal_center</span></button>
+            <button type="button" (click)="align('right')" title="Right"><span class="i">align_horizontal_right</span></button>
+            <button type="button" (click)="align('top')" title="Top"><span class="i">align_vertical_top</span></button>
+            <button type="button" (click)="align('middle')" title="Middle"><span class="i">align_vertical_center</span></button>
+            <button type="button" (click)="align('bottom')" title="Bottom"><span class="i">align_vertical_bottom</span></button>
+          </div>
+        </div>
+      } @else {
+        <!-- Tool settings -->
+        <div class="panel">
+          <div class="panel-head"><h4>Tool settings</h4></div>
+          <div class="row">
+            <div class="field">
+              <label>Stroke</label>
+              <input type="color" class="color-input" [ngModel]="strokeColor()" (ngModelChange)="strokeColor.set($event); updateBrush()" />
+            </div>
+            <div class="field">
+              <label>Highlight</label>
+              <input type="color" class="color-input" [ngModel]="highlightColor()" (ngModelChange)="highlightColor.set($event); updateBrush()" />
+            </div>
+            <div class="field">
+              <label>Text</label>
+              <input type="color" class="color-input" [ngModel]="textColor()" (ngModelChange)="textColor.set($event)" />
+            </div>
+          </div>
+          <div class="slider">
+            <label>Stroke / pen width <b>{{ strokeWidth() }}</b></label>
+            <input class="range" type="range" min="1" max="30" step="1" [ngModel]="strokeWidth()" (ngModelChange)="strokeWidth.set(+$event); updateBrush()" />
+          </div>
+          <div class="row">
+            <div class="field grow">
+              <label>Text font</label>
+              <select class="select select-sm" [ngModel]="fontFamily()" (ngModelChange)="fontFamily.set($event)">
+                @for (f of fonts; track f) {
+                  <option [value]="f">{{ f }}</option>
+                }
+              </select>
+            </div>
+            <div class="field" style="width: 72px">
+              <label>Size</label>
+              <input class="input input-sm" type="number" min="6" max="300" [ngModel]="fontSize()" (ngModelChange)="fontSize.set(+$event)" />
+            </div>
+          </div>
+        </div>
+
+        @if (pageKind() === 'image') {
+          <div class="panel">
+            <div class="panel-head">
+              <h4>Photo adjustments</h4>
+              <button class="btn btn-ghost btn-xs" type="button" (click)="resetAdjust()">Reset</button>
+            </div>
+            @for (s of [{ key: 'brightness', label: 'Brightness', min: -1, max: 1 }, { key: 'contrast', label: 'Contrast', min: -1, max: 1 }, { key: 'saturation', label: 'Saturation', min: -1, max: 1 }, { key: 'hue', label: 'Hue', min: -1, max: 1 }, { key: 'blur', label: 'Blur', min: 0, max: 1 }]; track s.key) {
+              <div class="slider">
+                <label>{{ s.label }} <b>{{ $any(adjust())[s.key] }}</b></label>
+                <input class="range" type="range" [min]="s.min" [max]="s.max" step="0.05" [ngModel]="$any(adjust())[s.key]" (ngModelChange)="setAdjust($any(s.key), +$event)" />
+              </div>
+            }
+            <div class="effects">
+              <button type="button" class="chip" [class.active]="adjust().grayscale" (click)="setAdjust('grayscale', !adjust().grayscale)">B&W</button>
+              <button type="button" class="chip" [class.active]="adjust().sepia" (click)="setAdjust('sepia', !adjust().sepia)">Sepia</button>
+              <button type="button" class="chip" [class.active]="adjust().vintage" (click)="setAdjust('vintage', !adjust().vintage)">Vintage</button>
+              <button type="button" class="chip" [class.active]="adjust().invert" (click)="setAdjust('invert', !adjust().invert)">Invert</button>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h4>Transform</h4></div>
+            <div class="icon-grid">
+              <button type="button" (click)="applyImageOp({ type: 'rotate', deg: -90 })" title="Rotate left"><span class="i">rotate_left</span></button>
+              <button type="button" (click)="applyImageOp({ type: 'rotate', deg: 90 })" title="Rotate right"><span class="i">rotate_right</span></button>
+              <button type="button" (click)="applyImageOp({ type: 'flip', axis: 'x' })" title="Flip horizontal"><span class="i">flip</span></button>
+              <button type="button" (click)="applyImageOp({ type: 'flip', axis: 'y' })" title="Flip vertical"><span class="i" style="transform: rotate(90deg)">flip</span></button>
+              <button type="button" (click)="startCrop()" title="Crop" [class.active]="cropping()"><span class="i">crop</span></button>
+            </div>
+            <p class="subtle small">Tip: crop and rotate before adding annotations.</p>
+          </div>
+        } @else {
+          <div class="panel">
+            <div class="panel-head"><h4>Page</h4></div>
+            <p class="small muted">Page {{ current() + 1 }} of {{ pages().length }} · {{ currentPage()?.width }}×{{ currentPage()?.height }} px</p>
+            @if (pageKind() === 'blank') {
+              <div class="row">
+                <label class="color-row">
+                  <input type="color" class="color-input" [ngModel]="toHex(currentPage()?.state?.background ?? '#ffffff', '#ffffff')" (ngModelChange)="setPageBackground($event)" />
+                  Background color
+                </label>
+              </div>
+            }
+            @if (isPdf()) {
+              <div class="alert small"><span class="i">tips_and_updates</span><span>Use <b>Edit text</b> (E) to change existing words, <b>Whiteout</b> (W) to hide content and <b>Signature</b> to sign.</span></div>
+            }
+          </div>
+        }
+
+        <div class="panel shortcuts">
+          <div class="panel-head"><h4>Shortcuts</h4></div>
+          <ul>
+            <li><span class="kbd">V</span> Select <span class="kbd">T</span> Text <span class="kbd">P</span> Draw</li>
+            <li><span class="kbd">R</span> Rect <span class="kbd">O</span> Ellipse <span class="kbd">A</span> Arrow</li>
+            <li><span class="kbd">Ctrl</span>+<span class="kbd">Z</span> Undo <span class="kbd">Ctrl</span>+<span class="kbd">D</span> Duplicate</li>
+            <li><span class="kbd">Del</span> Delete · Arrows nudge · <span class="kbd">Ctrl</span>+wheel zoom</li>
+          </ul>
+        </div>
+      }
+    </aside>
+  </div>
+</div>
+
+@if (signatureOpen()) {
+  <app-signature-pad (inserted)="insertSignature($event)" (closed)="signatureOpen.set(false)" />
+}
+
+@if (ocrText() !== null) {
+  <div class="modal-backdrop" animate.leave="is-leaving" (click)="ocrText.set(null)">
+    <div class="modal wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><span class="i">document_scanner</span> Extracted text</h3>
+        <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="ocrText.set(null)"><span class="i">close</span></button>
+      </div>
+      <div class="modal-body">
+        <pre class="ocr thin-scroll">{{ ocrText() }}</pre>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" type="button" (click)="copyOcr()"><span class="i">content_copy</span> Copy</button>
+        <button class="btn btn-primary" type="button" (click)="openOcrAsDocument()"><span class="i">edit_document</span> Edit as document</button>
+      </div>
+    </div>
+  </div>
+}

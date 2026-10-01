@@ -1,0 +1,112 @@
+<div class="shell" [class.collapsed]="collapsed()">
+  <aside class="sidebar" [class.open]="menuOpen()" aria-label="App navigation">
+    <div class="side-glow" aria-hidden="true"></div>
+
+    <div class="brand">
+      <app-logo link="/app/dashboard" [compact]="compactLogo()" />
+      <button class="collapse-btn" type="button" (click)="toggleCollapsed()" [attr.aria-label]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+        [title]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
+        <span class="i">{{ collapsed() ? 'left_panel_open' : 'left_panel_close' }}</span>
+      </button>
+    </div>
+
+    <a class="btn btn-primary new-btn" routerLink="/app/templates" [appMagnetic]="0.2" [title]="collapsed() ? 'New resume' : ''">
+      <span class="i">add</span><span class="label">New resume</span>
+    </a>
+
+    <nav>
+      <span class="nav-label">Workspace</span>
+      @for (item of nav; track item.link; let i = $index) {
+        <a [routerLink]="item.link" routerLinkActive="active" [style.--i]="i" [title]="collapsed() ? item.label : ''">
+          <span class="ni"><span class="i">{{ item.icon }}</span></span>
+          <span class="label">{{ item.label }}</span>
+        </a>
+      }
+      <span class="nav-label">Account</span>
+      <a routerLink="/app/billing" routerLinkActive="active" [style.--i]="nav.length" [title]="collapsed() ? 'Plan & billing' : ''">
+        <span class="ni"><span class="i">workspace_premium</span></span>
+        <span class="label grow">Plan &amp; billing</span>
+        @if (billing.isLifetime()) {
+          <span class="badge success label">Lifetime</span>
+        }
+      </a>
+      @if (auth.user()?.isAdmin) {
+        <a routerLink="/app/admin" routerLinkActive="active" [style.--i]="nav.length + 1" [title]="collapsed() ? 'Admin' : ''">
+          <span class="ni"><span class="i">admin_panel_settings</span></span>
+          <span class="label">Admin</span>
+        </a>
+      }
+    </nav>
+
+    @if (!billing.isLifetime()) {
+      @if (collapsed()) {
+        <a class="upgrade-mini" routerLink="/app/billing" title="Upgrade to lifetime"><span class="i fill">bolt</span></a>
+      } @else {
+        <div class="plan-card border-anim">
+          <div class="plan-head">
+            <strong><span class="i fill">bolt</span> Free plan</strong>
+            <span class="subtle small">Today</span>
+          </div>
+          @for (u of usage(); track u.kind) {
+            <div class="meter">
+              <div class="meter-row">
+                <span class="grow">{{ u.label }}</span>
+                <span class="count" [class.full]="u.full">{{ u.used }}/{{ u.limit < 0 ? '∞' : u.limit }}</span>
+              </div>
+              <div class="bar" [class.full]="u.full"><i [style.width.%]="u.percent"></i></div>
+            </div>
+          }
+          <a class="btn btn-primary btn-sm btn-block" routerLink="/app/billing">
+            Go lifetime · PKR {{ billing.price() }}
+          </a>
+        </div>
+      }
+    }
+
+    <div class="side-foot">
+      <div class="user menu-wrap" (appClickOutside)="userMenu.set(false)">
+        <button class="user-btn" type="button" (click)="userMenu.set(!userMenu())" [attr.aria-expanded]="userMenu()" aria-label="Account menu">
+          <span class="avatar">{{ auth.initials() }}</span>
+          <span class="grow who label">
+            <strong>{{ auth.user()?.fullName }}</strong>
+            <small>{{ auth.user()?.email }}</small>
+          </span>
+          <span class="i sm label">unfold_more</span>
+        </button>
+        @if (userMenu()) {
+          <div class="menu up left" animate.leave="is-leaving">
+            <div class="menu-label">{{ auth.user()?.email }}</div>
+            <a routerLink="/app/profile"><span class="i">person</span> Profile & settings</a>
+            <a routerLink="/app/billing"><span class="i">receipt_long</span> Plan & billing</a>
+            <a routerLink="/"><span class="i">public</span> Website</a>
+            <div class="menu-sep"></div>
+            <button type="button" class="danger" (click)="auth.logout()"><span class="i">logout</span> Log out</button>
+          </div>
+        }
+      </div>
+      <app-theme-toggle />
+    </div>
+  </aside>
+
+  @if (menuOpen()) {
+    <div class="scrim" animate.leave="is-leaving" (click)="menuOpen.set(false)"></div>
+  }
+
+  <div class="content">
+    <div class="content-bg" aria-hidden="true"><i></i><i></i></div>
+    <header class="mobile-bar">
+      <button class="btn btn-ghost btn-icon" type="button" (click)="menuOpen.set(true)" aria-label="Open menu">
+        <span class="i">menu</span>
+      </button>
+      <app-logo link="/app/dashboard" />
+      <span class="grow"></span>
+      @if (!billing.isLifetime()) {
+        <a class="upgrade-pill" routerLink="/app/billing"><span class="i fill sm">bolt</span> Upgrade</a>
+      }
+      <app-theme-toggle />
+    </header>
+    <main class="content-main">
+      <router-outlet />
+    </main>
+  </div>
+</div>

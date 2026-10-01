@@ -1,0 +1,510 @@
+<app-public-header [overlay]="true" />
+<div class="scroll-progress" aria-hidden="true"></div>
+
+<!-- ================================================================ Hero -->
+<section class="hero" appPointer>
+  <div class="hero-bg" aria-hidden="true">
+    <div class="aurora"><i></i><i></i><i></i></div>
+    <div class="grid-bg"></div>
+    <div class="beams"><i></i><i></i><i></i></div>
+    <div class="stars">
+      @for (s of stars; track $index) {
+        <i [style.left.%]="s.x" [style.top.%]="s.y" [style.width.px]="s.size" [style.height.px]="s.size" [style.animation-delay.s]="s.delay"></i>
+      }
+    </div>
+    <div class="cursor-glow"></div>
+    <div class="noise"></div>
+  </div>
+
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <a class="announce" [routerLink]="startLink()">
+        <span class="badge gradient">New</span>
+        <span>AI writer + 100-point ATS checker</span>
+        <span class="i sm">arrow_forward</span>
+      </a>
+
+      <!-- ngPreserveWhitespaces keeps the spaces between the animated word spans. -->
+      <h1 class="display" ngPreserveWhitespaces>
+        <span class="word" style="--w: 0">Build</span>
+        <span class="word" style="--w: 1">a</span>
+        <span class="word" style="--w: 2">resume</span>
+        <span class="word" style="--w: 3">that</span>
+        <span class="word" style="--w: 4">gets</span>
+        <span class="word" style="--w: 5">you</span>
+        <span class="word accent" style="--w: 6">
+          <span class="serif-i text-gradient">hired.</span>
+          <svg class="underline" viewBox="0 0 240 22" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M3 15 C 50 4, 120 2, 237 11" />
+          </svg>
+        </span>
+      </h1>
+
+      <p class="lead">
+        <span class="sr-only">Create an ATS-friendly resume for any job in minutes — with AI writing, 4,608 templates and a 100-point ATS score.</span>
+        <span aria-hidden="true">
+          Create an ATS-friendly resume for a
+          <span class="role"><app-typewriter [words]="roles" /></span>
+          in minutes — with AI writing, 4,608 templates and a 100-point ATS score.
+        </span>
+      </p>
+
+      <div class="cta">
+        <a class="btn btn-primary btn-xl btn-pill" [routerLink]="startLink()" appMagnetic>
+          Create free resume <span class="i">arrow_forward</span>
+        </a>
+        <a class="btn btn-glass btn-xl btn-pill" routerLink="/templates"><span class="i">grid_view</span> Browse templates</a>
+      </div>
+
+      <ul class="trust">
+        <li><span class="i">bolt</span> Free every day</li>
+        <li><span class="i">workspace_premium</span> Lifetime PKR {{ billing.price() }}</li>
+        <li><span class="i">account_balance_wallet</span> JazzCash · Easypaisa</li>
+      </ul>
+    </div>
+
+    <div class="hero-visual" aria-hidden="true">
+      <div class="window">
+        <div class="window-bar">
+          <span class="dots"><i></i><i></i><i></i></span>
+          <span class="doc-title">Alex Morgan — Resume</span>
+          <span class="saved"><span class="i sm">cloud_done</span> Saved</span>
+          <span class="fake-btn"><span class="i sm">download</span> PDF</span>
+        </div>
+        <div class="window-body">
+          <div class="form">
+            <div class="form-title"><span class="i sm">work</span> Work experience</div>
+            <label>Job title</label>
+            <div class="box typed"><span class="t1">Senior Product Designer</span></div>
+            <label>Company</label>
+            <div class="box typed"><span class="t2">Nimbus Cloud Inc.</span></div>
+            <label>Achievements</label>
+            <div class="box tall">
+              <span></span><span></span><span class="short"></span>
+            </div>
+            <div class="ai-chip"><span class="i fill sm">auto_awesome</span> AI improved 3 bullets</div>
+          </div>
+          <div class="paper">
+            <app-scaled-resume [content]="sample" [design]="heroDesign" />
+            <div class="scan"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="float f-ats">
+        <app-score-ring [score]="92" [size]="52" />
+        <div><b>ATS score</b><small>Excellent match</small></div>
+      </div>
+      <div class="float f-kw"><span class="ic"><span class="i">key</span></span><span><b>+18</b> keywords matched</span></div>
+      <div class="float f-pdf"><span class="ic red"><span class="i fill">picture_as_pdf</span></span><span>resume.pdf</span><span class="badge success">Ready</span></div>
+      <div class="float f-ai"><span class="ic violet"><span class="i fill">auto_awesome</span></span><span>“Shipped the new app <b>40% faster</b>”</span></div>
+    </div>
+  </div>
+
+  <a class="scroll-cue" routerLink="/" fragment="features" aria-label="Scroll to features">
+    <span class="mouse"><span></span></span>
+  </a>
+</section>
+
+<!-- ================================================================ Careers marquee -->
+<section class="careers" aria-label="Who it's for">
+  <p class="careers-title" appReveal>Made for every career — from fresh graduates to executives</p>
+  <div class="marquee" style="--marquee-duration: 46s">
+    <div class="marquee-track">
+      @for (c of careersA; track $index) {
+        <span class="career"><span class="i">{{ c.icon }}</span>{{ c.label }}</span>
+      }
+    </div>
+  </div>
+  <div class="marquee" style="--marquee-duration: 52s">
+    <div class="marquee-track reverse">
+      @for (c of careersB; track $index) {
+        <span class="career"><span class="i">{{ c.icon }}</span>{{ c.label }}</span>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Stats -->
+<section class="wrap stats">
+  @for (s of stats(); track s.label; let i = $index) {
+    <div class="stat" appReveal [revealDelay]="i * 90">
+      <b class="text-heading" [appCountUp]="s.value" [countPrefix]="s.prefix" [countSuffix]="s.suffix"></b>
+      <span>{{ s.label }}</span>
+    </div>
+  }
+</section>
+
+<!-- ================================================================ Features (bento) -->
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head center" appReveal>
+      <span class="eyebrow"><span class="pulse-dot"></span> Everything in one place</span>
+      <h2 class="display">Your whole job application, <span class="serif-i text-gradient">sorted.</span></h2>
+      <p>Write it, check it against the job, and download a file recruiters' software can read.</p>
+    </div>
+
+    <div class="bento spot-group" appPointer="spots">
+      <!-- Templates -->
+      <article class="tile t-templates spot" data-spot appReveal appInView>
+        <div class="tile-copy">
+          <span class="tile-ic"><span class="i">grid_view</span></span>
+          <h3><b [appCountUp]="4608"></b> templates</h3>
+          <p>Sixteen layouts in every color and font pairing. Switch designs any time — your content stays put.</p>
+          <div class="pills">
+            <span>16 layouts</span><span>24 palettes</span><span>12 font pairs</span>
+          </div>
+        </div>
+        <div class="fan">
+          <div class="mini m1"><i class="h"></i><i></i><i></i><i class="s"></i><i></i><i class="s"></i></div>
+          <div class="mini m2"><i class="h"></i><i></i><i class="s"></i><i></i><i></i><i class="s"></i></div>
+          <div class="mini m3"><i class="h"></i><i></i><i></i><i class="s"></i><i></i><i></i></div>
+        </div>
+      </article>
+
+      <!-- AI writer -->
+      <article class="tile t-ai spot" data-spot appReveal [revealDelay]="90" appInView>
+        <span class="tile-ic violet"><span class="i fill">auto_awesome</span></span>
+        <h3>AI writing assistant</h3>
+        <p>Draft a summary, turn duties into achievements and tailor your resume to any job post.</p>
+        <div class="rewrite">
+          <div class="before"><span class="i sm">close</span> Responsible for social media pages</div>
+          <div class="after">
+            <span class="i sm">check</span>
+            <span class="typed-line">Grew Instagram reach 3× in 6 months with a weekly reels plan</span>
+          </div>
+          <span class="sparkle s1"></span><span class="sparkle s2"></span>
+        </div>
+      </article>
+
+      <!-- ATS -->
+      <article class="tile t-ats spot" data-spot appReveal [revealDelay]="60" appInView>
+        <span class="tile-ic green"><span class="i">fact_check</span></span>
+        <h3>ATS score checker</h3>
+        <p>Upload a PDF, Word file or photo for a 100-point score with keyword matching.</p>
+        <div class="gauge">
+          <svg viewBox="0 0 120 66">
+            <defs>
+              <linearGradient id="gauge-grad" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0" stop-color="#22d3ee" />
+                <stop offset="0.5" stop-color="#8b5cf6" />
+                <stop offset="1" stop-color="#d946ef" />
+              </linearGradient>
+            </defs>
+            <path class="g-track" d="M10 60 A50 50 0 0 1 110 60" />
+            <path class="g-bar" d="M10 60 A50 50 0 0 1 110 60" pathLength="100" />
+          </svg>
+          <b [appCountUp]="92"></b>
+          <small>Excellent</small>
+        </div>
+      </article>
+
+      <!-- Analysis -->
+      <article class="tile t-analysis spot" data-spot appReveal [revealDelay]="120" appInView>
+        <span class="tile-ic amber"><span class="i">analytics</span></span>
+        <h3>Resume analysis</h3>
+        <p>Clear, recruiter-style feedback with fixes you can apply in one click.</p>
+        <ul class="checklist">
+          <li style="--i: 0"><span class="tick"><span class="i sm">check</span></span> Contact details complete</li>
+          <li style="--i: 1"><span class="tick"><span class="i sm">check</span></span> Strong action verbs</li>
+          <li style="--i: 2"><span class="tick"><span class="i sm">check</span></span> Measurable results</li>
+          <li style="--i: 3"><span class="tick warn"><span class="i sm">priority_high</span></span> Add 2 missing keywords</li>
+        </ul>
+      </article>
+
+      <!-- Editor -->
+      <article class="tile t-editor spot" data-spot appReveal [revealDelay]="180" appInView>
+        <span class="tile-ic pink"><span class="i">draw</span></span>
+        <h3>PDF &amp; document editor</h3>
+        <p>Change PDF text, sign, highlight, add images and convert between formats.</p>
+        <div class="sign">
+          <svg viewBox="0 0 220 70" aria-hidden="true">
+            <path pathLength="100" d="M8 48 C 22 18, 34 14, 36 30 C 38 44, 26 58, 30 50 C 36 36, 52 22, 58 34 C 62 42, 58 52, 66 44 C 74 36, 80 30, 86 38 C 90 44, 94 46, 102 36 C 110 26, 118 30, 122 40 C 126 50, 134 36, 144 32 C 156 28, 170 34, 212 26" />
+          </svg>
+          <span class="sign-line"></span>
+        </div>
+      </article>
+
+      <!-- Exports -->
+      <article class="tile t-export spot" data-spot appReveal [revealDelay]="80" appInView>
+        <div class="tile-copy">
+          <span class="tile-ic cyan"><span class="i">download</span></span>
+          <h3>PDF, Word &amp; text downloads</h3>
+          <p>A text-based PDF that applicant tracking systems can read, an editable .docx and plain text for job portals.</p>
+        </div>
+        <div class="files">
+          <span class="file pdf" style="--i: 0"><b>PDF</b><small>ATS-ready</small></span>
+          <span class="file docx" style="--i: 1"><b>DOCX</b><small>Editable</small></span>
+          <span class="file txt" style="--i: 2"><b>TXT</b><small>Copy-paste</small></span>
+          <span class="file png" style="--i: 3"><b>PNG</b><small>Images</small></span>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Steps -->
+<section class="section steps-section">
+  <div class="wrap">
+    <div class="section-head center" appReveal>
+      <span class="eyebrow">How it works</span>
+      <h2 class="display">From blank page to download in <span class="serif-i text-gradient">three</span> steps</h2>
+    </div>
+    <div class="steps-wrap" #stepsList>
+      <div class="steps-line" aria-hidden="true"><span></span></div>
+      <ol class="steps">
+        @for (s of steps; track s.title; let i = $index) {
+          <li class="step" appReveal [revealDelay]="i * 160" [style.--i]="i">
+            <span class="num"><span class="i">{{ s.icon }}</span></span>
+            <small>Step {{ i + 1 }}</small>
+            <h3>{{ s.title }}</h3>
+            <p>{{ s.text }}</p>
+          </li>
+        }
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Template showcase -->
+<section class="section showcase-section">
+  <div class="wrap">
+    <div class="section-head row-head" appReveal>
+      <div>
+        <span class="eyebrow">Templates</span>
+        <h2 class="display">Designs recruiters <span class="serif-i text-gradient">love</span> to read</h2>
+        <p>Clean layouts that parse correctly in applicant tracking systems — every one fully customizable.</p>
+      </div>
+      <a class="btn btn-glass btn-lg btn-pill" routerLink="/templates">View all 4,608 <span class="i">arrow_forward</span></a>
+    </div>
+  </div>
+  @defer (on viewport) {
+    <div class="marquee showcase" style="--marquee-duration: 80s">
+      <div class="marquee-track">
+        @for (t of showcase; track $index) {
+          <a class="show-card" routerLink="/templates" [appTilt]="9" [tiltScale]="1.04">
+            <div class="thumb"><app-scaled-resume [content]="sample" [design]="t.design" /></div>
+            <span class="show-name">{{ t.name }}</span>
+          </a>
+        }
+      </div>
+    </div>
+  } @placeholder {
+    <div class="showcase-ph"></div>
+  }
+</section>
+
+<!-- ================================================================ ATS -->
+<section class="section split-section" id="ats">
+  <div class="wrap split">
+    <div class="split-copy" appReveal="left">
+      <span class="eyebrow">ATS checker</span>
+      <h2 class="display">See what the robots see — <span class="serif-i text-gradient">before</span> recruiters do.</h2>
+      <p>Most companies screen resumes with software before anyone reads them. Upload yours and get a clear score with the fixes that matter.</p>
+      <ul class="checks">
+        @for (c of ['Keyword match against the job description', 'Detects scanned PDFs, tables and icon fonts that break parsing', 'Action verbs, measurable results and weak phrases', 'Works with PDF, Word and image files']; track c; let i = $index) {
+          <li appReveal="left" [revealDelay]="200 + i * 90"><span class="ck"><span class="i sm">check</span></span> {{ c }}</li>
+        }
+      </ul>
+      <a class="btn btn-primary btn-lg btn-pill" [routerLink]="auth.isAuthenticated() ? '/app/ats' : '/register'" appMagnetic>
+        Check my resume <span class="i">arrow_forward</span>
+      </a>
+    </div>
+
+    <div class="report" appReveal="right" appInView>
+      <div class="report-head">
+        <app-score-ring [score]="87" [size]="96" label="ATS" />
+        <div>
+          <h4>Good match</h4>
+          <p>Add 3 missing keywords to reach 90+.</p>
+        </div>
+        <span class="badge success live"><span class="pulse-dot"></span> Live scan</span>
+      </div>
+      @for (b of atsBars; track b.label; let i = $index) {
+        <div class="bar-row" [style.--d]="i * 140 + 'ms'">
+          <span>{{ b.label }}</span>
+          <div class="meter"><div [style.--w]="b.value + '%'"></div></div>
+          <b [appCountUp]="b.value" [countDuration]="1400"></b>
+        </div>
+      }
+      <div class="kw">
+        @for (k of ['TypeScript', 'Angular', 'REST APIs']; track k; let i = $index) {
+          <span class="chip success" [style.--d]="900 + i * 110 + 'ms'"><span class="i sm">check</span>{{ k }}</span>
+        }
+        @for (k of ['GraphQL', 'Kubernetes']; track k; let i = $index) {
+          <span class="chip danger" [style.--d]="1250 + i * 110 + 'ms'"><span class="i sm">add</span>{{ k }}</span>
+        }
+      </div>
+      <div class="scanline"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Editor -->
+<section class="section split-section" id="editor">
+  <div class="wrap split reverse">
+    <div class="editor-mock" appReveal="left" appInView aria-hidden="true">
+      <div class="em-tools">
+        @for (icon of editorTools; track icon; let i = $index) {
+          <span class="i" [style.--i]="i">{{ icon }}</span>
+        }
+      </div>
+      <div class="em-page">
+        <div class="l w80"></div>
+        <div class="l w60"></div>
+        <div class="l w90 hl"></div>
+        <div class="l w70"></div>
+        <div class="l w85"></div>
+        <div class="em-sign-wrap">
+          <svg class="em-sign" viewBox="0 0 220 70">
+            <path pathLength="100" d="M8 48 C 22 18, 34 14, 36 30 C 38 44, 26 58, 30 50 C 36 36, 52 22, 58 34 C 62 42, 58 52, 66 44 C 74 36, 80 30, 86 38 C 90 44, 94 46, 102 36 C 110 26, 118 30, 122 40 C 126 50, 134 36, 144 32 C 156 28, 170 34, 212 26" />
+          </svg>
+          <!-- The pen follows the same path while the signature draws itself. -->
+          <span class="em-cursor"><span class="i fill">edit</span></span>
+        </div>
+        <div class="sig-line"></div>
+      </div>
+      <span class="em-badge"><span class="i sm">verified</span> Signed &amp; exported</span>
+    </div>
+    <div class="split-copy" appReveal="right">
+      <span class="eyebrow">PDF &amp; image editor</span>
+      <h2 class="display">Edit PDFs, images and Word files — <span class="serif-i text-gradient">right here.</span></h2>
+      <p>Fix a typo in a PDF, sign a form or tidy up a scanned photo, all in your browser.</p>
+      <ul class="checks">
+        @for (c of ['Change existing PDF text, whiteout and add new text', 'Draw or type your signature', 'Crop, rotate and adjust photos', 'Merge PDFs, PDF ⇄ Word, images → PDF, image → text']; track c; let i = $index) {
+          <li appReveal="right" [revealDelay]="200 + i * 90"><span class="ck"><span class="i sm">check</span></span> {{ c }}</li>
+        }
+      </ul>
+      <a class="btn btn-primary btn-lg btn-pill" [routerLink]="auth.isAuthenticated() ? '/app/documents' : '/register'" appMagnetic>
+        Open the editor <span class="i">arrow_forward</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Pricing -->
+<section class="section" id="pricing">
+  <div class="wrap">
+    <div class="section-head center" appReveal>
+      <span class="eyebrow">Pricing</span>
+      <h2 class="display">Start free. Pay <span class="serif-i text-gradient">once</span> if you need more.</h2>
+      <p>No subscription, no renewals — one small payment unlocks everything for life.</p>
+    </div>
+    <div class="pricing">
+      <div class="price-card" appReveal="left">
+        <h3>Free</h3>
+        <p class="price">PKR 0</p>
+        <p class="muted small">For a quick application</p>
+        <ul>
+          @for (f of ['1 new resume per day', '1 cover letter per day', '1 document edit per day', 'All 4,608 templates', 'ATS score checker', 'PDF, Word & text downloads']; track f) {
+            <li><span class="i sm">check</span> {{ f }}</li>
+          }
+        </ul>
+        <a class="btn btn-glass btn-lg btn-block" [routerLink]="startLink()">Start for free</a>
+      </div>
+      <div class="price-card featured border-anim" appReveal="right" [revealDelay]="120">
+        <div class="glow" aria-hidden="true"></div>
+        <div class="price-top">
+          <h3>Lifetime</h3>
+          <span class="badge gradient"><span class="i sm">bolt</span> Best value</span>
+        </div>
+        <p class="price">PKR <span [appCountUp]="billing.price()" [countDuration]="1200"></span></p>
+        <p class="muted small">Pay once, use forever</p>
+        <ul>
+          @for (f of ['Unlimited resumes', 'Unlimited cover letters', 'Unlimited document edits', 'Everything in Free', 'Pay via JazzCash, Easypaisa or bank', 'No subscription, no renewals']; track f) {
+            <li><span class="i sm">check</span> {{ f }}</li>
+          }
+        </ul>
+        <a class="btn btn-primary btn-lg btn-block" [routerLink]="upgradeLink()" [appMagnetic]="0.12">Get lifetime access</a>
+      </div>
+    </div>
+    <div class="pay-methods" appReveal>
+      <span><span class="i">smartphone</span> JazzCash</span>
+      <span><span class="i">account_balance_wallet</span> Easypaisa</span>
+      <span><span class="i">account_balance</span> Bank transfer</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ FAQ -->
+<section class="section" id="faq">
+  <div class="wrap narrow">
+    <div class="section-head center" appReveal>
+      <span class="eyebrow">FAQ</span>
+      <h2 class="display">Questions, <span class="serif-i text-gradient">answered.</span></h2>
+    </div>
+    <div class="faq">
+      @for (f of faqs(); track f.q; let i = $index) {
+        <div class="qa" [class.open]="openFaq() === i" appReveal [revealDelay]="i * 60">
+          <button type="button" (click)="toggleFaq(i)" [attr.aria-expanded]="openFaq() === i" [attr.aria-controls]="'faq-' + i">
+            <span>{{ f.q }}</span>
+            <span class="plus" aria-hidden="true"><i></i><i></i></span>
+          </button>
+          <div class="answer" [id]="'faq-' + i" role="region">
+            <div><p>{{ f.a }}</p></div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Final CTA -->
+<section class="final">
+  <div class="wrap">
+    <div class="final-box" appPointer appReveal="zoom">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="grid-bg" aria-hidden="true"></div>
+      <div class="final-glow" aria-hidden="true"></div>
+      <div class="pages" aria-hidden="true">
+        <span class="pg p1"><i class="h"></i><i></i><i></i><i></i></span>
+        <span class="pg p2"><i class="h"></i><i></i><i></i><i></i></span>
+        <span class="pg p3"><i class="h"></i><i></i><i></i><i></i></span>
+      </div>
+      <h2 class="display">Your next job starts with <span class="serif-i">one</span> great resume.</h2>
+      <p>Create your first resume for free — it takes a few minutes.</p>
+      <a class="btn btn-xl btn-pill btn-white" [routerLink]="startLink()" appMagnetic>
+        Create free resume <span class="i">arrow_forward</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================ Footer -->
+<footer class="footer">
+  <div class="wrap footer-grid">
+    <div class="foot-brand">
+      <app-logo />
+      <p>AI resume builder, ATS checker and PDF editor — built for job seekers in Pakistan.</p>
+      <app-theme-toggle [showLabel]="true" />
+    </div>
+    <nav class="foot-col" aria-label="Product">
+      <h4>Product</h4>
+      <a routerLink="/templates">Templates</a>
+      <a routerLink="/" fragment="features">Features</a>
+      <a routerLink="/" fragment="pricing">Pricing</a>
+      <a routerLink="/" fragment="faq">FAQ</a>
+    </nav>
+    <nav class="foot-col" aria-label="Tools">
+      <h4>Tools</h4>
+      <a [routerLink]="auth.isAuthenticated() ? '/app/ats' : '/register'">ATS checker</a>
+      <a [routerLink]="auth.isAuthenticated() ? '/app/cover-letter' : '/register'">Cover letters</a>
+      <a [routerLink]="auth.isAuthenticated() ? '/app/documents' : '/register'">PDF editor</a>
+    </nav>
+    <nav class="foot-col" aria-label="Account">
+      <h4>Account</h4>
+      @if (auth.isAuthenticated()) {
+        <a routerLink="/app/dashboard">Dashboard</a>
+        <a routerLink="/app/billing">Plan &amp; billing</a>
+      } @else {
+        <a routerLink="/login">Log in</a>
+        <a routerLink="/register">Create account</a>
+      }
+    </nav>
+  </div>
+  <div class="wrap foot-bottom">
+    <span>© {{ year }} ResumeStudio. All rights reserved.</span>
+    <span>Lifetime access PKR {{ billing.price() }} · no subscription</span>
+  </div>
+  <div class="mega-word" aria-hidden="true">ResumeStudio</div>
+</footer>

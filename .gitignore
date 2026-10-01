@@ -1,0 +1,16 @@
+# dependencies & builds
+node_modules/
+dist/
+out-tsc/
+.angular/
+coverage/
+
+# backend runtime data & secrets
+backend/.env
+backend/uploads/
+backend/.cache/
+
+# logs & OS files
+*.log
+.DS_Store
+Thumbs.db

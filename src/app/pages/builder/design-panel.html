@@ -1,0 +1,179 @@
+@let design = d();
+
+<section class="panel">
+  <div class="panel-head">
+    <h4>Template & layout</h4>
+    <button class="btn btn-ghost btn-xs" type="button" (click)="resetToTemplate()" [disabled]="!store.templateId()"><span class="i">restart_alt</span> Reset</button>
+  </div>
+  <button class="btn btn-block" type="button" (click)="changeTemplate.emit()">
+    <span class="i">grid_view</span> Browse all templates
+  </button>
+  <div class="layouts">
+    @for (layout of meta()?.layouts ?? []; track layout.key) {
+      <button type="button" class="layout" [class.active]="design.layout === layout.key" (click)="set('layout', layout.key)" [title]="layout.description">
+        <span class="schema" [class.two]="layout.columns === 2" [attr.data-layout]="layout.key"><i></i><i></i><i></i></span>
+        <span class="lname">{{ layout.name }}</span>
+        @if (layout.ats) {
+          <span class="ats-dot" title="ATS-friendly"></span>
+        }
+      </button>
+    }
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h4>Colors</h4></div>
+  <div class="palettes">
+    @for (p of meta()?.palettes ?? []; track p.key) {
+      <button type="button" class="pal" [class.active]="isPaletteActive(p)" (click)="applyPalette(p)" [title]="p.name">
+        <span [style.background]="p.primary"></span><span [style.background]="p.accent"></span>
+      </button>
+    }
+  </div>
+  <div class="colors">
+    <label class="color-field"><input type="color" class="color-input" [ngModel]="design.primaryColor" (ngModelChange)="set('primaryColor', $event)" /> Primary</label>
+    <label class="color-field"><input type="color" class="color-input" [ngModel]="design.accentColor" (ngModelChange)="set('accentColor', $event)" /> Accent</label>
+    <label class="color-field"><input type="color" class="color-input" [ngModel]="design.textColor" (ngModelChange)="set('textColor', $event)" /> Text</label>
+    <label class="color-field"><input type="color" class="color-input" [ngModel]="design.mutedColor" (ngModelChange)="set('mutedColor', $event)" /> Muted</label>
+    <label class="color-field"><input type="color" class="color-input" [ngModel]="design.backgroundColor" (ngModelChange)="set('backgroundColor', $event)" /> Page</label>
+  </div>
+  @if (store.twoColumn()) {
+    <div class="sub-label">Sidebar</div>
+    <div class="row row-wrap">
+      <div class="segmented">
+        <button type="button" [class.active]="sidebarDark()" (click)="setSidebarMode('dark')">Dark</button>
+        <button type="button" [class.active]="!sidebarDark()" (click)="setSidebarMode('light')">Light</button>
+      </div>
+      <label class="color-field"><input type="color" class="color-input" [ngModel]="design.sidebarColor" (ngModelChange)="set('sidebarColor', $event)" /> Fill</label>
+      <label class="color-field"><input type="color" class="color-input" [ngModel]="design.sidebarTextColor" (ngModelChange)="set('sidebarTextColor', $event)" /> Text</label>
+    </div>
+  }
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h4>Typography</h4></div>
+  <div class="pairs">
+    @for (pair of meta()?.fonts ?? []; track pair.key) {
+      <button type="button" class="pair" [class.active]="design.headingFont === pair.heading && design.bodyFont === pair.body"
+        (click)="applyFontPair(pair.heading, pair.body)">
+        <span class="aa" [style.font-family]="fontStack(pair.heading)">Aa</span>
+        <span class="pname">{{ pair.name }}</span>
+      </button>
+    }
+  </div>
+  <div class="grid-2">
+    <div class="field">
+      <label>Headings</label>
+      <select class="select select-sm" [ngModel]="design.headingFont" (ngModelChange)="set('headingFont', $event)">
+        @for (f of fonts; track f) {
+          <option [value]="f" [style.font-family]="fontStack(f)">{{ f }}</option>
+        }
+      </select>
+    </div>
+    <div class="field">
+      <label>Body text</label>
+      <select class="select select-sm" [ngModel]="design.bodyFont" (ngModelChange)="set('bodyFont', $event)">
+        @for (f of fonts; track f) {
+          <option [value]="f" [style.font-family]="fontStack(f)">{{ f }}</option>
+        }
+      </select>
+    </div>
+  </div>
+  <div class="slider">
+    <label>Font size <b>{{ design.fontSize }} pt</b></label>
+    <input class="range" type="range" min="8.5" max="13" step="0.5" [ngModel]="design.fontSize" (ngModelChange)="setNumber('fontSize', $event)" />
+  </div>
+  <div class="slider">
+    <label>Line height <b>{{ design.lineHeight }}</b></label>
+    <input class="range" type="range" min="1.1" max="1.9" step="0.05" [ngModel]="design.lineHeight" (ngModelChange)="setNumber('lineHeight', $event)" />
+  </div>
+  <label class="switch"><input type="checkbox" [ngModel]="design.uppercaseHeadings" (ngModelChange)="set('uppercaseHeadings', $event)" /><span></span> Uppercase section headings</label>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h4>Spacing</h4></div>
+  <div class="slider">
+    <label>Page margins <b>{{ design.margin }} mm</b></label>
+    <input class="range" type="range" min="6" max="28" step="1" [ngModel]="design.margin" (ngModelChange)="setNumber('margin', $event)" />
+  </div>
+  <div class="slider">
+    <label>Section spacing <b>{{ design.sectionGap }} pt</b></label>
+    <input class="range" type="range" min="4" max="30" step="1" [ngModel]="design.sectionGap" (ngModelChange)="setNumber('sectionGap', $event)" />
+  </div>
+  @if (store.twoColumn()) {
+    <div class="slider">
+      <label>Sidebar width <b>{{ design.sidebarWidth }}%</b></label>
+      <input class="range" type="range" min="24" max="42" step="1" [ngModel]="design.sidebarWidth" (ngModelChange)="setNumber('sidebarWidth', $event)" />
+    </div>
+  }
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h4>Style</h4></div>
+  <div class="field">
+    <label>Section headings</label>
+    <div class="segmented">
+      @for (s of headingStyles; track s.key) {
+        <button type="button" [class.active]="design.headingStyle === s.key" (click)="set('headingStyle', s.key)">{{ s.label }}</button>
+      }
+    </div>
+  </div>
+  <div class="field">
+    <label>Bullets</label>
+    <div class="segmented">
+      @for (s of bulletStyles; track s.key) {
+        <button type="button" [class.active]="design.bulletStyle === s.key" (click)="set('bulletStyle', s.key)">{{ s.label }}</button>
+      }
+    </div>
+  </div>
+  <div class="field">
+    <label>Skills display</label>
+    <div class="segmented">
+      @for (s of skillStyles; track s.key) {
+        <button type="button" [class.active]="design.skillStyle === s.key" (click)="set('skillStyle', s.key)">{{ s.label }}</button>
+      }
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="field">
+      <label>Header alignment</label>
+      <div class="segmented block">
+        <button type="button" [class.active]="design.headerAlign === 'left'" (click)="set('headerAlign', 'left')"><span class="i">format_align_left</span></button>
+        <button type="button" [class.active]="design.headerAlign === 'center'" (click)="set('headerAlign', 'center')"><span class="i">format_align_center</span></button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Photo shape</label>
+      <div class="segmented block">
+        <button type="button" [class.active]="design.photoShape === 'circle'" (click)="set('photoShape', 'circle')"><span class="i">circle</span></button>
+        <button type="button" [class.active]="design.photoShape === 'rounded'" (click)="set('photoShape', 'rounded')"><span class="i">rounded_corner</span></button>
+        <button type="button" [class.active]="design.photoShape === 'square'" (click)="set('photoShape', 'square')"><span class="i">square</span></button>
+      </div>
+    </div>
+  </div>
+  <div class="toggles">
+    <label class="switch"><input type="checkbox" [ngModel]="design.showIcons" (ngModelChange)="set('showIcons', $event)" /><span></span> Contact icons</label>
+    <label class="switch"><input type="checkbox" [ngModel]="design.showPhoto" (ngModelChange)="set('showPhoto', $event)" /><span></span> Show photo</label>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head"><h4>Page</h4></div>
+  <div class="grid-2">
+    <div class="field">
+      <label>Paper size</label>
+      <div class="segmented block">
+        <button type="button" [class.active]="design.pageSize === 'A4'" (click)="set('pageSize', 'A4')">A4</button>
+        <button type="button" [class.active]="design.pageSize === 'Letter'" (click)="set('pageSize', 'Letter')">US Letter</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Date format</label>
+      <select class="select select-sm" [ngModel]="design.dateFormat" (ngModelChange)="set('dateFormat', $event)">
+        @for (f of dateFormats; track f) {
+          <option [value]="f">{{ f }}</option>
+        }
+      </select>
+    </div>
+  </div>
+</section>

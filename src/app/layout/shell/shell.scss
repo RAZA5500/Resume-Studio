@@ -1,0 +1,544 @@
+:host {
+  display: block;
+}
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+.sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 100vh;
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 14px 14px;
+  background: var(--surface-glass);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  border-right: 1px solid var(--border);
+  transition:
+    width 0.45s var(--ease-out),
+    padding 0.45s var(--ease-out),
+    transform 0.45s var(--ease-out);
+}
+
+.side-glow {
+  position: absolute;
+  top: -130px;
+  left: -90px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.24), transparent 65%);
+  pointer-events: none;
+  animation: float-y 9s var(--ease-in-out) infinite;
+}
+
+.brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 4px 4px;
+  animation: rise-in 0.6s var(--ease-out) both;
+}
+
+.collapse-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition:
+    background 0.2s var(--ease),
+    color 0.2s var(--ease);
+  &:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .i {
+    font-size: 19px;
+  }
+}
+
+.new-btn {
+  height: 44px;
+  border-radius: 14px;
+  font-size: 14px;
+  animation: rise-in 0.6s var(--ease-out) 0.08s both;
+  .i {
+    font-size: 20px;
+  }
+}
+
+nav {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -14px;
+  padding: 0 14px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.nav-label {
+  padding: 12px 10px 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 13px;
+  color: var(--text-2);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  transition:
+    background 0.25s var(--ease),
+    color 0.25s var(--ease);
+  animation: nav-in 0.55s var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 45ms + 120ms);
+  &:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    .ni {
+      transform: scale(1.08) rotate(-6deg);
+      color: var(--primary-700);
+    }
+  }
+  &.active {
+    color: var(--text);
+    background: linear-gradient(90deg, var(--primary-50), transparent 92%);
+    &::before {
+      content: '';
+      position: absolute;
+      left: -14px;
+      top: 9px;
+      bottom: 9px;
+      width: 3px;
+      border-radius: 0 4px 4px 0;
+      background: var(--grad-brand);
+      box-shadow: 0 0 14px rgba(217, 70, 239, 0.85);
+      animation: active-bar 0.5s var(--ease-spring) both;
+    }
+    .ni {
+      color: #fff;
+      background: var(--grad-brand);
+      box-shadow: 0 8px 18px -8px rgba(139, 92, 246, 0.95);
+    }
+  }
+}
+
+.ni {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  transition:
+    transform 0.45s var(--ease-spring),
+    background 0.3s var(--ease),
+    color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
+  .i {
+    font-size: 19px;
+  }
+}
+
+/* ---------------------------------------------------------------- plan card */
+.plan-card {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(217, 70, 239, 0.16), transparent 60%),
+    var(--surface-2);
+  animation: rise-in 0.7s var(--ease-out) 0.35s backwards;
+  .btn {
+    margin-top: 6px;
+  }
+}
+
+.plan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    .i {
+      font-size: 16px;
+      color: var(--amber);
+    }
+  }
+}
+
+.meter-row {
+  display: flex;
+  font-size: 12px;
+  color: var(--text-2);
+  .count {
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    &.full {
+      color: var(--danger);
+    }
+  }
+}
+
+.bar {
+  height: 4px;
+  margin-top: 5px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+  i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--grad-brand);
+    transform-origin: left center;
+    transition: width 1s var(--ease-out);
+    animation: bar-grow 1.2s var(--ease-out) 0.5s backwards;
+  }
+  &.full i {
+    background: var(--danger);
+  }
+}
+
+.upgrade-mini {
+  margin-top: auto;
+  align-self: center;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #fff;
+  background: var(--grad-warm);
+  box-shadow: 0 12px 28px -12px rgba(249, 115, 22, 0.9);
+  animation: float-y 4s var(--ease-in-out) infinite;
+}
+
+/* ---------------------------------------------------------------- footer / user */
+.side-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  animation: rise-in 0.6s var(--ease-out) 0.45s backwards;
+}
+
+/* Lifetime members have no plan card, so the footer sits at the bottom on its own. */
+nav + .side-foot {
+  margin-top: auto;
+}
+
+.user {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+.user-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+  &:hover {
+    background: var(--surface-2);
+  }
+  > .i {
+    color: var(--text-3);
+  }
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+  background: var(--grad-brand);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 3.5px rgba(167, 139, 250, 0.6);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+  strong,
+  small {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  strong {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  small {
+    color: var(--text-3);
+    font-size: 11.5px;
+  }
+}
+
+.menu.up {
+  width: 240px;
+}
+
+/* ---------------------------------------------------------------- content */
+.content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-bg {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--sidebar-w);
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: left 0.45s var(--ease-out);
+  i {
+    position: absolute;
+    border-radius: 50%;
+    &:nth-child(1) {
+      top: -300px;
+      right: -160px;
+      width: 680px;
+      height: 680px;
+      background: radial-gradient(circle, var(--aurora-1), transparent 65%);
+      animation: blob-b 32s var(--ease-in-out) infinite alternate;
+    }
+    &:nth-child(2) {
+      top: -260px;
+      left: 6%;
+      width: 560px;
+      height: 560px;
+      opacity: 0.55;
+      background: radial-gradient(circle, var(--aurora-2), transparent 65%);
+      animation: blob-a 36s var(--ease-in-out) infinite alternate;
+    }
+  }
+}
+
+.content-main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-bar,
+.scrim {
+  display: none;
+}
+
+.upgrade-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: var(--grad-warm);
+  box-shadow: 0 8px 20px -8px rgba(249, 115, 22, 0.8);
+}
+
+@keyframes nav-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+
+@keyframes active-bar {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes drawer-item {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+/* ---------------------------------------------------------------- collapsed (desktop only) */
+@media (min-width: 961px) {
+  .collapsed {
+    .sidebar {
+      width: var(--sidebar-w-collapsed);
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+    .brand {
+      flex-direction: column;
+      gap: 12px;
+      padding: 2px 0 4px;
+    }
+    .label {
+      display: none !important;
+    }
+    .new-btn {
+      width: 48px;
+      padding: 0;
+      align-self: center;
+    }
+    nav {
+      margin: 0 -12px;
+      padding: 0 12px;
+    }
+    .nav-label {
+      height: 1px;
+      margin: 12px 8px;
+      padding: 0;
+      font-size: 0;
+      background: var(--border);
+    }
+    nav a {
+      justify-content: center;
+      padding: 6px;
+      &.active::before {
+        left: -12px;
+      }
+    }
+    .side-foot {
+      flex-direction: column;
+      gap: 8px;
+    }
+    .user {
+      flex: none;
+    }
+    .user-btn {
+      justify-content: center;
+      padding: 4px;
+    }
+    .content-bg {
+      left: var(--sidebar-w-collapsed);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- mobile drawer */
+@media (max-width: 960px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    width: min(300px, 86vw);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-105%);
+    &.open {
+      transform: none;
+      /* A different keyframe name restarts the stagger every time the drawer opens. */
+      nav a {
+        animation: drawer-item 0.5s var(--ease-out) backwards;
+        animation-delay: calc(var(--i, 0) * 45ms + 150ms);
+      }
+    }
+  }
+  .collapse-btn {
+    display: none;
+  }
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: var(--overlay);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: fade-in 0.3s var(--ease) both;
+    &.is-leaving {
+      animation: fade-out 0.25s var(--ease) both;
+    }
+  }
+  .mobile-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--topbar-h);
+    padding: 0 12px;
+    background: var(--surface-glass);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border-bottom: 1px solid var(--border);
+  }
+  .content-bg {
+    left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .upgrade-pill {
+    display: none;
+  }
+}

@@ -1,0 +1,522 @@
+@let c = this.c();
+
+<!-- ============================ Personal details ============================ -->
+<div class="sec card" [class.is-open]="isOpen('personal')">
+  <button type="button" class="sec-head" (click)="toggle('personal')">
+    <span class="sec-ic"><span class="i">badge</span></span>
+    <span class="grow sec-title">Personal details</span>
+    <span class="i chevron">expand_more</span>
+  </button>
+  @if (isOpen('personal')) {
+    <div class="sec-body">
+      <div class="photo-row">
+        <div class="avatar" [style.background-image]="c.personal.photo ? 'url(' + c.personal.photo + ')' : null">
+          @if (!c.personal.photo) {
+            <span class="i">add_a_photo</span>
+          }
+        </div>
+        <div class="stack gap-sm">
+          <div class="row">
+            <label class="btn btn-sm">
+              <span class="i">upload</span> {{ c.personal.photo ? 'Change photo' : 'Upload photo' }}
+              <input #photoInput type="file" accept="image/*" hidden (change)="uploadPhoto(photoInput)" />
+            </label>
+            @if (c.personal.photo) {
+              <button class="btn btn-ghost btn-sm" type="button" (click)="removePhoto()"><span class="i">delete</span></button>
+            }
+          </div>
+          <label class="switch">
+            <input type="checkbox" [ngModel]="store.design().showPhoto" (ngModelChange)="store.setDesign({ showPhoto: $event })" />
+            <span></span> Show photo on resume
+          </label>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="field span-2">
+          <label>Full name</label>
+          <input class="input" [ngModel]="c.personal.fullName" (ngModelChange)="set(c.personal, 'fullName', $event)" placeholder="e.g. Sara Khan" />
+        </div>
+        <div class="field span-2">
+          <label>Professional title</label>
+          <input class="input" [ngModel]="c.personal.jobTitle" (ngModelChange)="set(c.personal, 'jobTitle', $event)" placeholder="e.g. Senior Frontend Engineer" />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input class="input" type="email" [ngModel]="c.personal.email" (ngModelChange)="set(c.personal, 'email', $event)" placeholder="you@email.com" />
+        </div>
+        <div class="field">
+          <label>Phone</label>
+          <input class="input" [ngModel]="c.personal.phone" (ngModelChange)="set(c.personal, 'phone', $event)" placeholder="+92 300 1234567" />
+        </div>
+        <div class="field">
+          <label>Location</label>
+          <input class="input" [ngModel]="c.personal.location" (ngModelChange)="set(c.personal, 'location', $event)" placeholder="Lahore, Pakistan" />
+        </div>
+        <div class="field">
+          <label>Website / portfolio</label>
+          <input class="input" [ngModel]="c.personal.website" (ngModelChange)="set(c.personal, 'website', $event)" placeholder="yourname.dev" />
+        </div>
+        <div class="field">
+          <label>LinkedIn</label>
+          <input class="input" [ngModel]="c.personal.linkedin" (ngModelChange)="set(c.personal, 'linkedin', $event)" placeholder="linkedin.com/in/yourname" />
+        </div>
+        <div class="field">
+          <label>GitHub</label>
+          <input class="input" [ngModel]="c.personal.github" (ngModelChange)="set(c.personal, 'github', $event)" placeholder="github.com/yourname" />
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- ============================ Sortable sections ============================ -->
+<div class="sections" cdkDropList (cdkDropListDropped)="drop($event)">
+  @for (key of c.sectionOrder; track key) {
+    <div class="sec card" cdkDrag [class.is-open]="isOpen(key)" [class.is-hidden]="isHidden(key)">
+      <div class="sec-drag-ph" *cdkDragPlaceholder></div>
+      <div class="sec-head" role="button" tabindex="0" (click)="toggle(key)" (keydown.enter)="toggle(key)">
+        <span class="i handle" cdkDragHandle (click)="$event.stopPropagation()" title="Drag to reorder">drag_indicator</span>
+        <span class="sec-ic"><span class="i">{{ icon(key) }}</span></span>
+        <span class="grow sec-title">{{ title(key) }}</span>
+        @if (count(key)) {
+          <span class="badge">{{ count(key) }}</span>
+        }
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" title="Rename section" (click)="renameSection(key, $event)">
+          <span class="i">edit</span>
+        </button>
+        <button class="btn btn-ghost btn-icon btn-xs" type="button" [title]="isHidden(key) ? 'Show on resume' : 'Hide from resume'" (click)="toggleHidden(key, $event)">
+          <span class="i">{{ isHidden(key) ? 'visibility_off' : 'visibility' }}</span>
+        </button>
+        <span class="i chevron">expand_more</span>
+      </div>
+
+      @if (isOpen(key)) {
+        <div class="sec-body">
+          @switch (type(key)) {
+            <!-- ---------------- Summary ---------------- -->
+            @case ('summary') {
+              <div class="field">
+                <label>
+                  Summary
+                  <span class="subtle small">{{ wordCount(c.summary) }} words · aim for 40–80</span>
+                </label>
+                <textarea class="textarea" rows="5" [ngModel]="c.summary" (ngModelChange)="set(c, 'summary', $event)"
+                  placeholder="2–4 sentences: who you are, years of experience, top skills and your biggest achievement."></textarea>
+              </div>
+              <div class="ai-bar">
+                <button class="btn btn-soft btn-xs" type="button" (click)="aiSummary()"><span class="i">auto_awesome</span> Write with AI</button>
+                <button class="btn btn-ghost btn-xs" type="button" (click)="aiImprove('summary', c.summary, 'summary')"><span class="i">magic_button</span> Improve</button>
+                <button class="btn btn-ghost btn-xs" type="button" (click)="aiImprove('summary', c.summary, 'grammar')"><span class="i">spellcheck</span> Fix grammar</button>
+                <button class="btn btn-ghost btn-xs" type="button" (click)="aiImprove('summary', c.summary, 'shorten')"><span class="i">compress</span> Shorten</button>
+              </div>
+              <ng-container *ngTemplateOutlet="aiPanelTpl; context: { $implicit: 'summary' }" />
+            }
+
+            <!-- ---------------- Experience ---------------- -->
+            @case ('experience') {
+              @for (e of c.experience; track e.id; let i = $index, first = $first, last = $last) {
+                <div class="item" [class.open]="openItem() === e.id">
+                  <div class="item-head" role="button" tabindex="0" (click)="toggleItem(e.id)" (keydown.enter)="toggleItem(e.id)">
+                    <div class="grow">
+                      <strong>{{ e.jobTitle || 'Untitled position' }}</strong>
+                      <small>{{ e.company || 'Company' }} · {{ dateRange(e.startDate, e.endDate, e.current) || 'Dates' }}</small>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="first" (click)="move(c.experience, i, -1, $event)"><span class="i">arrow_upward</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="last" (click)="move(c.experience, i, 1, $event)"><span class="i">arrow_downward</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" title="Duplicate" (click)="duplicateItem(c.experience, e, $event)"><span class="i">content_copy</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs danger" type="button" title="Delete" (click)="removeItem(c.experience, e, $event)"><span class="i">delete</span></button>
+                  </div>
+                  @if (openItem() === e.id) {
+                    <div class="item-body grid-2">
+                      <div class="field">
+                        <label>Job title</label>
+                        <input class="input" [ngModel]="e.jobTitle" (ngModelChange)="set(e, 'jobTitle', $event)" placeholder="Software Engineer" />
+                      </div>
+                      <div class="field">
+                        <label>Company</label>
+                        <input class="input" [ngModel]="e.company" (ngModelChange)="set(e, 'company', $event)" placeholder="Acme Inc." />
+                      </div>
+                      <div class="field">
+                        <label>Start date</label>
+                        <input class="input" type="month" [ngModel]="e.startDate" (ngModelChange)="set(e, 'startDate', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>End date</label>
+                        <input class="input" type="month" [disabled]="e.current" [ngModel]="e.endDate" (ngModelChange)="set(e, 'endDate', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>Location</label>
+                        <input class="input" [ngModel]="e.location" (ngModelChange)="set(e, 'location', $event)" placeholder="Karachi / Remote" />
+                      </div>
+                      <div class="field current">
+                        <label class="checkbox"><input type="checkbox" [ngModel]="e.current" (ngModelChange)="set(e, 'current', $event)" /> I currently work here</label>
+                      </div>
+                      <div class="field span-2">
+                        <label>Achievements & responsibilities <span class="subtle small">one bullet per line</span></label>
+                        <textarea class="textarea" rows="6" [ngModel]="e.description" (ngModelChange)="set(e, 'description', $event)"
+                          placeholder="Led a team of 5 to deliver…&#10;Increased conversion by 25% by…"></textarea>
+                      </div>
+                      <div class="ai-bar span-2">
+                        <button class="btn btn-soft btn-xs" type="button" (click)="aiBullets('exp:' + e.id, e.jobTitle, e.company, e.description)"><span class="i">auto_awesome</span> Generate bullets</button>
+                        <button class="btn btn-ghost btn-xs" type="button" (click)="aiImprove('exp:' + e.id, e.description, 'bullets')"><span class="i">magic_button</span> Improve bullets</button>
+                        <button class="btn btn-ghost btn-xs" type="button" (click)="aiImprove('exp:' + e.id, e.description, 'quantify')"><span class="i">percent</span> Add metrics</button>
+                      </div>
+                      <div class="span-2">
+                        <ng-container *ngTemplateOutlet="aiPanelTpl; context: { $implicit: 'exp:' + e.id }" />
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              <button class="btn btn-soft btn-sm add" type="button" (click)="addExperience()"><span class="i">add</span> Add experience</button>
+            }
+
+            <!-- ---------------- Education ---------------- -->
+            @case ('education') {
+              @for (e of c.education; track e.id; let i = $index, first = $first, last = $last) {
+                <div class="item" [class.open]="openItem() === e.id">
+                  <div class="item-head" role="button" tabindex="0" (click)="toggleItem(e.id)" (keydown.enter)="toggleItem(e.id)">
+                    <div class="grow">
+                      <strong>{{ e.degree || 'Degree' }}</strong>
+                      <small>{{ e.institution || 'Institution' }} · {{ dateRange(e.startDate, e.endDate, e.current) || 'Dates' }}</small>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="first" (click)="move(c.education, i, -1, $event)"><span class="i">arrow_upward</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="last" (click)="move(c.education, i, 1, $event)"><span class="i">arrow_downward</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs danger" type="button" (click)="removeItem(c.education, e, $event)"><span class="i">delete</span></button>
+                  </div>
+                  @if (openItem() === e.id) {
+                    <div class="item-body grid-2">
+                      <div class="field span-2">
+                        <label>Degree / program</label>
+                        <input class="input" [ngModel]="e.degree" (ngModelChange)="set(e, 'degree', $event)" placeholder="BS Computer Science" />
+                      </div>
+                      <div class="field">
+                        <label>Institution</label>
+                        <input class="input" [ngModel]="e.institution" (ngModelChange)="set(e, 'institution', $event)" placeholder="University name" />
+                      </div>
+                      <div class="field">
+                        <label>Location</label>
+                        <input class="input" [ngModel]="e.location" (ngModelChange)="set(e, 'location', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>Start date</label>
+                        <input class="input" type="month" [ngModel]="e.startDate" (ngModelChange)="set(e, 'startDate', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>End date</label>
+                        <input class="input" type="month" [disabled]="e.current" [ngModel]="e.endDate" (ngModelChange)="set(e, 'endDate', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>GPA / grade (optional)</label>
+                        <input class="input" [ngModel]="e.gpa" (ngModelChange)="set(e, 'gpa', $event)" placeholder="3.7 / 4.0" />
+                      </div>
+                      <div class="field current">
+                        <label class="checkbox"><input type="checkbox" [ngModel]="e.current" (ngModelChange)="set(e, 'current', $event)" /> Currently studying</label>
+                      </div>
+                      <div class="field span-2">
+                        <label>Details <span class="subtle small">honors, coursework, activities</span></label>
+                        <textarea class="textarea" rows="3" [ngModel]="e.description" (ngModelChange)="set(e, 'description', $event)"></textarea>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              <button class="btn btn-soft btn-sm add" type="button" (click)="addEducation()"><span class="i">add</span> Add education</button>
+            }
+
+            <!-- ---------------- Skills ---------------- -->
+            @case ('skills') {
+              <div class="chips">
+                @for (s of c.skills; track s.id) {
+                  <span class="skill">
+                    <span class="name">{{ s.name }}</span>
+                    <span class="lvl" title="Proficiency">
+                      @for (n of [1, 2, 3, 4, 5]; track n) {
+                        <button type="button" [class.on]="s.level >= n" (click)="setLevel(s, n)" [attr.aria-label]="'Level ' + n"></button>
+                      }
+                    </span>
+                    <button type="button" class="x" (click)="removeItem(c.skills, s)" aria-label="Remove skill"><span class="i sm">close</span></button>
+                  </span>
+                }
+              </div>
+              <div class="row">
+                <input #skillInput class="input" placeholder="Type skills and press Enter (comma separated)" (keydown.enter)="addSkills(skillInput)" />
+                <button class="btn" type="button" (click)="addSkills(skillInput)">Add</button>
+              </div>
+              <div class="ai-bar">
+                <button class="btn btn-soft btn-xs" type="button" (click)="suggestSkills()" [disabled]="suggestingSkills()">
+                  @if (suggestingSkills()) {
+                    <span class="spinner"></span>
+                  } @else {
+                    <span class="i">auto_awesome</span>
+                  }
+                  Suggest skills with AI
+                </button>
+                <span class="subtle small">Dots = proficiency (used by bar & dot skill styles)</span>
+              </div>
+              @if (skillSuggestions(); as sug) {
+                <div class="suggestions">
+                  @for (group of [{ label: 'Hard skills', items: sug.hardSkills }, { label: 'Tools', items: sug.tools }, { label: 'Soft skills', items: sug.softSkills }]; track group.label) {
+                    @if (group.items.length) {
+                      <div class="sug-label">{{ group.label }}</div>
+                      <div class="chips">
+                        @for (name of group.items; track name) {
+                          <button type="button" class="chip" (click)="addSuggestedSkill(name)"><span class="i">add</span> {{ name }}</button>
+                        }
+                      </div>
+                    }
+                  }
+                  <button class="btn btn-ghost btn-xs" type="button" (click)="skillSuggestions.set(null)">Hide suggestions</button>
+                </div>
+              }
+            }
+
+            <!-- ---------------- Projects ---------------- -->
+            @case ('projects') {
+              @for (p of c.projects; track p.id; let i = $index, first = $first, last = $last) {
+                <div class="item" [class.open]="openItem() === p.id">
+                  <div class="item-head" role="button" tabindex="0" (click)="toggleItem(p.id)" (keydown.enter)="toggleItem(p.id)">
+                    <div class="grow">
+                      <strong>{{ p.name || 'Untitled project' }}</strong>
+                      <small>{{ p.role || 'Role' }}</small>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="first" (click)="move(c.projects, i, -1, $event)"><span class="i">arrow_upward</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="last" (click)="move(c.projects, i, 1, $event)"><span class="i">arrow_downward</span></button>
+                    <button class="btn btn-ghost btn-icon btn-xs danger" type="button" (click)="removeItem(c.projects, p, $event)"><span class="i">delete</span></button>
+                  </div>
+                  @if (openItem() === p.id) {
+                    <div class="item-body grid-2">
+                      <div class="field">
+                        <label>Project name</label>
+                        <input class="input" [ngModel]="p.name" (ngModelChange)="set(p, 'name', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>Your role</label>
+                        <input class="input" [ngModel]="p.role" (ngModelChange)="set(p, 'role', $event)" placeholder="Lead developer" />
+                      </div>
+                      <div class="field span-2">
+                        <label>Link</label>
+                        <input class="input" [ngModel]="p.link" (ngModelChange)="set(p, 'link', $event)" placeholder="github.com/you/project" />
+                      </div>
+                      <div class="field">
+                        <label>Start</label>
+                        <input class="input" type="month" [ngModel]="p.startDate" (ngModelChange)="set(p, 'startDate', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>End</label>
+                        <input class="input" type="month" [ngModel]="p.endDate" (ngModelChange)="set(p, 'endDate', $event)" />
+                      </div>
+                      <div class="field span-2">
+                        <label>Description <span class="subtle small">one bullet per line</span></label>
+                        <textarea class="textarea" rows="4" [ngModel]="p.description" (ngModelChange)="set(p, 'description', $event)"></textarea>
+                      </div>
+                      <div class="ai-bar span-2">
+                        <button class="btn btn-soft btn-xs" type="button" (click)="aiImprove('proj:' + p.id, p.description, 'bullets')"><span class="i">magic_button</span> Improve with AI</button>
+                      </div>
+                      <div class="span-2">
+                        <ng-container *ngTemplateOutlet="aiPanelTpl; context: { $implicit: 'proj:' + p.id }" />
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              <button class="btn btn-soft btn-sm add" type="button" (click)="addProject()"><span class="i">add</span> Add project</button>
+            }
+
+            <!-- ---------------- Certifications ---------------- -->
+            @case ('certifications') {
+              @for (x of c.certifications; track x.id) {
+                <div class="item" [class.open]="openItem() === x.id">
+                  <div class="item-head" role="button" tabindex="0" (click)="toggleItem(x.id)" (keydown.enter)="toggleItem(x.id)">
+                    <div class="grow">
+                      <strong>{{ x.name || 'Certification' }}</strong>
+                      <small>{{ x.issuer || 'Issuer' }}</small>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-xs danger" type="button" (click)="removeItem(c.certifications, x, $event)"><span class="i">delete</span></button>
+                  </div>
+                  @if (openItem() === x.id) {
+                    <div class="item-body grid-2">
+                      <div class="field span-2">
+                        <label>Name</label>
+                        <input class="input" [ngModel]="x.name" (ngModelChange)="set(x, 'name', $event)" placeholder="AWS Certified Developer" />
+                      </div>
+                      <div class="field">
+                        <label>Issuer</label>
+                        <input class="input" [ngModel]="x.issuer" (ngModelChange)="set(x, 'issuer', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>Date</label>
+                        <input class="input" type="month" [ngModel]="x.date" (ngModelChange)="set(x, 'date', $event)" />
+                      </div>
+                      <div class="field span-2">
+                        <label>Credential link (optional)</label>
+                        <input class="input" [ngModel]="x.link" (ngModelChange)="set(x, 'link', $event)" />
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              <button class="btn btn-soft btn-sm add" type="button" (click)="addCertification()"><span class="i">add</span> Add certification</button>
+            }
+
+            <!-- ---------------- Languages ---------------- -->
+            @case ('languages') {
+              @for (l of c.languages; track l.id) {
+                <div class="row lang-row">
+                  <input class="input grow" [ngModel]="l.name" (ngModelChange)="set(l, 'name', $event)" placeholder="Language" />
+                  <select class="select level" [ngModel]="l.proficiency" (ngModelChange)="set(l, 'proficiency', $event)">
+                    @for (level of levels; track level) {
+                      <option [value]="level">{{ level }}</option>
+                    }
+                  </select>
+                  <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="removeItem(c.languages, l)"><span class="i">delete</span></button>
+                </div>
+              }
+              <button class="btn btn-soft btn-sm add" type="button" (click)="addLanguage()"><span class="i">add</span> Add language</button>
+            }
+
+            <!-- ---------------- Awards ---------------- -->
+            @case ('awards') {
+              @for (x of c.awards; track x.id) {
+                <div class="item" [class.open]="openItem() === x.id">
+                  <div class="item-head" role="button" tabindex="0" (click)="toggleItem(x.id)" (keydown.enter)="toggleItem(x.id)">
+                    <div class="grow">
+                      <strong>{{ x.title || 'Award' }}</strong>
+                      <small>{{ x.issuer || 'Issuer' }}</small>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-xs danger" type="button" (click)="removeItem(c.awards, x, $event)"><span class="i">delete</span></button>
+                  </div>
+                  @if (openItem() === x.id) {
+                    <div class="item-body grid-2">
+                      <div class="field span-2">
+                        <label>Title</label>
+                        <input class="input" [ngModel]="x.title" (ngModelChange)="set(x, 'title', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>Issuer</label>
+                        <input class="input" [ngModel]="x.issuer" (ngModelChange)="set(x, 'issuer', $event)" />
+                      </div>
+                      <div class="field">
+                        <label>Date</label>
+                        <input class="input" type="month" [ngModel]="x.date" (ngModelChange)="set(x, 'date', $event)" />
+                      </div>
+                      <div class="field span-2">
+                        <label>Description</label>
+                        <textarea class="textarea" rows="2" [ngModel]="x.description" (ngModelChange)="set(x, 'description', $event)"></textarea>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+              <button class="btn btn-soft btn-sm add" type="button" (click)="addAward()"><span class="i">add</span> Add award</button>
+            }
+
+            <!-- ---------------- Interests ---------------- -->
+            @case ('interests') {
+              <div class="chips">
+                @for (item of c.interests; track item.id) {
+                  <span class="skill">
+                    <span class="name">{{ item.name }}</span>
+                    <button type="button" class="x" (click)="removeItem(c.interests, item)" aria-label="Remove"><span class="i sm">close</span></button>
+                  </span>
+                }
+              </div>
+              <div class="row">
+                <input #interestInput class="input" placeholder="e.g. Photography, Chess, Volunteering" (keydown.enter)="addInterests(interestInput)" />
+                <button class="btn" type="button" (click)="addInterests(interestInput)">Add</button>
+              </div>
+            }
+
+            <!-- ---------------- Custom ---------------- -->
+            @case ('custom') {
+              @if (customSection(key); as section) {
+                @for (item of section.items; track item.id; let i = $index, first = $first, last = $last) {
+                  <div class="item" [class.open]="openItem() === item.id">
+                    <div class="item-head" role="button" tabindex="0" (click)="toggleItem(item.id)" (keydown.enter)="toggleItem(item.id)">
+                      <div class="grow">
+                        <strong>{{ item.title || 'Entry' }}</strong>
+                        <small>{{ item.subtitle }}</small>
+                      </div>
+                      <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="first" (click)="move(section.items, i, -1, $event)"><span class="i">arrow_upward</span></button>
+                      <button class="btn btn-ghost btn-icon btn-xs" type="button" [disabled]="last" (click)="move(section.items, i, 1, $event)"><span class="i">arrow_downward</span></button>
+                      <button class="btn btn-ghost btn-icon btn-xs danger" type="button" (click)="removeItem(section.items, item, $event)"><span class="i">delete</span></button>
+                    </div>
+                    @if (openItem() === item.id) {
+                      <div class="item-body grid-2">
+                        <div class="field">
+                          <label>Title</label>
+                          <input class="input" [ngModel]="item.title" (ngModelChange)="set(item, 'title', $event)" />
+                        </div>
+                        <div class="field">
+                          <label>Subtitle</label>
+                          <input class="input" [ngModel]="item.subtitle" (ngModelChange)="set(item, 'subtitle', $event)" />
+                        </div>
+                        <div class="field span-2">
+                          <label>Date / period</label>
+                          <input class="input" [ngModel]="item.date" (ngModelChange)="set(item, 'date', $event)" placeholder="2023 – Present" />
+                        </div>
+                        <div class="field span-2">
+                          <label>Description <span class="subtle small">one bullet per line</span></label>
+                          <textarea class="textarea" rows="3" [ngModel]="item.description" (ngModelChange)="set(item, 'description', $event)"></textarea>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+                <div class="row">
+                  <button class="btn btn-soft btn-sm add" type="button" (click)="addCustomItem(key)"><span class="i">add</span> Add entry</button>
+                  <button class="btn btn-danger-soft btn-sm" type="button" (click)="deleteCustomSection(key, $event)"><span class="i">delete</span> Delete section</button>
+                </div>
+              }
+            }
+          }
+        </div>
+      }
+    </div>
+  }
+</div>
+
+<button class="btn btn-block add-section" type="button" (click)="addCustomSection()">
+  <span class="i">library_add</span> Add custom section
+</button>
+
+<!-- ============================ AI suggestion panel ============================ -->
+<ng-template #aiPanelTpl let-target>
+  @if (aiPanel(); as panel) {
+    @if (panel.target === target) {
+      <div class="ai-panel">
+        <div class="ai-panel-head">
+          <span class="i">auto_awesome</span>
+          <strong class="grow">{{ panel.kind === 'bullets' ? 'Suggested bullet points' : 'AI suggestions' }}</strong>
+          @if (panel.source === 'offline') {
+            <span class="badge">offline</span>
+          }
+          <button class="btn btn-ghost btn-icon btn-xs" type="button" (click)="aiPanel.set(null)"><span class="i">close</span></button>
+        </div>
+        @if (panel.loading) {
+          <div class="ai-loading"><span class="spinner"></span> Thinking…</div>
+        } @else {
+          @for (option of panel.options; track $index) {
+            <div class="ai-option">
+              <p>{{ option }}</p>
+              <div class="row">
+                @if (panel.kind === 'bullets') {
+                  <button class="btn btn-soft btn-xs" type="button" (click)="applyAi(option, 'append')"><span class="i">add</span> Add</button>
+                } @else {
+                  <button class="btn btn-primary btn-xs" type="button" (click)="applyAi(option, 'replace')"><span class="i">check</span> Use this</button>
+                }
+              </div>
+            </div>
+          }
+          @if (panel.kind === 'bullets' && panel.options.length > 1) {
+            <button class="btn btn-primary btn-xs" type="button" (click)="applyAllBullets()"><span class="i">done_all</span> Add all</button>
+          }
+          @if (!panel.options.length) {
+            <p class="subtle small">No more suggestions.</p>
+          }
+        }
+      </div>
+    }
+  }
+</ng-template>

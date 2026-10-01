@@ -1,0 +1,120 @@
+<div class="auth">
+  <div class="bg" aria-hidden="true">
+    <div class="aurora"><i></i><i></i><i></i></div>
+    <div class="grid-bg"></div>
+    <div class="noise"></div>
+  </div>
+
+  <section class="form-side">
+    <div class="top">
+      <app-logo />
+      <app-theme-toggle />
+    </div>
+
+    <div class="form-card">
+      <span class="kicker"><span class="pulse-dot"></span> {{ isRegister() ? 'Free forever plan' : 'Welcome back' }}</span>
+      <h1>{{ isRegister() ? 'Create your free account' : 'Log in to your studio' }}</h1>
+      <p class="muted">
+        {{ isRegister() ? 'Start for free — no card needed.' : 'Pick up right where you left off.' }}
+      </p>
+
+      @if (expired()) {
+        <div class="alert warning"><span class="i">schedule</span> Your session expired. Please sign in again.</div>
+      }
+      @if (template()) {
+        <div class="alert"><span class="i">palette</span> Your selected template will be ready right after you {{ isRegister() ? 'sign up' : 'log in' }}.</div>
+      }
+
+      <form class="stack" (ngSubmit)="submit()" novalidate>
+        @if (isRegister()) {
+          <div class="field">
+            <label for="name">Full name</label>
+            <div class="input-group">
+              <span class="i">person</span>
+              <input id="name" class="input" name="name" autocomplete="name" placeholder="Sara Khan"
+                [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" />
+            </div>
+          </div>
+        }
+        <div class="field">
+          <label for="email">Email</label>
+          <div class="input-group">
+            <span class="i">mail</span>
+            <input id="email" class="input" type="email" name="email" autocomplete="email" placeholder="you@example.com"
+              [ngModel]="email()" (ngModelChange)="email.set($event)" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-group">
+            <span class="i">lock</span>
+            <input id="password" class="input" name="password" [type]="showPassword() ? 'text' : 'password'"
+              [autocomplete]="isRegister() ? 'new-password' : 'current-password'" placeholder="••••••••"
+              [ngModel]="password()" (ngModelChange)="password.set($event)" />
+            <button class="eye" type="button" (click)="showPassword.set(!showPassword())" aria-label="Toggle password visibility">
+              <span class="i sm">{{ showPassword() ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
+          @if (isRegister() && password()) {
+            <div class="strength" animate.leave="is-leaving">
+              @for (n of [1, 2, 3, 4]; track n) {
+                <span [class.on]="strength() >= n" [attr.data-level]="strength()"></span>
+              }
+              <small>{{ strengthLabel() }}</small>
+            </div>
+          }
+        </div>
+
+        @if (error()) {
+          <div class="alert danger"><span class="i">error</span> {{ error() }}</div>
+        }
+
+        <button class="btn btn-primary btn-lg btn-block submit" type="submit" [disabled]="loading()">
+          @if (loading()) {
+            <span class="spinner"></span>
+          }
+          {{ isRegister() ? 'Create account' : 'Log in' }}
+          @if (!loading()) {
+            <span class="i">arrow_forward</span>
+          }
+        </button>
+      </form>
+
+      <p class="switch-mode">
+        @if (isRegister()) {
+          Already have an account?
+          <a routerLink="/login" [queryParams]="{ returnUrl: returnUrl(), template: template() }">Log in</a>
+        } @else {
+          New to ResumeStudio?
+          <a routerLink="/register" [queryParams]="{ returnUrl: returnUrl(), template: template() }">Create a free account</a>
+        }
+      </p>
+    </div>
+
+    <p class="plan-note">Free plan: 1 resume, 1 cover letter and 1 document edit per day.</p>
+  </section>
+
+  <aside class="panel" appPointer aria-hidden="true">
+    <div class="panel-glow"></div>
+    <div class="stage">
+      <div class="paper">
+        <app-scaled-resume [content]="sample" [design]="sampleDesign" />
+        <div class="scan"></div>
+      </div>
+      <div class="chip-float c1">
+        <app-score-ring [score]="94" [size]="42" />
+        <span><b>ATS score</b><small>Excellent</small></span>
+      </div>
+      <div class="chip-float c2"><span class="ic"><span class="i fill">auto_awesome</span></span> Summary written by AI</div>
+      <div class="chip-float c3"><span class="ic green"><span class="i fill">picture_as_pdf</span></span> PDF ready to send</div>
+    </div>
+    <div class="panel-copy">
+      <h2 class="display">A resume that passes the screen <span class="serif-i">and</span> reads well.</h2>
+      <ul>
+        @for (f of features; track f; let i = $index) {
+          <li [style.--i]="i"><span class="ck"><span class="i sm">check</span></span> {{ f }}</li>
+        }
+      </ul>
+    </div>
+  </aside>
+</div>

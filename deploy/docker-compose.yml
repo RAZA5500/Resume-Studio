@@ -1,0 +1,72 @@
+# ResumeStudio — production stack for a VPS (e.g. Hostinger KVM).
+#   db  : PostgreSQL 17
+#   api : NestJS backend (+ Chromium for PDF export)
+#   web : Caddy — serves the Angular app, proxies /api to the backend, automatic HTTPS
+#
+# Usage (from this folder):
+#   cp .env.example .env   # then fill it in (or run: sudo bash setup.sh)
+#   docker compose up -d --build
+
+name: resumestudio
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: resumestudio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: resumestudio
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U resumestudio -d resumestudio']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    # Everything in .env (JWT_SECRET, ANTHROPIC_API_KEY, PAYMENT_*, ADMIN_EMAILS, …) reaches the API.
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_USER: resumestudio
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_NAME: resumestudio
+      FRONTEND_URL: https://${DOMAIN}
+      TRUST_PROXY: 1
+      UPLOAD_DIR: /data/uploads
+      CHROME_PATH: /usr/bin/chromium
+    volumes:
+      - uploads:/data/uploads
+    shm_size: 1gb
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ../frontend
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:
