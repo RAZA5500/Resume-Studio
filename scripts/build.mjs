@@ -47,7 +47,7 @@ function warnAboutMissingIcons() {
       if (entry.isDirectory()) walk(path);
       else if (['.ts', '.html'].includes(extname(entry.name))) {
         const source = readFileSync(path, 'utf8');
-        for (const m of source.matchAll(/class="i(?:s[^"]*)?"[^>]*>s*([a-z0-9_]+)s*</g)) {
+        for (const m of source.matchAll(/class="i(?:\s[^"]*)?"[^>]*>\s*([a-z0-9_]+)\s*</g)) {
           if (!subset.has(m[1])) missing.add(m[1]);
         }
       }
@@ -55,8 +55,6 @@ function warnAboutMissingIcons() {
   };
   walk('src/app');
   if (missing.size) {
-    console.warn(`
-⚠ Icons not in the icon font: ${[...missing].join(', ')} — run "npm run fonts" to add them.
-`);
+    console.warn(`\n⚠ Icons not in the icon font: ${[...missing].join(', ')} — run "npm run fonts" to add them.\n`);
   }
 }
