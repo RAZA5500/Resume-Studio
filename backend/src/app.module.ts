@@ -22,22 +22,35 @@ import { UsersModule } from './users/users.module.js';
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const url = config.get<string>('DATABASE_URL');
+        let url = config.get<string>('DATABASE_URL');
+        if (url && (url.includes('[') || url.includes('YOUR-PASSWORD') || url.includes('YOUR-REGION') || url.includes('YOUR-'))) {
+          url = undefined;
+        }
+        if (url) {
+          try {
+            new URL(url);
+          } catch {
+            url = undefined;
+          }
+        }
         const sslSetting = config.get<string>('DATABASE_SSL');
-        const isRemote = !!url && !url.includes('localhost') && !url.includes('127.0.0.1');
+        const isRemote = (!!url && !url.includes('localhost') && !url.includes('127.0.0.1')) ||
+          (!!config.get<string>('DATABASE_HOST') && config.get<string>('DATABASE_HOST') !== 'localhost');
         const enableSsl = sslSetting !== undefined ? sslSetting === 'true' : isRemote;
         const ssl = enableSsl ? { rejectUnauthorized: false } : false;
 
         return {
           type: 'postgres' as const,
+          retryAttempts: 1,
+          retryDelay: 1000,
           ...(url
             ? { url }
             : {
                 host: config.get<string>('DATABASE_HOST', 'localhost'),
                 port: Number(config.get<string>('DATABASE_PORT', '5432')),
-                username: config.get<string>('DATABASE_USER', 'resumestudio'),
-                password: config.get<string>('DATABASE_PASSWORD', 'resumestudio_secret'),
-                database: config.get<string>('DATABASE_NAME', 'resumestudio'),
+                username: config.get<string>('DATABASE_USER', 'postgres'),
+                password: config.get<string>('DATABASE_PASSWORD', ''),
+                database: config.get<string>('DATABASE_NAME', 'postgres'),
               }),
           ssl,
           extra: enableSsl
