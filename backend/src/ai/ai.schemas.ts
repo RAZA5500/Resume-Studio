@@ -1,4 +1,4 @@
-/** JSON schemas for Claude structured outputs (every object is closed and fully required). */
+/** JSON schemas for structured outputs (strict mode: every object is closed and fully required). */
 
 type Schema = Record<string, unknown>;
 

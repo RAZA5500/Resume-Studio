@@ -1,14 +1,29 @@
-# dependencies & builds
+# dependencies & build output
 node_modules/
 dist/
 out-tsc/
 .angular/
 coverage/
+*.tsbuildinfo
 
-# backend runtime data & secrets
-backend/.env
+# secrets (the .env.example templates stay)
+.env
+.env.*
+!.env.example
+
+# backend runtime data: uploaded files and the OCR language cache
 backend/uploads/
 backend/.cache/
+
+# editors
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.sublime-workspace
 
 # logs & OS files
 *.log

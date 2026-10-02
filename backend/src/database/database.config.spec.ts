@@ -44,7 +44,7 @@ describe('resolveDatabaseConfig', () => {
   it('prefers a real password in DATABASE_URL over a stale DATABASE_PASSWORD', () => {
     const { options, warnings } = resolve({
       DATABASE_URL: `postgresql://postgres.${REF}:right@${POOLER}:5432/postgres`,
-      DATABASE_PASSWORD: 'resumestudio_secret',
+      DATABASE_PASSWORD: 'stale-password',
     });
     expect(options.password).toBe('right');
     expect(warnings.join(' ')).toMatch(/DATABASE_PASSWORD is ignored/);
@@ -83,24 +83,18 @@ describe('resolveDatabaseConfig', () => {
     expect(target.source).toBe('SUPABASE_URL');
   });
 
-  it('rejects the docker-compose password for a Supabase database', () => {
-    const { problems } = resolve({ SUPABASE_URL: `https://${REF}.supabase.co`, DATABASE_PASSWORD: 'resumestudio_secret' });
-    expect(problems.join(' ')).toMatch(/docker-compose password/);
+  it('asks for a database instead of guessing one', () => {
+    expect(resolve({}).problems.join(' ')).toMatch(/No database is configured/);
+    const template = 'postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:5432/postgres';
+    expect(resolve({ DATABASE_URL: template }).problems.join(' ')).toMatch(/No database is configured/);
   });
 
-  it('falls back to the local docker-compose database without SSL', () => {
-    const { options, target, problems } = resolve({});
+  it('connects to a local PostgreSQL without SSL or a password', () => {
+    const { options, target, problems } = resolve({ DATABASE_URL: 'postgresql://postgres@localhost:5432/resumestudio' });
     expect(problems).toEqual([]);
-    expect(options).toMatchObject({
-      host: 'localhost',
-      port: 5432,
-      username: 'resumestudio',
-      password: 'resumestudio_secret',
-      database: 'resumestudio',
-      ssl: false,
-    });
+    expect(options).toMatchObject({ host: 'localhost', port: 5432, username: 'postgres', database: 'resumestudio', ssl: false });
     expect(target.kind).toBe('local');
-    expect(tls({ DATABASE_HOST: 'postgres' })).toBe(false); // docker-compose service name
+    expect(tls({ DATABASE_HOST: 'postgres' })).toBe(false); // a docker-compose service name
   });
 
   it('encrypts other providers like sslmode=require and verifies them only on request', () => {

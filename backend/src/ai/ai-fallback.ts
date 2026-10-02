@@ -1,5 +1,5 @@
 /**
- * Rule-based "offline AI". Used automatically when no ANTHROPIC_API_KEY is
+ * Rule-based "offline AI". Used automatically when no OPENROUTER_API_KEY is
  * configured so every feature of the app still produces useful output.
  */
 import { ACTION_VERBS, GENERIC_SKILLS, ROLE_SKILLS, SECTION_SYNONYMS } from '../ats/ats-dictionaries.js';

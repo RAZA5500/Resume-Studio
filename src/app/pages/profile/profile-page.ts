@@ -86,11 +86,11 @@ import { errorMessage } from '../../core/utils/http';
           <div class="card-header"><h3><span class="i">auto_awesome</span> AI engine (admin only)</h3></div>
           <div class="card-pad stack">
             @if (ai.enabled()) {
-              <div class="alert success"><span class="i">check_circle</span><span>Claude AI is active ({{ ai.status()?.model }}).</span></div>
+              <div class="alert success"><span class="i">check_circle</span><span>AI is active via OpenRouter ({{ ai.status()?.model }}).</span></div>
             } @else {
               <div class="alert warning">
                 <span class="i">key</span>
-                <div>AI is running in <b>offline mode</b> (rule-based). To enable Claude, add <code>ANTHROPIC_API_KEY=your-key</code> to <code>backend/.env</code> and restart the backend.</div>
+                <div>AI is running in <b>offline mode</b> (rule-based). To enable it, set <code>OPENROUTER_API_KEY</code> on the server (<code>backend/.env</code> locally) and restart the backend.</div>
               </div>
             }
           </div>

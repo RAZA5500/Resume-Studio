@@ -7,7 +7,7 @@ declare const ngApiUrl: string | undefined;
 /**
  * Origin of the backend baked into the build, e.g. "https://api.example.com".
  * Empty (the default) means the API is served from the same domain under /api —
- * the setup used by the dev proxy and by the VPS / Docker deployment.
+ * the dev proxy and production, where `npm start` serves the app and the API together.
  */
 export const API_URL = (typeof ngApiUrl === 'string' ? ngApiUrl : '').trim().replace(/\/+$/, '');
 

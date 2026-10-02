@@ -8,11 +8,10 @@
     "build": "node scripts/build.mjs && npm --prefix backend run build",
     "build:frontend": "node scripts/build.mjs",
     "build:backend": "npm --prefix backend run build",
-    "start:prod": "node server.mjs",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
     "fonts": "node scripts/fonts.mjs",
     "icons": "node scripts/app-icons.mjs",
+    "payment-qr": "node scripts/payment-qr.mjs",
     "apk": "node scripts/apk.mjs"
   },
   "workspaces": [

@@ -1,6 +1,6 @@
 /**
  * Shared resume data model. The Angular app keeps an identical copy in
- * frontend/src/app/core/models/resume.models.ts — keep both in sync.
+ * src/app/core/models/resume.models.ts (project root) — keep both in sync.
  */
 
 export interface PersonalInfo {

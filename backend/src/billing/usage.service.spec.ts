@@ -46,6 +46,13 @@ describe('BillingConfigService', () => {
     expect(config.isAdmin('admin@example.com')).toBe(true);
     expect(config.isAdmin('someone@example.com')).toBe(false);
   });
+
+  it('turns the support WhatsApp number into the international form wa.me needs', () => {
+    for (const value of ['03450739458', '+92 345 0739458', '0092-345-0739458', '923450739458']) {
+      expect(setup({ SUPPORT_WHATSAPP: value }).config.supportWhatsapp).toBe('923450739458');
+    }
+    expect(setup({ SUPPORT_WHATSAPP: '' }).config.supportWhatsapp).toBeNull();
+  });
 });
 
 describe('UsageService', () => {

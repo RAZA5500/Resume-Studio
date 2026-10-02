@@ -1,8 +1,8 @@
 <div class="status" [class.on]="ai.enabled()">
   <span class="i">auto_awesome</span>
   <div class="grow">
-    <strong>{{ ai.enabled() ? 'Claude AI is active' : 'Offline AI assistant' }}</strong>
-    <small>{{ ai.enabled() ? ai.status()?.model : 'Rule-based writing help.' }}</small>
+    <strong>{{ ai.enabled() ? 'AI writing is active' : 'Offline AI assistant' }}</strong>
+    <small>{{ ai.enabled() ? ai.model() : 'Rule-based writing help.' }}</small>
   </div>
 </div>
 

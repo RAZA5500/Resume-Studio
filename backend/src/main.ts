@@ -78,9 +78,14 @@ async function bootstrap() {
   const staticRoot = candidates.find((dir) => existsSync(dir) && existsSync(join(dir, 'index.html')));
   if (staticRoot) {
     Logger.log(`Serving frontend from: ${staticRoot}`, 'Bootstrap');
+    // Build files with a content hash in the name never change; everything else (ngsw.json, the
+    // service worker, manifest, payment QR) is revalidated so a new deploy shows up at once.
+    const hashed = /[-.][A-Z0-9]{8}\.(?:m?js|css|woff2?|ttf|svg|png|jpe?g|webp|avif)$/;
     app.useStaticAssets(staticRoot, {
       index: false,
-      maxAge: '1y',
+      setHeaders: (res, filePath) => {
+        res.setHeader('Cache-Control', hashed.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache');
+      },
     });
     expressApp.get(/^(?!\/api(\/|$)).*/, (_req: unknown, res: { sendFile: (p: string) => void }) => {
       res.sendFile(join(staticRoot, 'index.html'));

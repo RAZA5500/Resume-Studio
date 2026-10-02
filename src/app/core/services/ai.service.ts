@@ -18,11 +18,8 @@ export class AiService {
 
   readonly status = signal<AiStatus | null>(null);
   readonly enabled = computed(() => this.status()?.enabled ?? false);
-  readonly label = computed(() => {
-    const status = this.status();
-    if (!status) return 'AI';
-    return status.enabled ? `Claude · ${status.model}` : 'Offline assistant';
-  });
+  /** Model name without the OpenRouter provider prefix, e.g. "claude-sonnet-5.5". */
+  readonly model = computed(() => this.status()?.model?.split('/').pop() ?? '');
 
   loadStatus(): void {
     this.http.get<AiStatus>('/api/ai/status').subscribe({

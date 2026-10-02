@@ -86,8 +86,8 @@ export function describeDatabaseError(error: unknown, target: DatabaseTarget): D
     return issue(
       'refused',
       target.kind === 'local'
-        ? `Nothing is listening on ${target.host}:${target.port}. Start the local database (docker compose up -d) ` +
-            'or set DATABASE_URL to your Supabase connection string.'
+        ? `Nothing is listening on ${target.host}:${target.port}. Start that database, or set DATABASE_URL to the ` +
+            'Supabase connection string.'
         : `${target.host}:${target.port} refused the connection. Check the host and port.`,
       true,
     );

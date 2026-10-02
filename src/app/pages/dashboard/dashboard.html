@@ -269,7 +269,7 @@
           </div>
         </div>
         @if (!ai.enabled() && auth.user()?.isAdmin) {
-          <div class="alert"><span class="i">info</span><span>Offline mode (admin note): drafts are built with rule-based templates. Add ANTHROPIC_API_KEY to backend/.env for full AI writing.</span></div>
+          <div class="alert"><span class="i">info</span><span>Offline mode (admin note): drafts are built with rule-based templates. Set OPENROUTER_API_KEY on the server for full AI writing.</span></div>
         }
         @if (billing.remaining('resume') === 0) {
           <div class="alert warning"><span class="i">schedule</span><span>You've used today's free resume. Upgrade to lifetime access to create more today.</span></div>

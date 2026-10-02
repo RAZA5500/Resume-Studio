@@ -23,6 +23,14 @@ function intSetting(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
+/** wa.me links need the international number without "+" or 00; a local 03xx number becomes 923xx. */
+function whatsappNumber(value: string): string | null {
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  else if (digits.startsWith('0')) digits = `92${digits.slice(1)}`;
+  return digits.length >= 10 ? digits : null;
+}
+
 /** Pricing, free-plan limits, support contact and admin list — all from backend/.env. */
 @Injectable()
 export class BillingConfigService {
@@ -53,7 +61,7 @@ export class BillingConfigService {
     // Payments go to the merchant QR code on the billing page (public/payment/), which JazzCash,
     // Easypaisa and every bank app can scan through Raast, so all methods are always accepted.
     this.methods = PAYMENT_METHODS;
-    this.supportWhatsapp = get('SUPPORT_WHATSAPP') || null;
+    this.supportWhatsapp = whatsappNumber(get('SUPPORT_WHATSAPP'));
     this.adminEmails = new Set(
       get('ADMIN_EMAILS')
         .split(',')

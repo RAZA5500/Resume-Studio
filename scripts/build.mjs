@@ -6,7 +6,7 @@
  *   $env:API_URL="https://api.example.com"; npm run build (PowerShell)
  * On Hostinger web hosting, add API_URL under the website's environment variables instead.
  *
- * Without API_URL the app calls /api on its own domain (dev proxy, VPS / Docker setup).
+ * Without API_URL the app calls /api on its own domain (dev proxy, and `npm start`, which serves both).
  * Extra arguments are passed to `ng build`, e.g. `npm run build -- --configuration development`.
  */
 import { spawnSync } from 'node:child_process';

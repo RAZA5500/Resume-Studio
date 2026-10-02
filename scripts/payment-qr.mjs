@@ -1,7 +1,7 @@
 /**
- * Payment QR for the checkout page: `npm run payment-qr` (or `npm run payment-qr -- path/to/qr.jpg`)
+ * Payment QR for the checkout page: `npm run payment-qr -- path/to/new-qr.jpg`
  *
- * Takes the merchant QR poster (default: "Qr Scanner.jpeg" in the project root) and writes
+ * Takes the merchant QR poster (a JPEG; default: the current public/payment/payment-qr.jpg) and writes
  *   public/payment/payment-qr-600.webp, payment-qr-full.webp  — shown on the billing page
  *   public/payment/payment-qr.jpg                            — the "Save QR" download
  * The download stays JPEG so every banking app's "scan from gallery" can open it.
@@ -10,11 +10,11 @@
 import { Resvg } from '@resvg/resvg-js';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const source = process.argv[2] ?? 'Qr Scanner.jpeg';
 const outDir = 'public/payment';
+const source = process.argv[2] ?? join(outDir, 'payment-qr.jpg');
 const jpeg = readFileSync(source);
 if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) throw new Error(`${source} is not a JPEG image`);
 
@@ -51,5 +51,5 @@ for (const [name, target] of [['600', 600], ['full', 1200]]) {
   writeFileSync(file, webp);
   console.log(`  ${file}  ${image.width}×${image.height}  ${(webp.length / 1024).toFixed(1)} kB`);
 }
-copyFileSync(source, join(outDir, 'payment-qr.jpg'));
+if (resolve(source) !== resolve(outDir, 'payment-qr.jpg')) copyFileSync(source, join(outDir, 'payment-qr.jpg'));
 console.log(`  ${join(outDir, 'payment-qr.jpg')}  ${width}×${height}  ${(jpeg.length / 1024).toFixed(1)} kB (download)`);

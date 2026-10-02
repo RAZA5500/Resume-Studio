@@ -3,7 +3,7 @@ import type { ResumeContent } from '../common/types/resume.types.js';
 
 export type AiSource = 'ai' | 'offline';
 
-/** Shape returned by Claude for RESUME_SCHEMA. */
+/** Shape returned by the model for RESUME_SCHEMA. */
 export interface AiResume {
   personal: Record<string, string>;
   summary: string;

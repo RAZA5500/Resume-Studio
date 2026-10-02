@@ -2,7 +2,7 @@
 
 AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word document editor — with a free daily plan and a one-time **PKR 99 lifetime** upgrade paid by JazzCash, Easypaisa or bank transfer.
 
-**Stack:** Angular 21 (standalone, signals, zoneless) · NestJS 12 (ESM) · PostgreSQL 17 · TypeORM 1.x · Anthropic Claude
+**Stack:** Angular 21 (standalone, signals, zoneless) · NestJS 12 (ESM) · Supabase PostgreSQL 17 · TypeORM 1.x · OpenRouter (Claude Sonnet 5.5 by default)
 
 ---
 
@@ -22,35 +22,40 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 | **File tools** | Merge PDFs, extract pages, images → PDF, PDF → images, Word → PDF, PDF → Word, image → text (OCR) |
 | **Plans & payments** | Free: 1 new resume, 1 cover letter and 1 document edit per day. Lifetime (PKR 99, one-time): unlimited. Manual JazzCash / Easypaisa / bank payments with transaction ID + receipt screenshot, approved from the admin panel |
 
-> **AI works in two modes.** With `ANTHROPIC_API_KEY` set, every AI feature uses Claude (structured JSON outputs). Without a key, a built-in rule-based assistant keeps all features working (summaries, bullet rewrites, skills, tailoring, cover letters, resume parsing). The deep “AI analysis” in the ATS checker requires the key.
+> **AI works in two modes.** With `OPENROUTER_API_KEY` set, every AI feature uses the model in `AI_MODEL` through [OpenRouter](https://openrouter.ai) (structured JSON outputs). Without a key, a built-in rule-based assistant keeps all features working (summaries, bullet rewrites, skills, tailoring, cover letters, resume parsing). The deep “AI analysis” in the ATS checker requires the key.
 
 ---
 
 ## Project structure
 
+One npm workspace: the Angular app lives in the project root, the API in `backend/`. A single `npm install` in the root installs both (one `package-lock.json`).
+
 ```
 .
-├── docker-compose.yml          # optional local PostgreSQL 17 (Supabase is the main database)
-├── backend/                    # NestJS 12 API (ESM)
-│   └── src/
-│       ├── database/           # Supabase/PostgreSQL connection, migrations, retries, row level security
-│       ├── auth/  users/       # JWT auth (bcrypt), profile, change password
-│       ├── templates/          # template catalog generator + seeding + search
-│       ├── resumes/            # resume CRUD, DOCX/TXT export
-│       ├── ai/                 # Claude client, prompts, JSON schemas, offline fallback
-│       ├── ats/                # rule-based ATS scorer, dictionaries, reports
-│       ├── extraction/         # PDF/DOCX/DOC/RTF/HTML text extraction + Tesseract OCR
-│       ├── documents/          # uploaded documents + editor state
-│       ├── export/             # HTML→PDF (puppeteer-core), HTML→DOCX, file conversion
-│       ├── billing/            # plans, daily limits, AI fair-use cap, manual payments, admin API
-│       └── common/             # shared resume types, text helpers, auth guard
-└── frontend/                   # Angular 21 app
-    └── src/app/
-        ├── core/               # models, services, guards, interceptors, utils
-        ├── shared/resume/      # the resume renderer (all 16 layouts) + styles
-        ├── layout/             # app shell + public header
-        └── pages/              # landing, auth, dashboard, templates, builder, ats, documents,
-                                # editor (canvas + rich), cover letter, profile, billing, admin
+├── src/app/                    # Angular 21 app
+│   ├── core/                   # models, services, guards, interceptors, utils
+│   ├── shared/resume/          # the resume renderer (all 16 layouts) + styles
+│   ├── layout/                 # app shell + public header
+│   └── pages/                  # landing, auth, dashboard, templates, builder, ats, documents,
+│                               # editor (canvas + rich), cover letter, profile, billing, admin
+├── public/                     # static files: fonts, icons, payment QR, PWA manifest
+├── scripts/                    # build, fonts, icons, payment QR and APK scripts
+├── android/                    # Capacitor Android project (npm run apk)
+├── server.js                   # production entry (npm start): runs the API, which also serves the built app
+└── backend/                    # NestJS 12 API (ESM)
+    ├── .env.example            # every setting, documented
+    └── src/
+        ├── database/           # Supabase connection, migrations, retries, row level security
+        ├── auth/  users/       # JWT auth (bcrypt), profile, change password
+        ├── templates/          # template catalog generator + seeding + search
+        ├── resumes/            # resume CRUD, DOCX/TXT export
+        ├── ai/                 # OpenRouter client, prompts, JSON schemas, offline fallback
+        ├── ats/                # rule-based ATS scorer, dictionaries, reports
+        ├── extraction/         # PDF/DOCX/DOC/RTF/HTML text extraction + Tesseract OCR
+        ├── documents/          # uploaded documents + editor state
+        ├── export/             # HTML→PDF (puppeteer-core), HTML→DOCX, file conversion
+        ├── billing/            # plans, daily limits, AI fair-use cap, manual payments, admin API
+        └── common/             # shared resume types, text helpers, auth guard
 ```
 
 ---
@@ -67,19 +72,18 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 ## Quick start
 
 ```bash
-# 1) Database — in backend/.env (see "Database (Supabase)" below):
-#    DATABASE_URL=<Supabase → Connect → Direct → "Session pooler" string, [YOUR-PASSWORD] may stay>
-#    DATABASE_PASSWORD=<your Supabase database password>
-#    (or leave DATABASE_URL empty and run `docker compose up -d` for a local PostgreSQL)
-
-# 2) Backend (http://localhost:3000/api)
-cd backend
+# 1) Install everything (Angular app + backend workspace)
 npm install
+
+# 2) Settings: copy backend/.env.example to backend/.env and fill in
+#    DATABASE_URL + DATABASE_PASSWORD (see "Database (Supabase)"), JWT_SECRET and OPENROUTER_API_KEY
+
+# 3) Backend (http://localhost:3000/api)
+cd backend
 npm run db:check     # optional: tests the connection and says what to fix
 npm run start:dev
 
-# 3) Frontend (http://localhost:4200) — in a second terminal, from the project root
-npm install
+# 4) Frontend (http://localhost:4200) — in a second terminal, from the project root
 npm run start:dev
 ```
 
@@ -96,16 +100,15 @@ On first start the backend connects in the background, creates the tables with m
 - **Hostinger / any host:** set `DATABASE_URL` and `DATABASE_PASSWORD` as environment variables (hPanel → your Node.js app → Environment variables), redeploy, then open `https://<your-domain>/api/health`.
 - Free Supabase projects pause after a week without activity; restore them in the dashboard.
 
-### Enable Claude AI
-
-Edit `backend/.env`:
+### AI (OpenRouter)
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-...
-AI_MODEL=claude-opus-5-5        # best quality, or claude-sonnet-5 for lower cost
+OPENROUTER_API_KEY=sk-or-v1-...            # https://openrouter.ai/keys — the account needs credits
+AI_MODEL=anthropic/claude-sonnet-5.5       # default; any OpenRouter model with structured outputs
+# AI_FALLBACK_MODELS=anthropic/claude-haiku-4.5   # optional backups when the main model is down
 ```
 
-Restart the backend. The AI panel in the builder then shows “Claude AI is active”.
+Restart the backend; the AI panel in the builder then shows “AI writing is active”. Every request asks for JSON that matches a schema (`backend/src/ai/ai.schemas.ts`), is routed only to providers that enforce it, and is retried on rate limits and provider errors. A model without structured-output support still works: the schema then goes into the prompt. Cheaper: `anthropic/claude-haiku-4.5` ($1 / $5 per million input / output tokens, vs $2 / $10 for Sonnet 5.5); best quality: `anthropic/claude-opus-5.5`. Without credits OpenRouter refuses paid models and the app says so; set a spending limit on the key in the OpenRouter dashboard.
 
 ### Pricing, payments & admin
 
@@ -116,22 +119,11 @@ Restart the backend. The AI panel in the builder then shows “Claude AI is acti
 
 Limits reset at midnight in `APP_TIMEZONE` (default `Asia/Karachi`). When a limit is reached the API answers **HTTP 402** and the app shows the upgrade dialog. Filling an *existing* resume with AI or an imported file does not use the daily resume.
 
-**AI fair-use cap.** Every Claude call (writing, tailoring, parsing, cover letters, ATS deep review) counts towards `AI_DAILY_LIMIT_FREE` (default 20) or `AI_DAILY_LIMIT_LIFETIME` (default 100) per user per day (**HTTP 429** when used up). The offline assistant is not counted. This protects your Anthropic bill — a one-time PKR 99 cannot pay for unlimited AI calls.
+**AI fair-use cap.** Every AI model call (writing, tailoring, parsing, cover letters, ATS deep review) counts towards `AI_DAILY_LIMIT_FREE` (default 20) or `AI_DAILY_LIMIT_LIFETIME` (default 100) per user per day (**HTTP 429** when used up). The offline assistant is not counted. This protects your OpenRouter bill — a one-time PKR 99 cannot pay for unlimited AI calls.
 
 **How a payment works**
 
-1. Put your receiving accounts in `backend/.env` (only methods with a number are shown):
-   ```env
-   PAYMENT_JAZZCASH_NUMBER=03xxxxxxxxx
-   PAYMENT_JAZZCASH_TITLE=Your Name
-   PAYMENT_EASYPAISA_NUMBER=03xxxxxxxxx
-   PAYMENT_EASYPAISA_TITLE=Your Name
-   PAYMENT_BANK_NAME=Meezan Bank
-   PAYMENT_BANK_TITLE=Your Name
-   PAYMENT_BANK_ACCOUNT=PK00XXXX0000000000000000
-   SUPPORT_WHATSAPP=923xxxxxxxxx      # optional
-   ADMIN_EMAILS=you@example.com        # comma separated
-   ```
+1. Checkout shows one merchant QR code (JazzCash + Raast, so every wallet and bank app can scan it) from `public/payment/`. To change it: `npm run payment-qr -- path/to/new-qr.jpg`, then update `PAYMENT_QR` (merchant name, till ID, size) in `src/app/pages/billing/billing-page.ts`. In `backend/.env` set `ADMIN_EMAILS` and, optionally, `SUPPORT_WHATSAPP`.
 2. The user opens **Plan & billing** (`/app/billing`), sends the amount, and submits the transaction ID, the number they paid from and (optionally) a receipt screenshot.
 3. An admin (a logged-in user whose email is in `ADMIN_EMAILS`) opens **Admin** (`/app/admin`), checks the transaction in the JazzCash / Easypaisa / bank app and clicks **Approve** — the user gets lifetime access immediately — or **Reject** with a reason (the user can resubmit). Admins can also grant or revoke lifetime access from the Users tab.
 
@@ -141,32 +133,33 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 
 ## Configuration (`backend/.env`)
 
+`backend/.env.example` lists every setting with comments. In production the same names go into the hosting panel's environment variables.
+
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3000` | API port |
 | `FRONTEND_URL` | `http://localhost:4200` | Allowed CORS origins (comma separated) |
+| `TRUST_PROXY` | — | `1` behind a reverse proxy (Hostinger, Nginx) so rate limits see the real visitor IP |
 | `DATABASE_URL` | — | Postgres connection string, e.g. Supabase's "Session pooler" string. May keep `[YOUR-PASSWORD]`. Overrides the individual settings |
 | `DATABASE_PASSWORD` | — | Database password, used when `DATABASE_URL` has none or the placeholder (no URL-encoding) |
-| `DATABASE_HOST/PORT/USER/NAME` | docker-compose values | Individual settings when `DATABASE_URL` is empty |
+| `DATABASE_HOST/PORT/USER/NAME` | — / `5432` / `postgres` / `postgres` | Individual settings when `DATABASE_URL` is empty |
 | `SUPABASE_URL` / `SUPABASE_REGION` | — / `ap-southeast-1` | Alternative to `DATABASE_URL`: derives that project's session pooler |
 | `DATABASE_SSL` | automatic | `true`, `false`, `verify` or `no-verify`. Automatic: off for local hosts, on (and verified for Supabase) otherwise |
 | `DATABASE_SSL_CA` | — | Extra CA certificate for another provider (file path or PEM text) |
 | `DATABASE_MAX_CONNECTIONS` | `5` | Connection pool size (the Supabase free plan allows 15 in total) |
 | `DB_SYNC` | `false` | `true` lets TypeORM alter tables straight from the entities — local experiments only; migrations create the schema |
-| `JWT_SECRET` | random (generated) | Secret for signing tokens — keep it private |
+| `JWT_SECRET` | random per start | Long random secret for signing login tokens. Without it, logins end at every restart — set it in production and keep it private |
 | `JWT_EXPIRES_IN_DAYS` | `7` | Session length |
-| `ANTHROPIC_API_KEY` | — | Enables Claude for all AI features |
-| `AI_MODEL` | `claude-opus-5-5` | Claude model id |
+| `OPENROUTER_API_KEY` | — | Enables the AI model for all AI features (offline assistant without it) |
+| `AI_MODEL` | `anthropic/claude-sonnet-5.5` | OpenRouter model id |
+| `AI_FALLBACK_MODELS` | — | Comma-separated backup model ids |
 | `UPLOAD_DIR` | `uploads` | Where uploaded documents and payment screenshots are stored |
 | `CHROME_PATH` | auto-detect | Chrome / Edge / Chromium executable for PDF export |
 | `LIFETIME_PRICE_PKR` | `99` | One-time price of lifetime access |
 | `FREE_DAILY_RESUMES` / `FREE_DAILY_COVER_LETTERS` / `FREE_DAILY_DOCUMENTS` | `1` / `1` / `1` | Free-plan daily limits (`-1` = unlimited) |
 | `APP_TIMEZONE` | `Asia/Karachi` | When daily limits reset (midnight) |
 | `AI_DAILY_LIMIT_FREE` / `AI_DAILY_LIMIT_LIFETIME` | `20` / `100` | AI requests per user per day (`-1` = unlimited) |
-| `PAYMENT_JAZZCASH_NUMBER` / `_TITLE` | — | JazzCash account shown at checkout |
-| `PAYMENT_EASYPAISA_NUMBER` / `_TITLE` | — | Easypaisa account shown at checkout |
-| `PAYMENT_BANK_NAME` / `_TITLE` / `_ACCOUNT` | — | Bank account / IBAN shown at checkout |
-| `SUPPORT_WHATSAPP` | — | Optional WhatsApp number for payment questions (e.g. `923001234567`) |
+| `SUPPORT_WHATSAPP` | — | Optional WhatsApp number for payment questions (`03001234567` or `923001234567`) |
 | `ADMIN_EMAILS` | — | Comma-separated emails that can open `/app/admin` and approve payments |
 
 ---
@@ -212,13 +205,14 @@ npm test        # ATS scorer, template catalog, offline AI, DOCX, billing/limits
 
 ## Production notes
 
-1. `cd frontend && npx ng build` → deploy `frontend/dist/frontend/browser` to any static host (Nginx, Netlify, Vercel…) and proxy `/api` to the backend (or set a full API URL).
-2. `cd backend && npm run build && npm run start:prod`.
-3. Set a strong `JWT_SECRET` and persistent storage for `UPLOAD_DIR`. Schema changes ship as migrations, applied when the API starts.
-4. Install Chromium on the server (e.g. `apt install chromium`) and set `CHROME_PATH` for PDF export.
-5. Put the API behind HTTPS; rate limiting is already enabled (stricter limits on auth and AI routes).
-6. Fill in the `PAYMENT_*` accounts and `ADMIN_EMAILS`, and back up the `payments` table and `UPLOAD_DIR/payments` (receipt screenshots).
-7. Watch your Anthropic usage. With a one-time PKR 99 price, prefer `AI_MODEL=claude-sonnet-5` and keep the `AI_DAILY_LIMIT_*` caps.
+The app runs as one Node.js process: `npm start` (`server.js`) starts the API, which also serves the built Angular app from `dist/frontend/browser` on the same domain.
+
+1. **Hostinger Node.js app** (or any Node 22+ host): build command `npm run build` (Angular app + API), start command `npm start`.
+2. **Environment variables** (hPanel → Node.js app → Environment variables): `DATABASE_URL`, `DATABASE_PASSWORD`, `JWT_SECRET` (a new long random value), `OPENROUTER_API_KEY`, `AI_MODEL`, `ADMIN_EMAILS`, `SUPPORT_WHATSAPP`, `TRUST_PROXY=1`, `FRONTEND_URL=https://your-domain`. Then open `https://your-domain/api/health`.
+3. **Uploads:** each deploy replaces the app folder, so point `UPLOAD_DIR` at an absolute folder outside it, and back it up together with the Supabase database (`payments` + `UPLOAD_DIR/payments` hold the receipt screenshots).
+4. **PDF export** needs Chrome/Chromium on the server (`CHROME_PATH`); without one, downloads fall back to the browser's print dialog.
+5. Schema changes ship as migrations and are applied when the API starts. Rate limiting is built in (stricter on auth and AI routes); serve the site over HTTPS.
+6. Watch your OpenRouter usage: keep the `AI_DAILY_LIMIT_*` caps and set a spending limit on the API key.
 
 ---
 
@@ -228,7 +222,7 @@ npm test        # ATS scorer, template catalog, offline AI, DOCX, billing/limits
 - `lite` (see the block at the end of `src/styles.scss`) turns off backdrop blur, glow layers, cursor effects, view transitions and looping decoration. Layout and colours stay identical; loaders keep moving.
 - Try it: open the site with `?perf=lite` or `?perf=full` (remembered in the browser).
 - Interface fonts and the icon font are self-hosted in `public/fonts`. After using a new Material Symbols icon run `npm run fonts` — the build prints a warning when an icon is missing from the font.
-- The web build ships a service worker (`ngsw-config.json`): repeat visits load from the cache. Never cache `ngsw.json` / `ngsw-worker.js` on the server (`.htaccess` and the Caddyfile already handle this).
+- The web build ships a service worker (`ngsw-config.json`): repeat visits load from the cache. The API's static file server caches only content-hashed files for a year; everything else (`index.html`, `ngsw.json`, `ngsw-worker.js`, the manifest, the payment QR) is revalidated on every request, so new deploys show up at once.
 
 ---
 
@@ -272,17 +266,17 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 - **“Cannot reach the server”** in the UI → the backend is not running on port 3000.
 - **`/api/health` shows `"database": "misconfigured"` or `"retrying"`** → `dbError` and `dbHint` say what to change (`cd backend && npm run db:check` prints the same locally). Usual causes: a wrong password (reset it in Supabase → Project Settings → Database), a pooler user without `.<project-ref>`, or `db.<project>.supabase.co` on a host without IPv6 (use the session pooler).
 - **PDF download falls back to the print dialog** → no Chrome/Edge found; set `CHROME_PATH`.
-- **Docker errors** → start Docker Desktop, then `docker compose up -d`.
+- **AI shows an error** → the backend log names the OpenRouter answer: `401` wrong `OPENROUTER_API_KEY`, `402` no credits left (add some at openrouter.ai), `404` unknown `AI_MODEL`, `429` rate limit (retried automatically).
 
 ---
 
 ## Urdu / Hindi quick guide
 
-1. Database: Supabase → apna project → **Connect** → *Session pooler* wali string `backend/.env` ke `DATABASE_URL` mein paste karein (`[YOUR-PASSWORD]` waise hi rehne dein) aur database password `DATABASE_PASSWORD` mein likhein. `backend` folder mein `npm run db:check` se connection check karein. (Bina Supabase ke: Docker Desktop kholein aur `docker compose up -d`.)
-2. `backend` folder mein `npm install` aur `npm run start:dev` — tables khud ban jati hain (migrations).
-3. Project folder (root) mein `npm install` aur `npm run start:dev`.
+1. Project folder (root) mein `npm install` — frontend aur backend dono install ho jate hain.
+2. `backend/.env.example` ko `backend/.env` mein copy karein. Supabase → apna project → **Connect** → *Session pooler* wali string `DATABASE_URL` mein paste karein (`[YOUR-PASSWORD]` waise hi rehne dein), database password `DATABASE_PASSWORD` mein, aur ek lamba random `JWT_SECRET` likhein. `backend` folder mein `npm run db:check` se connection check karein.
+3. `backend` folder mein `npm run start:dev` — tables khud ban jati hain (migrations). Doosre terminal mein root se `npm run start:dev`.
 4. Browser mein `http://localhost:4200` kholein, account banayein, template choose karein.
-5. Asli Claude AI ke liye `backend/.env` mein `ANTHROPIC_API_KEY` daalein aur backend restart karein — bina key ke bhi app offline AI mode mein chalti hai.
-6. Payment lene ke liye `backend/.env` mein apna JazzCash / Easypaisa / bank number (`PAYMENT_*`) aur `ADMIN_EMAILS` mein apni email daalein, phir backend restart karein.
+5. AI ke liye `backend/.env` mein `OPENROUTER_API_KEY` (openrouter.ai/keys, account mein credits hone chahiye) aur `AI_MODEL` daalein, phir backend restart karein — bina key ke bhi app offline AI mode mein chalti hai.
+6. Payment: checkout par merchant QR dikhta hai (`public/payment/`). Naya QR lagane ke liye `npm run payment-qr -- naya-qr.jpg` chalayein. `backend/.env` mein `ADMIN_EMAILS` mein apni email aur `SUPPORT_WHATSAPP` mein apna number daalein.
 7. User payment bhej kar **Plan & billing** page par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai.
 8. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.

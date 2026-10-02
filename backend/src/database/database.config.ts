@@ -13,9 +13,6 @@ export const MIGRATIONS_TABLE = 'typeorm_migrations';
 /** Injection token of the resolved {@link DatabaseConfig}. */
 export const DATABASE_CONFIG = Symbol('DATABASE_CONFIG');
 
-/** Credentials of the local docker-compose.yml database, used when nothing else is configured. */
-const LOCAL_DEFAULTS = { user: 'resumestudio', password: 'resumestudio_secret', database: 'resumestudio' };
-
 /** Where the app connects to. Safe to log: never contains the password. */
 export interface DatabaseTarget {
   host: string;
@@ -23,8 +20,8 @@ export interface DatabaseTarget {
   user: string;
   database: string;
   /** The setting that described the server. */
-  source: 'DATABASE_URL' | 'DATABASE_HOST' | 'SUPABASE_URL' | 'defaults';
-  passwordSource: 'DATABASE_URL' | 'DATABASE_PASSWORD' | 'docker-compose default' | 'none';
+  source: 'DATABASE_URL' | 'DATABASE_HOST' | 'SUPABASE_URL' | 'nothing';
+  passwordSource: 'DATABASE_URL' | 'DATABASE_PASSWORD' | 'none';
   ssl: 'off' | 'verified' | 'not verified';
   kind: 'supabase-session-pooler' | 'supabase-transaction-pooler' | 'supabase-direct' | 'local' | 'remote';
 }
@@ -47,8 +44,8 @@ export interface DatabaseConfig {
  *  - DATABASE_HOST / _PORT / _USER / _PASSWORD / _NAME
  *  - SUPABASE_URL (+ DATABASE_PASSWORD) — derives the session pooler of that project
  *                    (region from SUPABASE_REGION, default ap-southeast-1, or SUPABASE_POOLER_HOST).
- *  - nothing       — the local docker-compose.yml database.
  *
+ * Without any of them the app does not try to connect and /api/health says what is missing.
  * SSL is on for every non-local server. Supabase certificates are verified against the bundled
  * Supabase root CA; DATABASE_SSL=no-verify|false|verify and DATABASE_SSL_CA override that.
  */
@@ -58,7 +55,7 @@ export function resolveDatabaseConfig(env: (key: string) => string | undefined):
   const warnings: string[] = [];
   const supabaseRef = supabaseProjectRef(read('SUPABASE_URL'));
 
-  let source: DatabaseTarget['source'] = 'defaults';
+  let source: DatabaseTarget['source'] = 'nothing';
   let host: string | undefined;
   let port: number | undefined;
   let user: string | undefined;
@@ -96,6 +93,13 @@ export function resolveDatabaseConfig(env: (key: string) => string | undefined):
       );
     } else {
       if (envHost) source = 'DATABASE_HOST';
+      else if (!problems.length) {
+        // (a malformed DATABASE_URL was reported above already)
+        problems.push(
+          'No database is configured. Set DATABASE_URL to the "Session pooler" connection string from ' +
+            'Supabase → Connect, and DATABASE_PASSWORD to the database password.',
+        );
+      }
       host = envHost ?? 'localhost';
       const rawPort = read('DATABASE_PORT');
       port = rawPort === undefined ? 5432 : toPort(rawPort);
@@ -108,8 +112,8 @@ export function resolveDatabaseConfig(env: (key: string) => string | undefined):
   const local = isLocalHost(host);
   const kind = hostKind(host, port ?? 5432, local);
   const supabase = kind.startsWith('supabase');
-  user ??= local ? LOCAL_DEFAULTS.user : 'postgres';
-  database ??= local ? LOCAL_DEFAULTS.database : 'postgres';
+  user ??= 'postgres';
+  database ??= 'postgres';
 
   // Supavisor finds the project from the user name ("postgres.<project-ref>").
   if (kind === 'supabase-session-pooler' || kind === 'supabase-transaction-pooler') {
@@ -148,9 +152,6 @@ export function resolveDatabaseConfig(env: (key: string) => string | undefined):
   } else if (envPassword) {
     password = envPassword;
     passwordSource = 'DATABASE_PASSWORD';
-  } else if (local && source !== 'DATABASE_URL') {
-    password = LOCAL_DEFAULTS.password;
-    passwordSource = 'docker-compose default';
   }
   if (!password && !local) {
     problems.push(
@@ -158,11 +159,6 @@ export function resolveDatabaseConfig(env: (key: string) => string | undefined):
         ? 'The Supabase database password is missing. Set DATABASE_PASSWORD (Supabase → Project Settings → ' +
             'Database → "Reset database password" if you do not know it).'
         : 'The database password is missing. Set DATABASE_PASSWORD or put it in DATABASE_URL.',
-    );
-  } else if (supabase && password === LOCAL_DEFAULTS.password) {
-    problems.push(
-      `DATABASE_PASSWORD is the local docker-compose password (${LOCAL_DEFAULTS.password}), not your Supabase ` +
-        'database password. Set the password of the Supabase project.',
     );
   }
 
