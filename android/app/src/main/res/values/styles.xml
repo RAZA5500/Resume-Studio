@@ -16,7 +16,11 @@
     </style>
 
 
+    <!-- Launch screen. Android 12+ shows the app icon on windowSplashScreenBackground and keeps it
+         until the web app calls SplashScreen.hide(); older versions show @drawable/splash. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
