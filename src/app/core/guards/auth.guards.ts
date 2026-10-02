@@ -1,6 +1,8 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
+import { isNativeApp } from '../native/platform';
+import { apiOrigin, serverIsConfigurable } from '../services/api-url.interceptor';
 import { AuthService } from '../services/auth.service';
 
 export const authGuard: CanActivateFn = (_route, state) => {
@@ -27,3 +29,15 @@ export const adminGuard: CanActivateFn = () => {
     catchError(() => of(home)),
   );
 };
+
+/** The Android app opens on the dashboard (or the log-in page), not on the marketing page. */
+export const homeGuard: CanActivateFn = () =>
+  isNativeApp()
+    ? inject(Router).createUrlTree([inject(AuthService).isAuthenticated() ? '/app/dashboard' : '/login'])
+    : true;
+
+/** An APK built without API_URL needs a server address before any page can load data. */
+export const serverGuard: CanActivateFn = (_route, state) =>
+  serverIsConfigurable() && !apiOrigin()
+    ? inject(Router).createUrlTree(['/connect'], { queryParams: { returnUrl: state.url } })
+    : true;

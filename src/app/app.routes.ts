@@ -1,35 +1,43 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, guestGuard } from './core/guards/auth.guards';
+import { adminGuard, authGuard, guestGuard, homeGuard, serverGuard } from './core/guards/auth.guards';
 
 export const routes: Routes = [
   {
     path: '',
     title: 'ResumeStudio — Resume Builder, ATS Checker & PDF Editor',
+    canActivate: [homeGuard],
     loadComponent: () => import('./pages/landing/landing').then((m) => m.Landing),
+  },
+  {
+    // Android test builds only (no API_URL baked in): asks for the backend address.
+    path: 'connect',
+    title: 'Connect — ResumeStudio',
+    loadComponent: () => import('./pages/connect/connect-page').then((m) => m.ConnectPage),
   },
   {
     path: 'login',
     title: 'Log in — ResumeStudio',
-    canActivate: [guestGuard],
+    canActivate: [serverGuard, guestGuard],
     loadComponent: () => import('./pages/auth/auth-page').then((m) => m.AuthPage),
     data: { mode: 'login', preload: true },
   },
   {
     path: 'register',
     title: 'Create account — ResumeStudio',
-    canActivate: [guestGuard],
+    canActivate: [serverGuard, guestGuard],
     loadComponent: () => import('./pages/auth/auth-page').then((m) => m.AuthPage),
     data: { mode: 'register', preload: true },
   },
   {
     path: 'templates',
     title: 'Resume Templates — ResumeStudio',
+    canActivate: [serverGuard],
     loadComponent: () => import('./pages/templates/templates-page').then((m) => m.TemplatesPage),
     data: { public: true, preload: true },
   },
   {
     path: 'app',
-    canActivate: [authGuard],
+    canActivate: [serverGuard, authGuard],
     loadComponent: () => import('./layout/shell/shell').then((m) => m.Shell),
     data: { preload: 'signed-in' },
     children: [
@@ -93,14 +101,14 @@ export const routes: Routes = [
   {
     path: 'builder/:id',
     title: 'Resume Builder — ResumeStudio',
-    canActivate: [authGuard],
+    canActivate: [serverGuard, authGuard],
     loadComponent: () => import('./pages/builder/builder').then((m) => m.Builder),
     data: { preload: 'signed-in' },
   },
   {
     path: 'editor/:id',
     title: 'Document Editor — ResumeStudio',
-    canActivate: [authGuard],
+    canActivate: [serverGuard, authGuard],
     loadComponent: () => import('./pages/editor/doc-editor').then((m) => m.DocEditor),
   },
   { path: '**', redirectTo: '' },

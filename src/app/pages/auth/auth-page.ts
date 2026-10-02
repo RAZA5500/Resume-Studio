@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { SAMPLE_CONTENT } from '../../core/models/resume.models';
+import { apiOrigin, serverIsConfigurable } from '../../core/services/api-url.interceptor';
 import { AuthService } from '../../core/services/auth.service';
 import { ResumeService } from '../../core/services/resume.service';
 import { errorMessage } from '../../core/utils/http';
@@ -31,6 +32,8 @@ export class AuthPage {
   readonly template = input<string>();
   readonly expired = input<string>();
 
+  /** Android test builds: the backend chosen on the Connect page, with a link to change it. */
+  protected readonly server = serverIsConfigurable() ? apiOrigin() : '';
   protected readonly fullName = signal('');
   protected readonly email = signal('');
   protected readonly password = signal('');

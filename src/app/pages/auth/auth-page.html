@@ -89,6 +89,9 @@
           <a routerLink="/register" [queryParams]="{ returnUrl: returnUrl(), template: template() }">Create a free account</a>
         }
       </p>
+      @if (server) {
+        <p class="switch-mode">Server: {{ server }} · <a routerLink="/connect">Change</a></p>
+      }
     </div>
 
     <p class="plan-note">Free plan: 1 resume, 1 cover letter and 1 document edit per day.</p>
