@@ -58,7 +58,11 @@
               }
             ],
             "styles": [
-              "node_modules/quill/dist/quill.snow.css",
+              {
+                "input": "node_modules/quill/dist/quill.snow.css",
+                "bundleName": "quill",
+                "inject": false
+              },
               "src/styles.scss"
             ],
             "allowedCommonJsDependencies": [

@@ -39,7 +39,8 @@ export class ThemeService {
     const doc = this.document as Document & { startViewTransition?: (cb: () => void) => ViewTransitionLike };
     const view = this.document.defaultView;
     const reduceMotion = view?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    if (!doc.startViewTransition || !view || reduceMotion) {
+    const lite = this.document.documentElement.dataset['perf'] === 'lite';
+    if (!doc.startViewTransition || !view || reduceMotion || lite) {
       update();
       return;
     }

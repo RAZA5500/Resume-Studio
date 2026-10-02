@@ -8,6 +8,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { loadFonts } from '../../../core/utils/fonts';
 
 /** Modal to draw or type a signature; emits a trimmed transparent PNG data URL. */
 @Component({
@@ -85,6 +86,7 @@ export class SignaturePad {
   private last: { x: number; y: number } | null = null;
 
   constructor() {
+    loadFonts(['Great Vibes', 'Dancing Script']);
     afterNextRender(() => this.clear());
   }
 

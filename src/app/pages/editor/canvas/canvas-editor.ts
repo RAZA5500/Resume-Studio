@@ -40,6 +40,7 @@ import { AiService } from '../../../core/services/ai.service';
 import { DocumentService } from '../../../core/services/document.service';
 import { DialogService, ToastService } from '../../../core/services/ui.service';
 import { dataUrlToBlob, downloadBlob, pickFile, readAsDataUrl, safeFileName } from '../../../core/utils/files';
+import { loadFonts } from '../../../core/utils/fonts';
 import { errorMessage, isLimitReached } from '../../../core/utils/http';
 import { loadPdfJs, openPdf, pdfBlob, renderPdfPage, textToHtml } from '../../../core/utils/pdf';
 import { ClickOutside } from '../../../shared/ui/click-outside';
@@ -200,6 +201,14 @@ export class CanvasEditor {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    loadFonts(CANVAS_FONTS);
+    afterNextRender(() => {
+      // Native listener: a template (wheel) binding would run change detection on every scroll tick.
+      const stage = this.stage().nativeElement;
+      const onWheel = (event: WheelEvent) => this.onWheel(event);
+      stage.addEventListener('wheel', onWheel, { passive: false });
+      destroyRef.onDestroy(() => stage.removeEventListener('wheel', onWheel));
+    });
     afterNextRender(() => void this.init());
     destroyRef.onDestroy(() => {
       this.flushRecord();
@@ -496,7 +505,7 @@ export class CanvasEditor {
     this.applyZoom();
   }
 
-  protected onWheel(event: WheelEvent): void {
+  private onWheel(event: WheelEvent): void {
     if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
     this.zoomBy(event.deltaY < 0 ? 0.1 : -0.1);

@@ -136,7 +136,7 @@
     </aside>
 
     <!-- ======================= Stage ======================= -->
-    <main class="ce-stage" #stage (wheel)="onWheel($event)">
+    <main class="ce-stage" #stage>
       @if (loading()) {
         <div class="ce-loading"><span class="spinner lg"></span><p>{{ loadingText() }}</p></div>
       }

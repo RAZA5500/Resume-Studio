@@ -20,6 +20,7 @@ import { DocumentService } from '../../../core/services/document.service';
 import { ExportService } from '../../../core/services/export.service';
 import { DialogService, ToastService } from '../../../core/services/ui.service';
 import { downloadBlob, downloadText, safeFileName } from '../../../core/utils/files';
+import { loadFonts } from '../../../core/utils/fonts';
 import { errorMessage, errorMessageAsync, isLimitReached } from '../../../core/utils/http';
 import { ClickOutside } from '../../../shared/ui/click-outside';
 
@@ -35,6 +36,19 @@ const FONTS: Record<string, string> = {
   mono: "'JetBrains Mono', monospace",
 };
 const SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px', '48px'];
+
+/** Quill's theme CSS is a lazy bundle (angular.json "inject": false) — only this editor needs it. */
+let quillTheme: Promise<void> | null = null;
+function loadQuillTheme(): Promise<void> {
+  quillTheme ??= new Promise<void>((resolve) => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'quill.css';
+    link.onload = link.onerror = () => resolve();
+    document.head.appendChild(link);
+  });
+  return quillTheme;
+}
 
 let registered = false;
 function registerFormats(): void {
@@ -104,6 +118,8 @@ export class RichEditor {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    loadFonts(Object.values(FONTS).map((stack) => stack.split(',')[0].replace(/['"]/g, '').trim()));
+    void loadQuillTheme();
     afterNextRender(() => void this.init());
     destroyRef.onDestroy(() => {
       if (this.version !== this.savedVersion && this.saveState() !== 'limit') void this.save();
@@ -111,6 +127,8 @@ export class RichEditor {
   }
 
   private async init(): Promise<void> {
+    // The toolbar would flash unstyled without the theme; it is cached after the first visit.
+    await loadQuillTheme();
     registerFormats();
     const doc = this.doc();
     this.name.set(doc.name);

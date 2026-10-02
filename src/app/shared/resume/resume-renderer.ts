@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, ViewEncapsulation } from '@angular/core';
 import {
   bulletLines,
   dateRange,
@@ -11,7 +11,7 @@ import {
   TWO_COLUMN_LAYOUTS,
 } from '../../core/models/resume.models';
 import { isDark, mix } from '../../core/utils/colors';
-import { fontStack } from '../../core/utils/fonts';
+import { fontStack, loadFonts } from '../../core/utils/fonts';
 import { RESUME_CSS } from './resume-styles';
 
 export const DEFAULT_DESIGN: DesignSettings = {
@@ -78,6 +78,13 @@ export class ResumeRenderer {
   readonly mode = input<'preview' | 'thumb' | 'export'>('preview');
 
   protected readonly d = computed<DesignSettings>(() => ({ ...DEFAULT_DESIGN, ...this.design() }));
+
+  constructor() {
+    effect(() => {
+      const d = this.d();
+      loadFonts([d.headingFont, d.bodyFont, ...(d.layout === 'tech' ? ['JetBrains Mono'] : [])]);
+    });
+  }
   protected readonly c = computed(() => this.content());
   protected readonly family = computed<Family>(() => FAMILY[this.d().layout] ?? 'single');
   protected readonly twoColumn = computed(() => TWO_COLUMN_LAYOUTS.includes(this.d().layout));

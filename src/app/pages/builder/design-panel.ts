@@ -7,7 +7,7 @@ import type { BulletStyle, DateFormat, DesignSettings, HeadingStyle, SkillStyle 
 import { TemplateService } from '../../core/services/resume.service';
 import { ToastService } from '../../core/services/ui.service';
 import { isDark, mix } from '../../core/utils/colors';
-import { FONT_OPTIONS, fontStack } from '../../core/utils/fonts';
+import { FONT_OPTIONS, fontStack, loadFonts } from '../../core/utils/fonts';
 import { BuilderStore } from './builder-store';
 
 @Component({
@@ -28,6 +28,10 @@ export class DesignPanel {
   protected readonly d = computed(() => this.store.design());
   protected readonly fonts = FONT_OPTIONS;
   protected readonly fontStack = fontStack;
+
+  constructor() {
+    loadFonts(FONT_OPTIONS);
+  }
 
   protected readonly headingStyles: Array<{ key: HeadingStyle; label: string }> = [
     { key: 'line', label: 'Line' },
