@@ -117,7 +117,7 @@
                     <img
                       src="payment/payment-qr-full.webp"
                       srcset="payment/payment-qr-600.webp 600w, payment/payment-qr-full.webp 906w"
-                      sizes="(max-width: 600px) 64vw, 220px"
+                      sizes="(max-width: 600px) 64vw, 200px"
                       [width]="qr.width"
                       [height]="qr.height"
                       [alt]="'JazzCash and Raast payment QR code for ' + qr.merchant + ', Till ID ' + qr.tillId"
@@ -135,9 +135,9 @@
                     <span class="app"><i class="dot bank"></i> Any bank app</span>
                   </div>
                   <ol class="qr-steps">
-                    <li>Open your app and tap <b>Scan QR</b></li>
-                    <li>Pay <b>PKR {{ billing.price() }}</b> to <b>{{ qr.merchant }}</b></li>
-                    <li>Keep the <b>Transaction ID</b> from your receipt</li>
+                    <li><span>Open your app and tap <b>Scan QR</b></span></li>
+                    <li><span>Pay <b>PKR {{ billing.price() }}</b> to <b>{{ qr.merchant }}</b></span></li>
+                    <li><span>Keep the <b>Transaction ID</b> from your receipt</span></li>
                   </ol>
                   <div class="till">
                     <span>Till ID</span>
@@ -172,61 +172,60 @@
                     }
                   </div>
                 </div>
-                  <div class="grid-2">
-                    <div class="field">
-                      <label for="tid">Transaction ID (TID)</label>
-                      <input id="tid" class="input mono" name="tid" autocomplete="off" placeholder="e.g. 01234567890"
-                        [ngModel]="transactionId()" (ngModelChange)="transactionId.set($event)" />
-                    </div>
-                    <div class="field">
-                      <label for="sender">Paid from (number / account)</label>
-                      <input id="sender" class="input" name="sender" inputmode="tel" autocomplete="off" placeholder="03xx xxxxxxx"
-                        [ngModel]="senderNumber()" (ngModelChange)="senderNumber.set($event)" />
-                    </div>
+                <div class="grid-2">
+                  <div class="field">
+                    <label for="tid">Transaction ID (TID)</label>
+                    <input id="tid" class="input mono" name="tid" autocomplete="off" placeholder="e.g. 01234567890"
+                      [ngModel]="transactionId()" (ngModelChange)="transactionId.set($event)" />
                   </div>
                   <div class="field">
-                    <label for="sender-name">Account holder name <span class="hint">optional</span></label>
-                    <input id="sender-name" class="input" name="senderName" autocomplete="off"
-                      [ngModel]="senderName()" (ngModelChange)="senderName.set($event)" />
+                    <label for="sender">Paid from (number / account)</label>
+                    <input id="sender" class="input" name="sender" inputmode="tel" autocomplete="off" placeholder="03xx xxxxxxx"
+                      [ngModel]="senderNumber()" (ngModelChange)="senderNumber.set($event)" />
                   </div>
-                  <div class="field">
-                    <span class="label">Receipt screenshot <span class="hint">optional, speeds up verification</span></span>
-                    @if (screenshotUrl(); as url) {
-                      <div class="shot">
-                        <img [src]="url" alt="Payment receipt preview" />
-                        <div class="grow">
-                          <b>{{ screenshot()?.name }}</b>
-                          <button class="btn btn-ghost btn-xs" type="button" (click)="clearScreenshot()">Remove</button>
-                        </div>
+                </div>
+                <div class="field">
+                  <label for="sender-name">Account holder name <span class="hint">optional</span></label>
+                  <input id="sender-name" class="input" name="senderName" autocomplete="off"
+                    [ngModel]="senderName()" (ngModelChange)="senderName.set($event)" />
+                </div>
+                <div class="field">
+                  <span class="label">Receipt screenshot <span class="hint">optional, speeds up verification</span></span>
+                  @if (screenshotUrl(); as url) {
+                    <div class="shot">
+                      <img [src]="url" alt="Payment receipt preview" />
+                      <div class="grow">
+                        <b>{{ screenshot()?.name }}</b>
+                        <button class="btn btn-ghost btn-xs" type="button" (click)="clearScreenshot()">Remove</button>
                       </div>
-                    } @else {
-                      <label class="upload">
-                        <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickScreenshot($event)" />
-                        <span class="i">upload</span> Choose image (PNG, JPG or WebP, max 5 MB)
-                      </label>
-                    }
-                  </div>
-
-                  @if (formError()) {
-                    <div class="alert danger"><span class="i">error</span><span>{{ formError() }}</span></div>
+                    </div>
+                  } @else {
+                    <label class="upload">
+                      <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickScreenshot($event)" />
+                      <span class="i">upload</span> Choose image (PNG, JPG or WebP, max 5 MB)
+                    </label>
                   }
+                </div>
 
-                  <button class="btn btn-primary btn-lg" type="submit" [disabled]="submitting()">
-                    @if (submitting()) {
-                      <span class="spinner"></span>
-                    }
-                    Submit payment
-                  </button>
-                  <p class="subtle small">
-                    Your account is upgraded after we match the transaction ID with the payment we received.
-                    @if (whatsappLink(); as link) {
-                      Questions? <a [href]="link" target="_blank" rel="noopener">Message us on WhatsApp</a>.
-                    }
-                  </p>
-                </form>
-              </li>
-            </ol>
-          }
+                @if (formError()) {
+                  <div class="alert danger"><span class="i">error</span><span>{{ formError() }}</span></div>
+                }
+
+                <button class="btn btn-primary btn-lg" type="submit" [disabled]="submitting()">
+                  @if (submitting()) {
+                    <span class="spinner"></span>
+                  }
+                  Submit payment
+                </button>
+                <p class="subtle small">
+                  Your account is upgraded after we match the transaction ID with the payment we received.
+                  @if (whatsappLink(); as link) {
+                    Questions? <a [href]="link" target="_blank" rel="noopener">Message us on WhatsApp</a>.
+                  }
+                </p>
+              </form>
+            </li>
+          </ol>
         </div>
       </section>
     }
@@ -235,4 +234,17 @@
   <p class="subtle small footnote">
     Need help? See the <a routerLink="/" fragment="faq">FAQ</a>.
   </p>
+
+  @if (qrOpen()) {
+    <div class="modal-backdrop qr-backdrop" animate.leave="is-leaving" (click)="qrOpen.set(false)">
+      <figure class="qr-lightbox" role="dialog" aria-modal="true" aria-label="Payment QR code" (click)="$event.stopPropagation()">
+        <img src="payment/payment-qr-full.webp" [width]="qr.width" [height]="qr.height"
+          [alt]="'JazzCash and Raast payment QR code for ' + qr.merchant + ', Till ID ' + qr.tillId" />
+        <figcaption>Scan with JazzCash, Easypaisa or any bank app · PKR {{ billing.price() }}</figcaption>
+        <button class="btn btn-icon btn-sm close" type="button" (click)="qrOpen.set(false)" aria-label="Close">
+          <span class="i">close</span>
+        </button>
+      </figure>
+    </div>
+  }
 </div>

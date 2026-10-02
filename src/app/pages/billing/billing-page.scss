@@ -270,39 +270,287 @@ code {
   box-shadow: 0 6px 14px -6px rgba(37, 99, 235, 0.9);
 }
 
-.account {
+/* ---------------------------------------------------------------- QR payment */
+.qr-card {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+  padding: 20px 20px 20px 22px;
+  border-radius: 22px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--input-bg);
-  overflow: hidden;
-  animation: pop-in 0.45s var(--ease-out) both;
-  > .acc-row + .acc-row {
-    border-top: 1px solid var(--border);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(250, 204, 21, 0.14), transparent 55%),
+    radial-gradient(90% 80% at 100% 100%, rgba(37, 99, 235, 0.12), transparent 60%),
+    var(--input-bg);
+  animation: pop-in 0.5s var(--ease-out) both;
+}
+
+/* The poster, tilted a little like a card on a desk; it straightens when touched. */
+.qr-poster {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: none;
+  cursor: zoom-in;
+  rotate: -2deg;
+  transition:
+    rotate 0.45s var(--ease-spring),
+    translate 0.45s var(--ease-spring),
+    scale 0.45s var(--ease-spring);
+  &:hover,
+  &:focus-visible {
+    rotate: 0deg;
+    translate: 0 -3px;
+    scale: 1.02;
+  }
+  &:focus-visible {
+    outline: 3px solid var(--primary-100);
+    outline-offset: 4px;
   }
 }
 
-.acc-row {
-  display: flex;
+.frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 18px;
+  /* JazzCash yellow while the image loads */
+  background: #ffd400;
+  box-shadow:
+    0 0 0 5px rgba(255, 255, 255, 0.07),
+    0 20px 40px -18px rgba(202, 138, 4, 0.7);
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+/* A scanner line sweeping over the QR code inside the poster (its position in the image). */
+.scan-beam {
+  position: absolute;
+  left: 21%;
+  right: 21%;
+  top: 29.5%;
+  height: 40.5%;
+  overflow: hidden;
+  border-radius: 6px;
+  pointer-events: none;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 55%, rgba(37, 99, 235, 0.16) 90%, rgba(37, 99, 235, 0.9) 99%, transparent 100%);
+    transform: translateY(-100%);
+    animation: qr-scan 2.8s var(--ease-in-out) 0.8s infinite;
+  }
+}
+
+.scan-me {
+  position: absolute;
+  z-index: 2;
+  top: -11px;
+  left: -10px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 46px;
-  padding: 6px 14px;
-  transition: background 0.2s var(--ease);
-  &:hover {
+  gap: 5px;
+  padding: 5px 11px 5px 8px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--grad-brand);
+  box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.9);
+  rotate: -6deg;
+  animation: pop-in 0.5s var(--ease-spring) 0.35s both;
+}
+
+.zoom {
+  position: absolute;
+  z-index: 2;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #111827;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.45);
+  .i {
+    font-size: 18px;
+  }
+}
+
+.qr-lead {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  &.jazz {
+    background: linear-gradient(135deg, #fdb913 50%, #ed1c24 50%);
+  }
+  &.easy {
+    background: #2db24a;
+  }
+  &.bank {
+    background: var(--primary);
+  }
+}
+
+.qr-steps {
+  counter-reset: step;
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+  li {
+    counter-increment: step;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+  }
+  li::before {
+    content: counter(step);
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--primary-700);
     background: var(--primary-50);
   }
   b {
-    font-weight: 600;
-    text-align: right;
-    word-break: break-all;
+    color: var(--text);
   }
 }
 
-.copy {
-  display: inline-flex;
+.till {
+  margin-top: 14px;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  padding: 7px 8px 7px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--text-3);
+  b {
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+  }
+  .btn {
+    margin-left: auto;
+  }
+}
+
+.qr-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Only for touch devices: someone paying on the same phone cannot scan its own screen. */
+.phone-tip {
+  display: none;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  background: var(--primary-50);
+  .i {
+    font-size: 18px;
+    color: var(--primary-700);
+  }
+  b {
+    color: var(--text);
+  }
+}
+
+@media (hover: none) {
+  .phone-tip {
+    display: flex;
+  }
+}
+
+/* Enlarged QR */
+.qr-backdrop {
+  align-items: center;
+}
+
+.qr-lightbox {
+  position: relative;
+  margin: 0;
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: modal-in 0.4s var(--ease-out) both;
+  img {
+    width: 100%;
+    height: auto;
+    max-height: calc(100vh - 110px);
+    object-fit: contain;
+    border-radius: 22px;
+    background: #ffd400;
+    box-shadow: var(--shadow-lg);
+  }
+  figcaption {
+    text-align: center;
+    font-size: 13px;
+    color: #fff;
+    opacity: 0.9;
+  }
+  .close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: #fff;
+    background: rgba(15, 23, 42, 0.6);
+  }
 }
 
 .hint {
@@ -398,6 +646,21 @@ form .btn-lg {
   }
 }
 
+@keyframes qr-scan {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+}
+
 @media (max-width: 800px) {
   .checkout {
     grid-template-columns: minmax(0, 1fr);
@@ -411,5 +674,16 @@ form .btn-lg {
   .meters {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+  }
+  .qr-card {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    padding: 22px 16px 18px;
+  }
+  .qr-poster {
+    width: min(64vw, 260px);
+  }
+  .qr-info {
+    width: 100%;
   }
 }

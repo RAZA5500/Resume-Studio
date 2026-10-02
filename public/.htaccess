@@ -47,5 +47,6 @@ Options -MultiViews -Indexes
   AddType application/javascript .mjs
   AddType image/svg+xml .svg
   AddType font/woff2 .woff2
+  AddType image/webp .webp
   AddType application/manifest+json .webmanifest
 </IfModule>
