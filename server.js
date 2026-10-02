@@ -1,5 +1,7 @@
-// Entry point for Hostinger Node.js Web App / CloudLinux Passenger
-import('./backend/dist/main.js').catch((err) => {
-  console.error('Failed to start ResumeStudio server:', err);
-  process.exit(1);
-});
+console.log('Starting ResumeStudio unified server...');
+import('./backend/dist/main.js')
+  .then(() => console.log('ResumeStudio backend bootstrap initiated'))
+  .catch((err) => {
+    console.error('Failed to start ResumeStudio server:', err);
+    process.exit(1);
+  });
