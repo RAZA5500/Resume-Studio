@@ -42,7 +42,10 @@ async function initDatabaseInBackground(app: NestExpressApplication, dataSource:
       const errorMsg = err instanceof Error ? err.message : String(err);
       setLastDatabaseError(errorMsg);
       Logger.error(`Database connection attempt ${attempt} failed: ${errorMsg}`, 'Database');
-      if (attempt < maxAttempts) {
+      if (errorMsg.includes('password authentication failed') || errorMsg.includes('too many authentication failures')) {
+        Logger.warn('Supabase password authentication failed. Pausing retries for 60s. Please configure the correct database password.', 'Database');
+        await new Promise((r) => setTimeout(r, 60000));
+      } else if (attempt < maxAttempts) {
         await new Promise((r) => setTimeout(r, 5000));
       }
     }
