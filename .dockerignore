@@ -1,8 +1,0 @@
-node_modules
-dist
-.angular
-.git
-.vscode
-*.log
-Dockerfile
-.dockerignore
