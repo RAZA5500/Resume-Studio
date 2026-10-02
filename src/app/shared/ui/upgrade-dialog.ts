@@ -109,4 +109,8 @@ export class UpgradeDialog {
     this.upgrade.close();
     void this.router.navigateByUrl('/app/billing');
   }
+
+  protected onEscape(): void {
+    if (this.upgrade.reason()) this.upgrade.close();
+  }
 }
