@@ -127,7 +127,9 @@ export class BillingPage implements OnInit {
     try {
       const response = await fetch('payment/payment-qr.jpg');
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      downloadBlob(await response.blob(), 'ResumeStudio-payment-QR.jpg');
+      // Typed explicitly: some hosts send .jpg as application/octet-stream.
+      const image = new Blob([await response.arrayBuffer()], { type: 'image/jpeg' });
+      downloadBlob(image, 'ResumeStudio-payment-QR.jpg');
       // The Android app shows its own "saved" message and share sheet.
       if (!isNativeApp()) this.toast.success('QR saved. In your app tap Scan QR, then pick it from the gallery.');
     } catch {
