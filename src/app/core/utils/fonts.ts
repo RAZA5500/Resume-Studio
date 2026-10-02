@@ -35,7 +35,8 @@ const SCRIPT_FONT_WEIGHTS: Record<string, string> = {
 const ALL_WEIGHTS: Record<string, string> = { ...FONT_WEIGHTS, ...SCRIPT_FONT_WEIGHTS };
 
 export function googleFontsUrl(families: string[]): string {
-  const unique = [...new Set(families.filter((f) => ALL_WEIGHTS[f]))];
+  const recognized = families.filter((f) => ALL_WEIGHTS[f]);
+  const unique = [...new Set(recognized.length ? recognized : ['Inter'])];
   const params = unique
     .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}:wght@${ALL_WEIGHTS[f]}`)
     .join('&');

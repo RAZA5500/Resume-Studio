@@ -464,7 +464,7 @@ export class CanvasEditor {
     const [page] = list.splice(from, 1);
     list.splice(to, 0, page);
     this.pages.set(list);
-    this.current.set(to);
+    await this.showPage(to);
     this.markDirty();
   }
 

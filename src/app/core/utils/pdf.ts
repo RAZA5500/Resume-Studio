@@ -61,8 +61,9 @@ export function parsePageRanges(input: string, total: number): number[] {
   const pages = new Set<number>();
   for (const part of input.split(',').map((p) => p.trim()).filter(Boolean)) {
     const [startRaw, endRaw] = part.split('-').map((p) => p.trim());
-    const start = Math.max(1, Number(startRaw) || 1);
-    const end = part.includes('-') ? Math.min(total, Number(endRaw) || total) : start;
+    let start = Math.max(1, Number(startRaw) || 1);
+    let end = part.includes('-') ? Math.min(total, Number(endRaw) || total) : start;
+    if (start > end) [start, end] = [end, start];
     for (let p = start; p <= end && p <= total; p++) pages.add(p - 1);
   }
   return [...pages].sort((a, b) => a - b);
@@ -100,15 +101,19 @@ export async function imagesToPdf(files: File[]): Promise<Uint8Array> {
 /** Converts any browser-readable image to JPEG bytes (pdf-lib only embeds JPG/PNG). */
 async function normalizeImage(file: File): Promise<Uint8Array> {
   const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0);
-  const blob = await canvasToBlob(canvas, 'image/jpeg', 0.92);
-  return new Uint8Array(await blob.arrayBuffer());
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0);
+    const blob = await canvasToBlob(canvas, 'image/jpeg', 0.92);
+    return new Uint8Array(await blob.arrayBuffer());
+  } finally {
+    bitmap.close();
+  }
 }
 
 export function pdfBlob(bytes: Uint8Array): Blob {

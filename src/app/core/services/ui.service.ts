@@ -65,12 +65,14 @@ export class DialogService {
   readonly current = signal<DialogRequest | null>(null);
 
   confirm(options: DialogOptions): Promise<boolean> {
+    this.current()?.resolve(false);
     return new Promise((resolve) =>
       this.current.set({ kind: 'confirm', ...options, resolve: (v) => resolve(v === true) }),
     );
   }
 
   prompt(options: DialogOptions): Promise<string | null> {
+    this.current()?.resolve(null);
     return new Promise((resolve) =>
       this.current.set({
         kind: 'prompt',

@@ -62,6 +62,9 @@ import { DialogService } from '../../core/services/ui.service';
     .close { position: absolute; top: 14px; right: 14px; }
     @keyframes dialog-ic-in { from { opacity: 0; transform: scale(0.4) rotate(-25deg); } }
   `,
+  host: {
+    '(document:keydown.escape)': 'onEscape()',
+  },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DialogHost {
@@ -89,5 +92,9 @@ export class DialogHost {
   protected cancel(): void {
     const dialog = this.dialogs.current();
     this.dialogs.close(dialog?.kind === 'prompt' ? null : false);
+  }
+
+  protected onEscape(): void {
+    if (this.dialogs.current()) this.cancel();
   }
 }

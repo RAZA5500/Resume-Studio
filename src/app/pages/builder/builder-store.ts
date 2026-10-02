@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, OnDestroy, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
   createEmptyContent,
@@ -19,7 +19,7 @@ const HISTORY_LIMIT = 60;
  * Provided at the Builder component level.
  */
 @Injectable()
-export class BuilderStore {
+export class BuilderStore implements OnDestroy {
   private readonly api = inject(ResumeService);
 
   readonly id = signal<string | null>(null);
@@ -90,15 +90,34 @@ export class BuilderStore {
   }
 
   undo(): void {
+    if (this.snapshotTimer) {
+      clearTimeout(this.snapshotTimer);
+      this.snapshotTimer = null;
+    }
     if (this.pointer <= 0) return;
     this.pointer--;
     this.restore(this.history[this.pointer]);
   }
 
   redo(): void {
+    if (this.snapshotTimer) {
+      clearTimeout(this.snapshotTimer);
+      this.snapshotTimer = null;
+    }
     if (this.pointer >= this.history.length - 1) return;
     this.pointer++;
     this.restore(this.history[this.pointer]);
+  }
+
+  ngOnDestroy(): void {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (this.snapshotTimer) {
+      clearTimeout(this.snapshotTimer);
+      this.snapshotTimer = null;
+    }
   }
 
   /** Saves immediately (used before exports and when leaving the page). */

@@ -90,6 +90,9 @@ const TITLES: Record<string, string> = {
     @keyframes crown-in { from { opacity: 0; transform: scale(0.3) rotate(-30deg); } }
     @media (max-width: 520px) { .plans { grid-template-columns: 1fr; } }
   `,
+  host: {
+    '(document:keydown.escape)': 'onEscape()',
+  },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UpgradeDialog {

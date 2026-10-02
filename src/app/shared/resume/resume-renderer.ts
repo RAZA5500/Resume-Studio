@@ -133,27 +133,27 @@ export class ResumeRenderer {
     };
   });
 
-  protected readonly name = computed(() => this.c().personal.fullName.trim());
-  protected readonly jobTitle = computed(() => this.c().personal.jobTitle.trim());
+  protected readonly name = computed(() => this.c().personal?.fullName?.trim() ?? '');
+  protected readonly jobTitle = computed(() => this.c().personal?.jobTitle?.trim() ?? '');
 
   protected readonly photo = computed(() => {
     const d = this.d();
-    const photo = this.c().personal.photo;
+    const photo = this.c().personal?.photo;
     if (!d.showPhoto) return null;
     if (photo) return { src: photo, placeholder: false };
     return this.mode() === 'export' ? null : { src: SAMPLE_PHOTO, placeholder: this.mode() === 'preview' };
   });
 
   protected readonly contacts = computed<ContactItem[]>(() => {
-    const p = this.c().personal;
+    const p = this.c().personal ?? {};
     const url = (value: string) => (/^https?:\/\//i.test(value) ? value : `https://${value}`);
     const items: ContactItem[] = [
-      { key: 'email', value: p.email, href: p.email ? `mailto:${p.email}` : null },
-      { key: 'phone', value: p.phone, href: p.phone ? `tel:${p.phone.replace(/[^\d+]/g, '')}` : null },
-      { key: 'location', value: p.location, href: null },
-      { key: 'linkedin', value: p.linkedin, href: p.linkedin ? url(p.linkedin) : null },
-      { key: 'website', value: p.website, href: p.website ? url(p.website) : null },
-      { key: 'github', value: p.github, href: p.github ? url(p.github) : null },
+      { key: 'email', value: p.email ?? '', href: p.email ? `mailto:${p.email}` : null },
+      { key: 'phone', value: p.phone ?? '', href: p.phone ? `tel:${p.phone.replace(/[^\d+]/g, '')}` : null },
+      { key: 'location', value: p.location ?? '', href: null },
+      { key: 'linkedin', value: p.linkedin ?? '', href: p.linkedin ? url(p.linkedin) : null },
+      { key: 'website', value: p.website ?? '', href: p.website ? url(p.website) : null },
+      { key: 'github', value: p.github ?? '', href: p.github ? url(p.github) : null },
     ];
     return items.filter((i) => i.value?.trim());
   });
@@ -161,7 +161,9 @@ export class ResumeRenderer {
   /** Visible sections that actually contain data, in the user's order. */
   protected readonly visibleKeys = computed(() => {
     const c = this.c();
-    return c.sectionOrder.filter((key) => !c.hiddenSections.includes(key) && this.hasData(c, key));
+    const order = c.sectionOrder ?? [];
+    const hidden = c.hiddenSections ?? [];
+    return order.filter((key) => !hidden.includes(key) && this.hasData(c, key));
   });
 
   protected readonly asideKeys = computed(() => this.visibleKeys().filter((k) => ASIDE_SECTIONS.has(k)));
@@ -174,27 +176,27 @@ export class ResumeRenderer {
     const c = this.c();
     const fmt = this.d().dateFormat;
     return {
-      experience: c.experience.map((e) => ({
+      experience: (c.experience ?? []).map((e) => ({
         ...e,
         range: dateRange(e.startDate, e.endDate, e.current, fmt),
         lines: bulletLines(e.description),
       })),
-      education: c.education.map((e) => ({
+      education: (c.education ?? []).map((e) => ({
         ...e,
         range: dateRange(e.startDate, e.endDate, e.current, fmt),
         lines: bulletLines(e.description),
       })),
-      projects: c.projects.map((p) => ({
+      projects: (c.projects ?? []).map((p) => ({
         ...p,
         range: dateRange(p.startDate, p.endDate, false, fmt),
         lines: bulletLines(p.description),
       })),
-      certifications: c.certifications.map((x) => ({ ...x, when: formatDate(x.date, fmt) })),
-      awards: c.awards.map((x) => ({ ...x, when: formatDate(x.date, fmt) })),
+      certifications: (c.certifications ?? []).map((x) => ({ ...x, when: formatDate(x.date, fmt) })),
+      awards: (c.awards ?? []).map((x) => ({ ...x, when: formatDate(x.date, fmt) })),
       custom: new Map(
-        c.customSections.map((s) => [
+        (c.customSections ?? []).map((s) => [
           `custom:${s.id}`,
-          s.items.map((i) => ({ ...i, lines: bulletLines(i.description) })),
+          (s.items ?? []).map((i) => ({ ...i, lines: bulletLines(i.description) })),
         ]),
       ),
     };
@@ -220,25 +222,25 @@ export class ResumeRenderer {
   private hasData(c: ResumeContent, key: string): boolean {
     switch (key) {
       case 'summary':
-        return !!c.summary.trim();
+        return !!c.summary?.trim();
       case 'experience':
-        return c.experience.length > 0;
+        return (c.experience?.length ?? 0) > 0;
       case 'education':
-        return c.education.length > 0;
+        return (c.education?.length ?? 0) > 0;
       case 'skills':
-        return c.skills.length > 0;
+        return (c.skills?.length ?? 0) > 0;
       case 'projects':
-        return c.projects.length > 0;
+        return (c.projects?.length ?? 0) > 0;
       case 'certifications':
-        return c.certifications.length > 0;
+        return (c.certifications?.length ?? 0) > 0;
       case 'languages':
-        return c.languages.length > 0;
+        return (c.languages?.length ?? 0) > 0;
       case 'awards':
-        return c.awards.length > 0;
+        return (c.awards?.length ?? 0) > 0;
       case 'interests':
-        return c.interests.length > 0;
+        return (c.interests?.length ?? 0) > 0;
       default:
-        return !!c.customSections.find((s) => `custom:${s.id}` === key)?.items.length;
+        return !!c.customSections?.find((s) => `custom:${s.id}` === key)?.items?.length;
     }
   }
 }

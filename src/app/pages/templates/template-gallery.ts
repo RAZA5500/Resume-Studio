@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { catchError, debounceTime, map, of, startWith, switchMap } from 'rxjs';
@@ -30,6 +30,25 @@ const COLOR_SWATCHES: Record<string, string> = {
 })
 export class TemplateGallery {
   private readonly templates = inject(TemplateService);
+
+  constructor() {
+    effect(
+      () => {
+        // Track filter changes to reset page back to 1
+        this.search();
+        this.category();
+        this.layout();
+        this.color();
+        this.font();
+        this.atsOnly();
+        this.photo();
+        this.columns();
+        this.sort();
+        this.page.set(1);
+      },
+      { allowSignalWrites: true },
+    );
+  }
 
   /** Content used for thumbnails (the user's own resume inside the builder). */
   readonly content = input<ResumeContent>(SAMPLE_CONTENT);
