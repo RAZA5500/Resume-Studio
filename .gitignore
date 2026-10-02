@@ -11,8 +11,8 @@ coverage/
 .env.*
 !.env.example
 
-# backend runtime data: uploaded files and the OCR language cache
-backend/uploads/
+# runtime data: uploaded files (UPLOAD_DIR, relative to where the API starts) and the OCR language cache
+uploads/
 backend/.cache/
 
 # editors
