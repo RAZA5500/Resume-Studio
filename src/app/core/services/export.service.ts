@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { nativeHooks } from '../native/platform';
 import { RESUME_CSS } from '../../shared/resume/resume-styles';
 import { type DesignSettings, TWO_COLUMN_LAYOUTS } from '../models/resume.models';
 import { escapeHtml } from '../utils/files';
@@ -21,6 +22,11 @@ export class ExportService {
 
   /** Browser print dialog fallback (also produces a text based PDF via "Save as PDF"). */
   print(html: string): void {
+    // Android app: the system print service ("Save as PDF") renders the same HTML.
+    if (nativeHooks.printHtml) {
+      nativeHooks.printHtml(html, /<title>([^<]*)<\/title>/.exec(html)?.[1] || 'ResumeStudio');
+      return;
+    }
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
     frame.srcdoc = html;

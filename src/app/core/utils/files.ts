@@ -1,4 +1,8 @@
+import { nativeHooks } from '../native/platform';
+
 export function downloadBlob(blob: Blob, fileName: string): void {
+  // Android app: saved to Documents and offered in the share sheet (see native-app.ts).
+  if (nativeHooks.saveFile) return nativeHooks.saveFile(blob, fileName);
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
