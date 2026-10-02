@@ -68,9 +68,10 @@ async function bootstrap() {
     });
   }
 
-  const port = Number(config.get<string>('PORT') ?? 3000);
+  const rawPort = config.get<string>('PORT') ?? process.env.PORT ?? '3000';
+  const port = /^\d+$/.test(rawPort) ? Number(rawPort) : rawPort;
   await app.listen(port);
-  Logger.log(`API ready at http://localhost:${port}/api`, 'Bootstrap');
+  Logger.log(`API ready on ${typeof port === 'number' ? `http://localhost:${port}/api` : port}`, 'Bootstrap');
 }
 
 // No top-level await: some hosts (e.g. Passenger-based Node.js hosting) load the entry file with require().

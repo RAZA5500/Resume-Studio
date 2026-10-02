@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "node server.js",
+    "start:dev": "ng serve",
     "build": "node scripts/build.mjs && npm --prefix backend run build",
     "build:frontend": "node scripts/build.mjs",
     "build:backend": "npm --prefix backend run build",
