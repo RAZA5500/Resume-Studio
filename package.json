@@ -4,13 +4,19 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build.mjs && npm --prefix backend run build",
+    "build:frontend": "node scripts/build.mjs",
+    "build:backend": "npm --prefix backend run build",
+    "start:prod": "node server.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "fonts": "node scripts/fonts.mjs",
     "icons": "node scripts/app-icons.mjs",
     "apk": "node scripts/apk.mjs"
   },
+  "workspaces": [
+    "backend"
+  ],
   "private": true,
   "packageManager": "npm@11.17.0",
   "dependencies": {

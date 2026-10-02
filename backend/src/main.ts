@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -45,6 +47,26 @@ async function bootstrap() {
     }),
   );
   app.enableShutdownHooks();
+
+  // When running on unified hosts (e.g. Hostinger), serve compiled Angular frontend if present
+  const candidates = [
+    resolve(process.cwd(), '../dist/frontend/browser'),
+    resolve(process.cwd(), 'dist/frontend/browser'),
+    resolve(process.cwd(), 'public_html'),
+    resolve(process.cwd(), '../public_html'),
+  ];
+  const staticRoot = candidates.find((dir) => existsSync(dir) && existsSync(join(dir, 'index.html')));
+  if (staticRoot) {
+    Logger.log(`Serving frontend from: ${staticRoot}`, 'Bootstrap');
+    app.useStaticAssets(staticRoot, {
+      index: false,
+      maxAge: '1y',
+    });
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.get(/^(?!\/api(\/|$)).*/, (_req: unknown, res: { sendFile: (p: string) => void }) => {
+      res.sendFile(join(staticRoot, 'index.html'));
+    });
+  }
 
   const port = Number(config.get<string>('PORT') ?? 3000);
   await app.listen(port);
