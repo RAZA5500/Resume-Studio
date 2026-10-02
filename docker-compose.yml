@@ -1,3 +1,5 @@
+# NOTE: The database is now hosted on Supabase (cloud PostgreSQL).
+# This local docker-compose is an optional offline fallback only.
 services:
   postgres:
     image: postgres:17-alpine

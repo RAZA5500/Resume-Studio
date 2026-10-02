@@ -1,15 +1,6 @@
 @echo off
-rem ResumeStudio AI - starts PostgreSQL (Docker), the NestJS API and the Angular app.
+rem ResumeStudio AI - starts the NestJS API (connected to Supabase) and the Angular app.
 cd /d "%~dp0"
-
-echo Starting PostgreSQL (Docker)...
-docker compose up -d
-if errorlevel 1 (
-  echo.
-  echo Docker is not running. Start Docker Desktop and run this script again.
-  pause
-  exit /b 1
-)
 
 if not exist "backend\node_modules" (
   echo Installing backend packages...

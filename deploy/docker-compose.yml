@@ -1,30 +1,14 @@
 # ResumeStudio — production stack for a VPS (e.g. Hostinger KVM).
-#   db  : PostgreSQL 17
-#   api : NestJS backend (+ Chromium for PDF export)
+#   api : NestJS backend (+ Chromium for PDF export), connects to Supabase PostgreSQL
 #   web : Caddy — serves the Angular app, proxies /api to the backend, automatic HTTPS
 #
 # Usage (from this folder):
-#   cp .env.example .env   # then fill it in (or run: sudo bash setup.sh)
+#   cp .env.example .env   # then fill it in (with your Supabase DATABASE_URL)
 #   docker compose up -d --build
 
 name: resumestudio
 
 services:
-  db:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: resumestudio
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
-      POSTGRES_DB: resumestudio
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U resumestudio -d resumestudio']
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   api:
     build: ../backend
     restart: unless-stopped
@@ -33,11 +17,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_HOST: db
-      DATABASE_PORT: 5432
-      DATABASE_USER: resumestudio
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
-      DATABASE_NAME: resumestudio
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in deploy/.env}
+      DATABASE_SSL: 'true'
       FRONTEND_URL: https://${DOMAIN}
       TRUST_PROXY: 1
       UPLOAD_DIR: /data/uploads
@@ -45,9 +26,6 @@ services:
     volumes:
       - uploads:/data/uploads
     shm_size: 1gb
-    depends_on:
-      db:
-        condition: service_healthy
 
   web:
     build: ../frontend
@@ -66,7 +44,6 @@ services:
       - api
 
 volumes:
-  pgdata:
   uploads:
   caddy_data:
   caddy_config:
