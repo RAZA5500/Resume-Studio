@@ -33,24 +33,50 @@ import { UsersModule } from './users/users.module.js';
             url = undefined;
           }
         }
+
+        const supabaseUrl = config.get<string>('SUPABASE_URL');
+        let supabaseProject = '';
+        if (supabaseUrl) {
+          const match = supabaseUrl.match(/https?:\/\/([^.]+)\.supabase\.co/);
+          if (match) supabaseProject = match[1];
+        }
+
+        let host = config.get<string>('DATABASE_HOST');
+        let port = Number(config.get<string>('DATABASE_PORT', '5432'));
+        let username = config.get<string>('DATABASE_USER');
+        const password = config.get<string>('DATABASE_PASSWORD', '');
+        let database = config.get<string>('DATABASE_NAME');
+
+        // Auto-configure Supabase pooler if Supabase URL is present and host is missing/localhost
+        if (supabaseProject && (!host || host === 'localhost' || host === '127.0.0.1')) {
+          const region = config.get<string>('SUPABASE_REGION', 'ap-southeast-1');
+          host = `aws-0-${region}.pooler.supabase.com`;
+          port = 5432;
+          username = `postgres.${supabaseProject}`;
+          database = 'postgres';
+        } else {
+          host = host || 'localhost';
+          username = username || 'postgres';
+          database = database || 'postgres';
+        }
+
         const sslSetting = config.get<string>('DATABASE_SSL');
         const isRemote = (!!url && !url.includes('localhost') && !url.includes('127.0.0.1')) ||
-          (!!config.get<string>('DATABASE_HOST') && config.get<string>('DATABASE_HOST') !== 'localhost');
+          (!!host && host !== 'localhost' && host !== '127.0.0.1');
         const enableSsl = sslSetting !== undefined ? sslSetting === 'true' : isRemote;
         const ssl = enableSsl ? { rejectUnauthorized: false } : false;
 
         return {
           type: 'postgres' as const,
-          retryAttempts: 1,
-          retryDelay: 1000,
+          manualInitialization: true, // Non-blocking startup: never crash the web server
           ...(url
             ? { url }
             : {
-                host: config.get<string>('DATABASE_HOST', 'localhost'),
-                port: Number(config.get<string>('DATABASE_PORT', '5432')),
-                username: config.get<string>('DATABASE_USER', 'postgres'),
-                password: config.get<string>('DATABASE_PASSWORD', ''),
-                database: config.get<string>('DATABASE_NAME', 'postgres'),
+                host,
+                port,
+                username,
+                password,
+                database,
               }),
           ssl,
           extra: enableSsl
@@ -61,7 +87,7 @@ import { UsersModule } from './users/users.module.js';
               }
             : undefined,
           autoLoadEntities: true,
-          // Auto-creates tables in development. Set DB_SYNC=false and use migrations in production.
+          // Auto-creates tables in development/sync mode.
           synchronize: config.get<string>('DB_SYNC', 'true') === 'true',
         };
       },
