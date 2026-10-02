@@ -56,8 +56,8 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 
 ## Requirements
 
-- **Node.js 22.12+** (Angular 21). Node 22.22.3+ is needed if you later upgrade to Angular 22.
-- **Docker Desktop** (for PostgreSQL) — or any PostgreSQL 14+ server.
+- **Node.js 22.12+** (Angular 21).
+- **Supabase PostgreSQL** (or any PostgreSQL 14+ database).
 - **Google Chrome or Microsoft Edge** installed (used for server-side PDF export; auto-detected).
 - Internet access for Google Fonts, and on first OCR run to download Tesseract language data (~10 MB, cached in `backend/.cache`).
 
@@ -66,8 +66,10 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 ## Quick start
 
 ```bash
-# 1) Database
-docker compose up -d
+# 1) Configure Supabase Database
+# In backend/.env, set your Supabase connection string:
+# DATABASE_URL=postgresql://postgres:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
+# DATABASE_SSL=true
 
 # 2) Backend (http://localhost:3000/api)
 cd backend
@@ -81,7 +83,7 @@ npm start
 ```
 
 Open **http://localhost:4200**, create an account and start building.
-On first start the backend creates all tables automatically and seeds the 4,608 templates.
+On first start, the backend automatically connects to Supabase, synchronizes all tables, and seeds the 4,608 templates. (Or execute `backend/supabase_schema.sql` directly in your Supabase SQL Editor).
 
 ### Enable Claude AI
 
