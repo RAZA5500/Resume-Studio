@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
+import { DatabaseService } from '../database/database.service.js';
 import { QueryTemplatesDto } from './dto/query-templates.dto.js';
 import {
   CATALOG_VERSION,
@@ -25,15 +26,14 @@ export interface TemplatePage {
 export class TemplatesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(TemplatesService.name);
 
-  constructor(@InjectRepository(Template) private readonly templates: Repository<Template>) {}
+  constructor(
+    @InjectRepository(Template) private readonly templates: Repository<Template>,
+    private readonly database: DatabaseService,
+  ) {}
 
   /** Seeds (or refreshes) the generated catalog so a fresh database is usable immediately. */
   async seedCatalog(): Promise<void> {
     try {
-      if (!this.templates.manager?.connection?.isInitialized) {
-        this.logger.debug('Cannot seed template catalog: database not yet initialized.');
-        return;
-      }
       const generated = generateTemplates();
       const [count, outdated] = await Promise.all([
         this.templates.count(),
@@ -52,10 +52,9 @@ export class TemplatesService implements OnApplicationBootstrap {
     }
   }
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (this.templates.manager?.connection?.isInitialized) {
-      await this.seedCatalog();
-    }
+  onApplicationBootstrap(): void {
+    // The database connects in the background; seed as soon as it is ready without delaying startup.
+    void this.database.whenReady().then(() => this.seedCatalog());
   }
 
   async list(query: QueryTemplatesDto): Promise<TemplatePage> {

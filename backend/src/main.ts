@@ -5,11 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
-import { DataSource } from 'typeorm';
 import { AppModule } from './app.module.js';
-import { setLastDatabaseError } from './health.controller.js';
-import { TemplatesService } from './templates/templates.service.js';
+import { DatabaseService } from './database/database.service.js';
 
 /** TRUST_PROXY=1 (one proxy hop), true, false, or a list of proxy IPs — see Express "trust proxy". */
 function trustProxySetting(value: string | undefined): boolean | number | string | undefined {
@@ -19,43 +18,10 @@ function trustProxySetting(value: string | undefined): boolean | number | string
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-async function initDatabaseInBackground(app: NestExpressApplication, dataSource: DataSource, config: ConfigService) {
-  let attempt = 0;
-  const maxAttempts = 60; // Retry up to 5 minutes with 5s delay
-  while (!dataSource.isInitialized && attempt < maxAttempts) {
-    attempt++;
-    try {
-      const host = config.get<string>('DATABASE_HOST') || 'Supabase pooler';
-      Logger.log(`Connecting to database at ${host} (attempt ${attempt}/${maxAttempts})...`, 'Database');
-      await dataSource.initialize();
-      setLastDatabaseError(null);
-      Logger.log('Supabase PostgreSQL database connection established! Tables synchronized.', 'Database');
-      
-      try {
-        const templatesService = app.get(TemplatesService);
-        await templatesService.seedCatalog();
-      } catch (seedErr) {
-        Logger.warn(`Catalog seed notice: ${(seedErr as Error).message}`, 'Database');
-      }
-      return;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      setLastDatabaseError(errorMsg);
-      Logger.error(`Database connection attempt ${attempt} failed: ${errorMsg}`, 'Database');
-      if (errorMsg.includes('password authentication failed') || errorMsg.includes('too many authentication failures')) {
-        Logger.warn('Supabase password authentication failed. Pausing retries for 60s. Please configure the correct database password.', 'Database');
-        await new Promise((r) => setTimeout(r, 60000));
-      } else if (attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 5000));
-      }
-    }
-  }
-}
-
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
-  const dataSource = app.get(DataSource);
+  const database = app.get(DatabaseService);
 
   // Behind Nginx / Caddy / Hostinger the client IP arrives in X-Forwarded-For. Without this,
   // every visitor shares the proxy's IP and the rate limiter blocks them all together.
@@ -66,19 +32,6 @@ async function bootstrap() {
   app.useBodyParser('json', { limit: '30mb' });
   app.useBodyParser('urlencoded', { limit: '30mb', extended: true });
 
-  // Graceful degradation for API calls while database is connecting
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.use('/api', (req: { path: string }, res: { status: (code: number) => { json: (body: unknown) => void } }, next: () => void) => {
-    if (req.path === '/health' || req.path === '/health/' || dataSource.isInitialized) {
-      return next();
-    }
-    return res.status(503).json({
-      statusCode: 503,
-      error: 'Service Unavailable',
-      message: 'Database is connecting to Supabase. Please retry in a few seconds.',
-    });
-  });
-
   app.setGlobalPrefix('api');
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(compression());
@@ -88,6 +41,23 @@ async function bootstrap() {
     origin: [...origins, 'https://localhost'],
     credentials: true,
     exposedHeaders: ['Content-Disposition'],
+  });
+
+  // The database connects in the background (DatabaseService). Until it is ready, API calls get a
+  // clear 503 (after CORS, so the app can read it) instead of failing inside a controller.
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    if (database.isReady || req.path === '/health' || req.path === '/health/') return next();
+    const { state } = database.status();
+    res.setHeader('Retry-After', state === 'misconfigured' ? '300' : '5');
+    res.status(503).json({
+      statusCode: 503,
+      error: 'Service Unavailable',
+      message:
+        state === 'misconfigured'
+          ? 'The database is not configured on the server. See /api/health.'
+          : 'The database is starting up. Please retry in a few seconds.',
+    });
   });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -121,11 +91,6 @@ async function bootstrap() {
   const port = /^\d+$/.test(rawPort) ? Number(rawPort) : rawPort;
   await app.listen(port);
   Logger.log(`API ready on ${typeof port === 'number' ? `http://localhost:${port}/api` : port}`, 'Bootstrap');
-
-  // Initiate database connection in background so startup is never blocked
-  initDatabaseInBackground(app, dataSource, config).catch((err) => {
-    Logger.error(`Database background initialization error: ${err.message}`, 'Bootstrap');
-  });
 }
 
 // No top-level await: some hosts (e.g. Passenger-based Node.js hosting) load the entry file with require().

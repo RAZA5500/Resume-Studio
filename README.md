@@ -30,9 +30,10 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 
 ```
 .
-├── docker-compose.yml          # PostgreSQL 17
+├── docker-compose.yml          # optional local PostgreSQL 17 (Supabase is the main database)
 ├── backend/                    # NestJS 12 API (ESM)
 │   └── src/
+│       ├── database/           # Supabase/PostgreSQL connection, migrations, retries, row level security
 │       ├── auth/  users/       # JWT auth (bcrypt), profile, change password
 │       ├── templates/          # template catalog generator + seeding + search
 │       ├── resumes/            # resume CRUD, DOCX/TXT export
@@ -66,24 +67,34 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 ## Quick start
 
 ```bash
-# 1) Configure Supabase Database
-# In backend/.env, set your Supabase connection string:
-# DATABASE_URL=postgresql://postgres:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
-# DATABASE_SSL=true
+# 1) Database — in backend/.env (see "Database (Supabase)" below):
+#    DATABASE_URL=<Supabase → Connect → Direct → "Session pooler" string, [YOUR-PASSWORD] may stay>
+#    DATABASE_PASSWORD=<your Supabase database password>
+#    (or leave DATABASE_URL empty and run `docker compose up -d` for a local PostgreSQL)
 
 # 2) Backend (http://localhost:3000/api)
 cd backend
 npm install
+npm run db:check     # optional: tests the connection and says what to fix
 npm run start:dev
 
-# 3) Frontend (http://localhost:4200) — in a second terminal
-cd frontend
+# 3) Frontend (http://localhost:4200) — in a second terminal, from the project root
 npm install
-npm start
+npm run start:dev
 ```
 
 Open **http://localhost:4200**, create an account and start building.
-On first start, the backend automatically connects to Supabase, synchronizes all tables, and seeds the 4,608 templates. (Or execute `backend/supabase_schema.sql` directly in your Supabase SQL Editor).
+On first start the backend connects in the background, creates the tables with migrations, locks them against Supabase's public Data API and seeds the 4,608 templates. `GET /api/health` shows the database state.
+
+### Database (Supabase)
+
+- **Connection string.** Supabase → your project → **Connect** → *Direct* → **Session pooler** (port 5432, works on IPv4-only hosts such as Hostinger; `db.<project>.supabase.co` is IPv6-only). The user must look like `postgres.<project-ref>`. Paste the string unchanged into `DATABASE_URL` and put the password in `DATABASE_PASSWORD` — no URL-encoding needed. A complete URL with the password inside works too, and so does `SUPABASE_URL` + `DATABASE_PASSWORD` (the pooler host is derived; set `SUPABASE_REGION` if the project is not in `ap-southeast-1`).
+- **SSL** is automatic and verified: Supabase signs its certificates with a private CA, which ships in `backend/src/database/supabase-ca.ts`. `DATABASE_SSL=no-verify` still encrypts but skips the certificate check.
+- **Schema = migrations.** `backend/src/database/migrations` is applied at every start, under a lock, so it is safe with several app processes. After changing an entity: `cd backend && npm run migration:generate -- src/database/migrations/<Name>`, then add the new class to `migrations/index.ts`. `npm run migration:show` lists what is applied. `DB_SYNC=true` (TypeORM changing tables directly) is for local experiments only.
+- **Data API locked.** Supabase serves every table in `public` over its REST/GraphQL API to anyone with the project's anon key. All app tables have row level security switched on without policies and the `anon`/`authenticated` grants removed, so only the backend (the tables' owner) can read users, payments and resumes. The Security Advisor may list "RLS enabled, no policy" — that is intended.
+- **Startup never waits for the database.** The server starts, `/api/health` reports `connecting` / `retrying` / `misconfigured` with `dbError` and `dbHint`, other API calls answer 503 until the database is ready, and connecting is retried with backoff (every 5 minutes after a wrong password, because the pooler temporarily blocks hosts that keep failing to log in).
+- **Hostinger / any host:** set `DATABASE_URL` and `DATABASE_PASSWORD` as environment variables (hPanel → your Node.js app → Environment variables), redeploy, then open `https://<your-domain>/api/health`.
+- Free Supabase projects pause after a week without activity; restore them in the dashboard.
 
 ### Enable Claude AI
 
@@ -134,10 +145,14 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | --- | --- | --- |
 | `PORT` | `3000` | API port |
 | `FRONTEND_URL` | `http://localhost:4200` | Allowed CORS origins (comma separated) |
-| `DATABASE_URL` | — | Full Postgres URL (Neon, Render, Supabase…). Overrides the individual settings |
-| `DATABASE_HOST/PORT/USER/PASSWORD/NAME` | docker-compose values | Postgres connection |
-| `DATABASE_SSL` | `false` | `true` for hosted databases that require SSL |
-| `DB_SYNC` | `true` | Auto-create/update tables. Use `false` + migrations in production |
+| `DATABASE_URL` | — | Postgres connection string, e.g. Supabase's "Session pooler" string. May keep `[YOUR-PASSWORD]`. Overrides the individual settings |
+| `DATABASE_PASSWORD` | — | Database password, used when `DATABASE_URL` has none or the placeholder (no URL-encoding) |
+| `DATABASE_HOST/PORT/USER/NAME` | docker-compose values | Individual settings when `DATABASE_URL` is empty |
+| `SUPABASE_URL` / `SUPABASE_REGION` | — / `ap-southeast-1` | Alternative to `DATABASE_URL`: derives that project's session pooler |
+| `DATABASE_SSL` | automatic | `true`, `false`, `verify` or `no-verify`. Automatic: off for local hosts, on (and verified for Supabase) otherwise |
+| `DATABASE_SSL_CA` | — | Extra CA certificate for another provider (file path or PEM text) |
+| `DATABASE_MAX_CONNECTIONS` | `5` | Connection pool size (the Supabase free plan allows 15 in total) |
+| `DB_SYNC` | `false` | `true` lets TypeORM alter tables straight from the entities — local experiments only; migrations create the schema |
 | `JWT_SECRET` | random (generated) | Secret for signing tokens — keep it private |
 | `JWT_EXPIRES_IN_DAYS` | `7` | Session length |
 | `ANTHROPIC_API_KEY` | — | Enables Claude for all AI features |
@@ -190,7 +205,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 
 ```bash
 cd backend
-npm test        # ATS scorer, template catalog, offline AI, DOCX and billing/limits unit tests (Vitest)
+npm test        # ATS scorer, template catalog, offline AI, DOCX, billing/limits and database settings unit tests (Vitest)
 ```
 
 ---
@@ -199,7 +214,7 @@ npm test        # ATS scorer, template catalog, offline AI, DOCX and billing/lim
 
 1. `cd frontend && npx ng build` → deploy `frontend/dist/frontend/browser` to any static host (Nginx, Netlify, Vercel…) and proxy `/api` to the backend (or set a full API URL).
 2. `cd backend && npm run build && npm run start:prod`.
-3. Set a strong `JWT_SECRET`, `DB_SYNC=false` (generate TypeORM migrations), and persistent storage for `UPLOAD_DIR`.
+3. Set a strong `JWT_SECRET` and persistent storage for `UPLOAD_DIR`. Schema changes ship as migrations, applied when the API starts.
 4. Install Chromium on the server (e.g. `apt install chromium`) and set `CHROME_PATH` for PDF export.
 5. Put the API behind HTTPS; rate limiting is already enabled (stricter limits on auth and AI routes).
 6. Fill in the `PAYMENT_*` accounts and `ADMIN_EMAILS`, and back up the `payments` table and `UPLOAD_DIR/payments` (receipt screenshots).
@@ -255,6 +270,7 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 
 - **The project is inside OneDrive.** Syncing `node_modules` (hundreds of thousands of files) slows everything down and can cause `EPERM` errors. Move the folder outside OneDrive or pause syncing while developing.
 - **“Cannot reach the server”** in the UI → the backend is not running on port 3000.
+- **`/api/health` shows `"database": "misconfigured"` or `"retrying"`** → `dbError` and `dbHint` say what to change (`cd backend && npm run db:check` prints the same locally). Usual causes: a wrong password (reset it in Supabase → Project Settings → Database), a pooler user without `.<project-ref>`, or `db.<project>.supabase.co` on a host without IPv6 (use the session pooler).
 - **PDF download falls back to the print dialog** → no Chrome/Edge found; set `CHROME_PATH`.
 - **Docker errors** → start Docker Desktop, then `docker compose up -d`.
 
@@ -262,9 +278,9 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 
 ## Urdu / Hindi quick guide
 
-1. Docker Desktop kholein, phir project folder mein `docker compose up -d` chalayein (database).
-2. `backend` folder mein `npm install` aur `npm run start:dev`.
-3. `frontend` folder mein `npm install` aur `npm start`.
+1. Database: Supabase → apna project → **Connect** → *Session pooler* wali string `backend/.env` ke `DATABASE_URL` mein paste karein (`[YOUR-PASSWORD]` waise hi rehne dein) aur database password `DATABASE_PASSWORD` mein likhein. `backend` folder mein `npm run db:check` se connection check karein. (Bina Supabase ke: Docker Desktop kholein aur `docker compose up -d`.)
+2. `backend` folder mein `npm install` aur `npm run start:dev` — tables khud ban jati hain (migrations).
+3. Project folder (root) mein `npm install` aur `npm run start:dev`.
 4. Browser mein `http://localhost:4200` kholein, account banayein, template choose karein.
 5. Asli Claude AI ke liye `backend/.env` mein `ANTHROPIC_API_KEY` daalein aur backend restart karein — bina key ke bhi app offline AI mode mein chalti hai.
 6. Payment lene ke liye `backend/.env` mein apna JazzCash / Easypaisa / bank number (`PAYMENT_*`) aur `ADMIN_EMAILS` mein apni email daalein, phir backend restart karein.
