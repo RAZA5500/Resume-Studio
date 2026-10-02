@@ -10,7 +10,9 @@
  * Extra arguments are passed to `ng build`, e.g. `npm run build -- --configuration development`.
  */
 import { spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { extname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const apiUrl = (process.env.API_URL ?? process.env.NG_APP_API_URL ?? '').trim().replace(/\/+$/, '');
@@ -29,4 +31,32 @@ console.log(
 const ngCli = require.resolve('@angular/cli/bin/ng.js');
 const args = [ngCli, 'build', ...process.argv.slice(2), '--define', `ngApiUrl=${JSON.stringify(apiUrl)}`];
 const result = spawnSync(process.execPath, args, { stdio: 'inherit' });
+if (result.status === 0) warnAboutMissingIcons();
 process.exit(result.status ?? 1);
+
+/**
+ * The icon font only contains the icons listed in scripts/icons.json (npm run fonts). An icon
+ * added later would show as its name in plain text, so point it out here.
+ */
+function warnAboutMissingIcons() {
+  const subset = new Set(JSON.parse(readFileSync('scripts/icons.json', 'utf8')));
+  const missing = new Set();
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (['.ts', '.html'].includes(extname(entry.name))) {
+        const source = readFileSync(path, 'utf8');
+        for (const m of source.matchAll(/class="i(?:s[^"]*)?"[^>]*>s*([a-z0-9_]+)s*</g)) {
+          if (!subset.has(m[1])) missing.add(m[1]);
+        }
+      }
+    }
+  };
+  walk('src/app');
+  if (missing.size) {
+    console.warn(`
+⚠ Icons not in the icon font: ${[...missing].join(', ')} — run "npm run fonts" to add them.
+`);
+  }
+}
