@@ -23,18 +23,18 @@ export function initNativeApp(injector: Injector): void {
   const theme = injector.get(ThemeService);
   const toast = injector.get(ToastService);
 
-  // Keep the splash screen up until the first page has painted (with a safety timeout).
-  const hideSplash = () => void SplashScreen.hide({ fadeOutDuration: 200 }).catch(() => undefined);
-  const fallback = setTimeout(hideSplash, 6000);
+  // Hide the splash screen as soon as the first page has painted (it also times out on its own,
+  // see capacitor.config.ts).
   router.events
     .pipe(
       filter((event) => event instanceof NavigationEnd),
       first(),
     )
-    .subscribe(() => {
-      clearTimeout(fallback);
-      requestAnimationFrame(() => requestAnimationFrame(hideSplash));
-    });
+    .subscribe(() =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => void SplashScreen.hide({ fadeOutDuration: 200 }).catch(() => undefined)),
+      ),
+    );
 
   // Status / navigation bar icons and the area behind them follow the light/dark theme.
   runInInjectionContext(injector, () =>
@@ -48,10 +48,10 @@ export function initNativeApp(injector: Injector): void {
 
   void App.addListener('backButton', ({ canGoBack }) => {
     // Close the top-most dialog or menu first (they all close on a backdrop tap).
-    const backdrops = document.querySelectorAll<HTMLElement>('.modal-backdrop');
+    const backdrops = document.querySelectorAll<HTMLElement>('.modal-backdrop:not(.is-leaving)');
     const overlay =
       backdrops[backdrops.length - 1] ??
-      document.querySelector<HTMLElement>('.scrim') ??
+      document.querySelector<HTMLElement>('.scrim:not(.is-leaving)') ??
       document.querySelector<HTMLElement>('.menu-open .burger');
     if (overlay) {
       overlay.click();

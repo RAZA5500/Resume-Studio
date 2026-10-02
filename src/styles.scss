@@ -2100,8 +2100,10 @@ html.theme-vt::view-transition-new(root) {
   }
 
   .rv {
-    --rv-y: 18px;
     transition-duration: 0.5s;
+    &:not([data-rv]) {
+      --rv-y: 18px;
+    }
     &[data-rv='left'] {
       --rv-x: -20px;
     }

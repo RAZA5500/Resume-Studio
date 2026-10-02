@@ -205,6 +205,50 @@ npm test        # ATS scorer, template catalog, offline AI, DOCX and billing/lim
 
 ---
 
+## Performance (low-end phones)
+
+- `src/index.html` picks a **performance tier** before the first paint: `data-perf="lite"` on touch screens, ≤ 4 GB RAM, ≤ 4 CPU cores, Data Saver, 2G or "reduce motion"; otherwise `full`. On `full` devices `PerfService` measures real frame times once and switches to `lite` if the device cannot keep up.
+- `lite` (see the block at the end of `src/styles.scss`) turns off backdrop blur, glow layers, cursor effects, view transitions and looping decoration. Layout and colours stay identical; loaders keep moving.
+- Try it: open the site with `?perf=lite` or `?perf=full` (remembered in the browser).
+- Interface fonts and the icon font are self-hosted in `public/fonts`. After using a new Material Symbols icon run `npm run fonts` — the build prints a warning when an icon is missing from the font.
+- The web build ships a service worker (`ngsw-config.json`): repeat visits load from the cache. Never cache `ngsw.json` / `ngsw-worker.js` on the server (`.htaccess` and the Caddyfile already handle this).
+
+---
+
+## Android app (APK)
+
+The Android app is the same Angular build packaged with [Capacitor](https://capacitorjs.com) (`capacitor.config.ts`, `android/`). Pages load from the phone; only API calls use the network.
+
+```bash
+API_URL=https://your-domain.com npm run apk                       # production app (bash)
+$env:API_URL="https://your-domain.com"; npm run apk               # PowerShell
+npm run apk                                                       # test app: asks for the server on first launch
+APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version + Play Store bundle
+```
+
+- Output: `dist/apk/ResumeStudio-<version>.apk` (and `.aab` with `--aab`).
+- Needs JDK 21 and the Android SDK (`JAVA_HOME`, `ANDROID_HOME`); the script also finds the portable copies in `D:\Android`.
+- The first run creates the release signing key: `android/keystore/resumestudio-release.jks` + `android/keystore.properties` (both git-ignored). **Back them up** — every update must be signed with the same key.
+- The backend always allows the app's origin (`https://localhost`) in CORS.
+- In the app, downloads are saved to *Documents › ResumeStudio* and offered in the share sheet; "print / Save as PDF" uses Android's print service; the back button closes dialogs first.
+- Test app with the backend on your PC: the phone and PC must be on the same Wi-Fi; enter `http://<PC IP>:3000` (from `ipconfig`) on the Connect screen and allow Node.js through the Windows firewall.
+- The brand mark (an "R" on a page with a folded corner) lives in `scripts/app-icons.mjs`. `npm run icons` writes the favicon (SVG + ICO), the iOS and PWA icons, and the Android launcher icons and splash images as WebP. The logo component and the boot screen inline the same SVG.
+- Images: the logo and favicon are SVG (smaller and sharper than any bitmap); document thumbnails and payment screenshots are encoded as WebP in the browser (JPEG on Safari, which cannot write WebP). Resume photos stay JPEG because older Word versions cannot show WebP in the DOCX export.
+
+---
+
+## Dependency notes
+
+`package.json` → `overrides` (npm does not allow comments there):
+
+- `piscina: 5.3.2` — the patched version of a build-time worker pool (GHSA-67c8-pqhq-4rmx). Angular 21's `@angular/build` pins 5.2.0; drop the override after upgrading to Angular ≥ 22.2.
+- `xcode → uuid ^11.1.1` — patched `uuid` for the Capacitor CLI's iOS helper (GHSA-w5hq-g745-h8pq).
+- `fabric → canvas / jsdom` replaced by an empty package — they only serve fabric under Node.js; the browser build never loads them (saves ~60 packages and a native build step).
+
+`quill@2.0.3` is still reported by `npm audit` (CVE-2025-15056, low): there is no fixed release, and 2.0.2 contains the same code. The flaw is in Quill's video/formula embeds, which the document editor does not allow (`FORMATS` in `rich-editor.ts`); exported HTML is also stripped of scripts, frames and event handlers.
+
+---
+
 ## Troubleshooting
 
 - **The project is inside OneDrive.** Syncing `node_modules` (hundreds of thousands of files) slows everything down and can cause `EPERM` errors. Move the folder outside OneDrive or pause syncing while developing.
@@ -223,3 +267,4 @@ npm test        # ATS scorer, template catalog, offline AI, DOCX and billing/lim
 5. Asli Claude AI ke liye `backend/.env` mein `ANTHROPIC_API_KEY` daalein aur backend restart karein — bina key ke bhi app offline AI mode mein chalti hai.
 6. Payment lene ke liye `backend/.env` mein apna JazzCash / Easypaisa / bank number (`PAYMENT_*`) aur `ADMIN_EMAILS` mein apni email daalein, phir backend restart karein.
 7. User payment bhej kar **Plan & billing** page par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai.
+8. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.

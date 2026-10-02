@@ -35,7 +35,60 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Downscales an image file to fit in `max` px (square crop optional) and returns a JPEG data URL. */
+let webpEncoding: boolean | null = null;
+
+/** Chrome, Edge, Firefox and Android encode WebP from a canvas; Safari silently returns PNG instead. */
+export function canEncodeWebp(): boolean {
+  if (webpEncoding === null) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    webpEncoding = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+  }
+  return webpEncoding;
+}
+
+/**
+ * Smallest well-supported format for pictures that are only displayed (thumbnails, previews,
+ * payment screenshots): WebP, or JPEG where the browser cannot write WebP.
+ */
+export function compactImageType(): 'image/webp' | 'image/jpeg' {
+  return canEncodeWebp() ? 'image/webp' : 'image/jpeg';
+}
+
+/**
+ * Shrinks a photo or screenshot before upload: longest side at most `max` px, re-encoded as
+ * WebP (JPEG on Safari). Keeps the original when re-encoding would not make it smaller.
+ */
+export async function compressImage(file: File, max = 1600, quality = 0.82): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const type = compactImageType();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+    if (!blob || blob.size >= file.size) return file;
+    const name = `${file.name.replace(/\.[^.]+$/, '') || 'image'}.${type === 'image/webp' ? 'webp' : 'jpg'}`;
+    return new File([blob], name, { type });
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Downscales an image file to fit in `max` px (square crop optional) and returns a JPEG data URL.
+ * Stays JPEG on purpose: resume photos also go into the Word export, and Word before Microsoft 365
+ * cannot display WebP.
+ */
 export async function resizeImage(file: Blob, max = 480, square = false, quality = 0.88): Promise<string> {
   const img = await loadImage(await readAsDataUrl(file));
   let sx = 0;

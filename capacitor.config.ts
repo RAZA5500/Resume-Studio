@@ -21,15 +21,23 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: !httpsApi,
+    // Plain-HTML page for phones whose web engine is too old (see minWebViewVersion).
+    errorPath: 'webview-update.html',
   },
   android: {
     // The app page is https://localhost; an http:// API would be blocked as mixed content.
     allowMixedContent: !httpsApi,
+    // Angular 21 targets Chrome 111+ ("baseline widely available"). Older, un-updated WebViews would show a blank
+    // screen, so they get webview-update.html, which links to the Play Store update instead.
+    minWebViewVersion: 111,
   },
   plugins: {
     SplashScreen: {
-      // Hidden by the app once the first page has rendered (src/app/core/native/native-app.ts).
-      launchAutoHide: false,
+      // The app hides it as soon as the first page has rendered (src/app/core/native/native-app.ts);
+      // the time limit covers pages without that script (webview-update.html). index.html shows
+      // the same mark while loading, so a slow start still looks continuous.
+      launchAutoHide: true,
+      launchShowDuration: 2500,
       backgroundColor: '#0a0c10',
       showSpinner: false,
     },

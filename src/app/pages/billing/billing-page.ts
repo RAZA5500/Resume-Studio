@@ -6,6 +6,7 @@ import type { PaymentMethodInfo } from '../../core/models/app.models';
 import { AuthService } from '../../core/services/auth.service';
 import { BillingService, METHOD_LABELS, USAGE_LABELS } from '../../core/services/billing.service';
 import { ToastService } from '../../core/services/ui.service';
+import { compressImage } from '../../core/utils/files';
 import { errorMessage } from '../../core/utils/http';
 import { CountUp } from '../../shared/motion/count-up';
 
@@ -105,15 +106,17 @@ export class BillingPage implements OnInit {
     }
   }
 
-  protected pickScreenshot(event: Event): void {
+  protected async pickScreenshot(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
+    const picked = input.files?.[0] ?? null;
     input.value = '';
-    if (!file) return;
-    if (!SCREENSHOT_TYPES.includes(file.type)) {
+    if (!picked) return;
+    if (!SCREENSHOT_TYPES.includes(picked.type)) {
       this.toast.error('Please choose a PNG, JPG or WebP image.');
       return;
     }
+    // Phone screenshots are often 1–3 MB PNGs; as WebP they upload in a fraction of the time.
+    const file = await compressImage(picked);
     if (file.size > MAX_SCREENSHOT_BYTES) {
       this.toast.error('The screenshot must be smaller than 5 MB.');
       return;

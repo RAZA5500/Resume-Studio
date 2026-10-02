@@ -39,7 +39,15 @@ import type { DocumentFile, ImproveMode } from '../../../core/models/app.models'
 import { AiService } from '../../../core/services/ai.service';
 import { DocumentService } from '../../../core/services/document.service';
 import { DialogService, ToastService } from '../../../core/services/ui.service';
-import { dataUrlToBlob, downloadBlob, pickFile, readAsDataUrl, safeFileName } from '../../../core/utils/files';
+import {
+  canEncodeWebp,
+  compactImageType,
+  dataUrlToBlob,
+  downloadBlob,
+  pickFile,
+  readAsDataUrl,
+  safeFileName,
+} from '../../../core/utils/files';
 import { loadFonts } from '../../../core/utils/fonts';
 import { errorMessage, isLimitReached } from '../../../core/utils/http';
 import { loadPdfJs, openPdf, pdfBlob, renderPdfPage, textToHtml } from '../../../core/utils/pdf';
@@ -400,7 +408,7 @@ export class CanvasEditor {
       if (page.thumb) continue;
       if (page.state.source.type === 'pdf') {
         const canvas = await renderPdfPage(this.pdf!, page.state.source.index + 1, 0.3, page.state.rotation);
-        page.thumb = canvas.toDataURL('image/jpeg', 0.7);
+        page.thumb = canvas.toDataURL(compactImageType(), 0.7);
       } else if (page.bg) {
         page.thumb = page.bg;
       }
@@ -1332,7 +1340,8 @@ export class CanvasEditor {
         ? await this.renderPageImage(first, {
             background: true,
             multiplier: Math.min(1, 320 / first.width),
-            format: 'jpeg',
+            // Shown in the documents list only, so the smallest format wins.
+            format: canEncodeWebp() ? 'webp' : 'jpeg',
             quality: 0.7,
           })
         : undefined;

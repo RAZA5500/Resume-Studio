@@ -37,6 +37,19 @@ const FONTS: Record<string, string> = {
 };
 const SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px', '48px'];
 
+/**
+ * The formats the editor accepts: what the toolbar offers (plus text direction for Urdu/RTL
+ * imports). Quill's video and formula embeds export unescaped HTML (CVE-2025-15056, no fixed Quill
+ * release yet); leaving them out means pasted or imported content can never create them.
+ */
+const FORMATS = [
+  'header', 'font', 'size', 'bold', 'italic', 'underline', 'strike', 'color', 'background', 'script',
+  'align', 'direction', 'list', 'indent', 'blockquote', 'code-block', 'link', 'image',
+];
+
+/** Elements an exported document never needs; they could run code in the print frame or PDF renderer. */
+const UNSAFE_ELEMENTS = 'script, iframe, frame, object, embed, applet, base, link, meta, style, form';
+
 /** Quill's theme CSS is a lazy bundle (angular.json "inject": false) — only this editor needs it. */
 let quillTheme: Promise<void> | null = null;
 function loadQuillTheme(): Promise<void> {
@@ -76,6 +89,17 @@ function inlineQuillClasses(html: string): string {
       el.classList.remove(cls);
     }
     if (!el.classList.length) el.removeAttribute('class');
+  });
+  // Defence in depth for the exported page (same-origin print frame, server-side PDF): no scripts,
+  // frames, event handlers or script URLs, whatever the editor content contained.
+  doc.body.querySelectorAll(UNSAFE_ELEMENTS).forEach((el) => el.remove());
+  doc.body.querySelectorAll('*').forEach((el) => {
+    for (const { name, value } of Array.from(el.attributes)) {
+      const url = value.replace(/[\s\u0000-\u001f]+/g, '').toLowerCase();
+      if (/^on/i.test(name) || /^(javascript|vbscript):|^data:(text\/html|image\/svg)/.test(url)) {
+        el.removeAttribute(name);
+      }
+    }
   });
   return doc.body.innerHTML;
 }
@@ -135,6 +159,7 @@ export class RichEditor {
     this.quill = new Quill(this.host().nativeElement, {
       theme: 'snow',
       placeholder: 'Start writing…',
+      formats: FORMATS,
       modules: {
         toolbar: [
           [{ header: [1, 2, 3, false] }],
