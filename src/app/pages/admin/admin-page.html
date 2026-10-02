@@ -223,7 +223,7 @@
         <button class="btn btn-ghost btn-icon btn-sm" type="button" (click)="closeReceipt()" aria-label="Close"><span class="i">close</span></button>
       </div>
       <div class="modal-body receipt-body">
-        <img [src]="r.url" alt="Payment receipt" />
+        <img [src]="r.url" alt="Payment receipt" loading="lazy" decoding="async" />
       </div>
       <div class="modal-footer">
         <span class="grow small muted">{{ r.payment.user?.email }} · {{ methodLabels[r.payment.method] }} · {{ r.payment.currency }} {{ r.payment.amount }}</span>

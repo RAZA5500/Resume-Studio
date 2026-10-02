@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, effect, ElementRef, inject, signal, viewChild } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { DialogService } from '../../core/services/ui.service';
 
+// Plain value/input bindings instead of ngModel: this host is part of the start-up bundle, and
+// FormsModule would pull @angular/forms (~35 kB) into it for two fields.
 @Component({
   selector: 'app-dialog-host',
-  imports: [FormsModule],
   template: `
     @if (dialogs.current(); as dialog) {
       <div class="modal-backdrop" animate.leave="is-leaving" (click)="cancel()" (keydown.escape)="cancel()">
@@ -25,10 +25,10 @@ import { DialogService } from '../../core/services/ui.service';
                   }
                   @if (dialog.multiline) {
                     <textarea #input id="dialog-input" class="textarea" rows="5" [placeholder]="dialog.placeholder ?? ''"
-                      [ngModel]="value()" (ngModelChange)="value.set($event)"></textarea>
+                      [value]="value()" (input)="value.set(input.value)"></textarea>
                   } @else {
                     <input #input id="dialog-input" class="input" [placeholder]="dialog.placeholder ?? ''"
-                      [ngModel]="value()" (ngModelChange)="value.set($event)" (keydown.enter)="confirm()" />
+                      [value]="value()" (input)="value.set(input.value)" (keydown.enter)="confirm()" />
                   }
                 </div>
               }

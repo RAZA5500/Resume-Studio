@@ -3,7 +3,9 @@ import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angu
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom, timeout } from 'rxjs';
+import { AiService } from '../../core/services/ai.service';
 import { apiOrigin, saveServerOrigin } from '../../core/services/api-url.interceptor';
+import { BillingService } from '../../core/services/billing.service';
 import { Logo } from '../../shared/ui/logo';
 
 /**
@@ -59,6 +61,8 @@ import { Logo } from '../../shared/ui/logo';
 export class ConnectPage {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly ai = inject(AiService);
+  private readonly billing = inject(BillingService);
 
   readonly returnUrl = input<string>('');
 
@@ -77,6 +81,9 @@ export class ConnectPage {
     try {
       await firstValueFrom(this.http.get(`${origin}/api/health`).pipe(timeout(10000)));
       saveServerOrigin(origin);
+      // App start-up skipped these while no server was set.
+      this.ai.loadStatus();
+      this.billing.loadConfig();
       await this.router.navigateByUrl(this.returnUrl() || '/login', { replaceUrl: true });
     } catch {
       this.error.set(`No ResumeStudio server answered at ${origin}. Check the address and that the backend is running.`);

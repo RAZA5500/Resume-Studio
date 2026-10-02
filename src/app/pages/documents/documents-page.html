@@ -73,7 +73,7 @@
         <article class="doc" appReveal [revealDelay]="(i % 6) * 70">
           <a class="thumb" [routerLink]="['/editor', doc.id]">
             @if (doc.thumbnail) {
-              <img [src]="doc.thumbnail" alt="" />
+              <img [src]="doc.thumbnail" alt="" loading="lazy" decoding="async" />
             } @else {
               <span class="i placeholder" [attr.data-kind]="doc.kind">{{ icon(doc) }}</span>
             }

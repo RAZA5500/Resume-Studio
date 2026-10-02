@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { isNativeApp } from '../native/platform';
-import { apiOrigin, serverIsConfigurable } from '../services/api-url.interceptor';
+import { apiReady } from '../services/api-url.interceptor';
 import { AuthService } from '../services/auth.service';
 
 export const authGuard: CanActivateFn = (_route, state) => {
@@ -38,6 +38,4 @@ export const homeGuard: CanActivateFn = () =>
 
 /** An APK built without API_URL needs a server address before any page can load data. */
 export const serverGuard: CanActivateFn = (_route, state) =>
-  serverIsConfigurable() && !apiOrigin()
-    ? inject(Router).createUrlTree(['/connect'], { queryParams: { returnUrl: state.url } })
-    : true;
+  apiReady() ? true : inject(Router).createUrlTree(['/connect'], { queryParams: { returnUrl: state.url } });

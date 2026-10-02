@@ -2114,12 +2114,6 @@ html.theme-vt::view-transition-new(root) {
   }
 }
 
-/* Off-screen blocks skip rendering until they come near the viewport. */
-.cv-auto {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 900px;
-}
-
 /* ---------------------------------------------------------------- reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

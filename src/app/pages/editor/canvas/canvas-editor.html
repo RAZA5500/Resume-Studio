@@ -119,7 +119,7 @@
         <button type="button" class="page-thumb" [class.active]="i === current()" (click)="goToPage(i)">
           <span class="pt-img" [style.aspect-ratio]="p.width + ' / ' + p.height" [style.background]="p.state.background ?? '#fff'">
             @if (p.thumb) {
-              <img [src]="p.thumb" alt="" />
+              <img [src]="p.thumb" alt="" loading="lazy" decoding="async" />
             }
           </span>
           <span class="pt-num">{{ i + 1 }}</span>

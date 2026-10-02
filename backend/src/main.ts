@@ -2,6 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 
@@ -28,8 +29,10 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // The Android app (Capacitor) serves its pages from https://localhost, so that origin is always allowed.
+  const origins = (config.get<string>('FRONTEND_URL') ?? 'http://localhost:4200').split(',').map((o) => o.trim());
   app.enableCors({
-    origin: (config.get<string>('FRONTEND_URL') ?? 'http://localhost:4200').split(',').map((o) => o.trim()),
+    origin: [...origins, 'https://localhost'],
     credentials: true,
     exposedHeaders: ['Content-Disposition'],
   });

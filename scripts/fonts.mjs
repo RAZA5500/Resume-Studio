@@ -62,28 +62,30 @@ function walk(dir, files = []) {
 }
 
 /**
- * Every word in the source that could be an icon: the text of class="i" elements plus each
- * quoted snake_case string (icons picked in TypeScript, ternaries in templates). Words that are
- * not Material Symbols names are dropped later, so over-matching only costs a few bytes.
+ * Icons used in the source. `direct`: the text of class="i" elements — always kept. `quoted`: every
+ * quoted snake_case string (icons picked in TypeScript, ternaries in templates); these are kept
+ * only when Google lists them as an icon name, so ordinary strings do not bloat the request.
  */
 function iconCandidates() {
-  const words = new Set();
+  const direct = new Set();
+  const quoted = new Set();
   for (const file of walk('src/app')) {
     const source = readFileSync(file, 'utf8');
-    for (const m of source.matchAll(/class="i(?:\s[^"]*)?"[^>]*>\s*([a-z0-9_]+)\s*</g)) words.add(m[1]);
-    for (const m of source.matchAll(/(['"`])([a-z0-9][a-z0-9_]{1,48})\1/g)) words.add(m[2]);
+    for (const m of source.matchAll(/class="i(?:\s[^"]*)?"[^>]*>\s*([a-z0-9_]+)\s*</g)) direct.add(m[1]);
+    for (const m of source.matchAll(/(['"`])([a-z0-9][a-z0-9_]{1,48})\1/g)) quoted.add(m[2]);
   }
-  return words;
+  return { direct, quoted };
 }
 
+/**
+ * Every icon name Google knows, in any Material family. Older names (auto_awesome, expand_more…)
+ * are listed as Material Icons only, yet the Symbols font still accepts them as ligatures, and the
+ * subset API simply skips names it cannot draw — so filtering by family would drop working icons.
+ */
 async function materialSymbolNames() {
   const raw = await get('https://fonts.google.com/metadata/icons?key=material_symbols&incomplete=true');
   const data = JSON.parse(raw.replace(/^\)\]\}'/, ''));
-  return new Set(
-    data.icons
-      .filter((icon) => !(icon.unsupported_families ?? []).includes('Material Symbols Outlined'))
-      .map((icon) => icon.name),
-  );
+  return new Set(data.icons.map((icon) => icon.name));
 }
 
 function hashed(slug, buffer) {
@@ -114,8 +116,10 @@ async function main() {
     }
   }
 
+  // The metadata lags behind the font (newer icons such as magic_button are missing from it).
   const known = await materialSymbolNames();
-  const icons = [...iconCandidates()].filter((word) => known.has(word)).sort();
+  const { direct, quoted } = iconCandidates();
+  const icons = [...new Set([...direct, ...[...quoted].filter((word) => known.has(word))])].sort();
   const iconCss = await get(
     `https://fonts.googleapis.com/css2?family=${ICON_QUERY}&icon_names=${icons.join(',')}&display=block`,
   );

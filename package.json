@@ -6,7 +6,10 @@
     "start": "ng serve",
     "build": "node scripts/build.mjs",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "fonts": "node scripts/fonts.mjs",
+    "icons": "node scripts/app-icons.mjs",
+    "apk": "node scripts/apk.mjs"
   },
   "private": true,
   "packageManager": "npm@11.17.0",

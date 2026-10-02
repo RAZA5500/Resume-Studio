@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AiService } from './core/services/ai.service';
+import { apiReady } from './core/services/api-url.interceptor';
 import { AuthService } from './core/services/auth.service';
 import { BillingService } from './core/services/billing.service';
 import { DialogHost } from './shared/ui/dialog-host';
@@ -24,6 +25,8 @@ export class App implements OnInit {
   private readonly billing = inject(BillingService);
 
   ngOnInit(): void {
+    // An Android test build without a server yet loads these after the Connect page.
+    if (!apiReady()) return;
     this.ai.loadStatus();
     this.billing.loadConfig();
     if (this.auth.isAuthenticated()) {

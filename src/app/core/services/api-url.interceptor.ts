@@ -31,6 +31,11 @@ export function serverIsConfigurable(): boolean {
   return isNativeApp() && !API_URL;
 }
 
+/** False only in an Android test build whose server has not been chosen yet. */
+export function apiReady(): boolean {
+  return !serverIsConfigurable() || !!apiOrigin();
+}
+
 export function saveServerOrigin(origin: string): void {
   try {
     localStorage.setItem(SERVER_KEY, origin.trim().replace(/\/+$/, ''));
