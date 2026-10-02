@@ -8,7 +8,7 @@ export class UsersService {
   constructor(@InjectRepository(User) private readonly users: Repository<User>) {}
 
   findByEmail(email: string, withPassword = false): Promise<User | null> {
-    const query = this.users.createQueryBuilder('u').where('LOWER(u.email) = LOWER(:email)', { email });
+    const query = this.users.createQueryBuilder('u').where('LOWER(u.email) = LOWER(:email)', { email: email.trim() });
     if (withPassword) query.addSelect('u.passwordHash');
     return query.getOne();
   }

@@ -29,6 +29,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(compression());
   // The Android app (Capacitor) serves its pages from https://localhost, so that origin is always allowed.
   const origins = (config.get<string>('FRONTEND_URL') ?? 'http://localhost:4200').split(',').map((o) => o.trim());
   app.enableCors({

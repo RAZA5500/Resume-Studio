@@ -39,8 +39,8 @@ export class PdfRendererService implements OnModuleDestroy {
       await page.setJavaScriptEnabled(false);
       await page.setRequestInterception(true);
       page.on('request', (request) => {
-        if (ALLOWED_REQUEST.test(request.url())) void request.continue();
-        else void request.abort();
+        if (ALLOWED_REQUEST.test(request.url())) void request.continue().catch(() => undefined);
+        else void request.abort().catch(() => undefined);
       });
       await page.setContent(html, { waitUntil: 'load', timeout: 45_000 });
       // Web fonts are fetched after layout — wait for them so the PDF embeds the right typefaces.
@@ -96,7 +96,7 @@ export class PdfRendererService implements OnModuleDestroy {
       'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
       localAppData ? `${localAppData}\\Google\\Chrome\\Application\\chrome.exe` : undefined,
-      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
       'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
       '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',

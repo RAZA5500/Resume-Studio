@@ -129,7 +129,10 @@ export class TextExtractionService implements OnModuleDestroy {
   private rtfToText(rtf: string): string {
     return decodeEntities(
       rtf
+        .replace(/\\line/g, '\n')
         .replace(/\\par[d]?/g, '\n')
+        .replace(/\\tab/g, '\t')
+        .replace(/\\~/g, ' ')
         .replace(/\\'([0-9a-f]{2})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
         .replace(/\\u(-?\d+)\??/g, (_, code: string) => String.fromCharCode(Number(code) < 0 ? Number(code) + 65536 : Number(code)))
         .replace(/\{\\\*[^{}]*\}/g, '')

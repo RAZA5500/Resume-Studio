@@ -30,10 +30,22 @@ export function parseJsonLoose<T>(raw: string): T {
       // keep trying
     }
   }
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start >= 0 && end > start) {
-    return JSON.parse(text.slice(start, end + 1)) as T;
+  const objStart = text.indexOf('{');
+  const objEnd = text.lastIndexOf('}');
+  const arrStart = text.indexOf('[');
+  const arrEnd = text.lastIndexOf(']');
+
+  const candidates: { start: number; end: number }[] = [];
+  if (objStart >= 0 && objEnd > objStart) candidates.push({ start: objStart, end: objEnd });
+  if (arrStart >= 0 && arrEnd > arrStart) candidates.push({ start: arrStart, end: arrEnd });
+  candidates.sort((a, b) => a.start - b.start);
+
+  for (const c of candidates) {
+    try {
+      return JSON.parse(text.slice(c.start, c.end + 1)) as T;
+    } catch {
+      // keep trying candidates
+    }
   }
   throw new Error('Could not parse JSON from AI response');
 }

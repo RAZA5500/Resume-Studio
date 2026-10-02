@@ -60,15 +60,17 @@ export function bulletLines(description: string): string[] {
 }
 
 export function sectionTitle(content: ResumeContent, key: string): string {
-  if (content.sectionTitles[key]) return content.sectionTitles[key];
+  if (content.sectionTitles?.[key]) return content.sectionTitles[key];
   if (key.startsWith('custom:')) {
-    return content.customSections.find((s) => `custom:${s.id}` === key)?.title ?? 'Section';
+    return content.customSections?.find((s) => `custom:${s.id}` === key)?.title ?? 'Section';
   }
   return DEFAULT_SECTION_TITLES[key] ?? key;
 }
 
 export function visibleSections(content: ResumeContent): string[] {
-  return content.sectionOrder.filter((key) => !content.hiddenSections.includes(key));
+  const order = content.sectionOrder ?? [];
+  const hidden = content.hiddenSections ?? [];
+  return order.filter((key) => !hidden.includes(key));
 }
 
 function contactParts(content: ResumeContent): string[] {
@@ -151,7 +153,7 @@ function sectionPlainText(content: ResumeContent, key: string): string[] {
       if (content.interests.length) lines.push(content.interests.map((i) => i.name).join(', '));
       break;
     default: {
-      const section = content.customSections.find((s) => `custom:${s.id}` === key);
+      const section = content.customSections?.find((s) => `custom:${s.id}` === key);
       for (const item of section?.items ?? []) {
         lines.push([item.title, item.subtitle, item.date].filter(Boolean).join(' — '));
         lines.push(...bulletLines(item.description).map((b) => `• ${b}`));
@@ -267,8 +269,8 @@ export function resumeToDocxHtml(content: ResumeContent, design?: Partial<Design
         if (content.interests.length) parts.push(heading(title), `<p>${e(content.interests.map((i) => i.name).join(' • '))}</p>`);
         break;
       default: {
-        const section = content.customSections.find((s) => `custom:${s.id}` === key);
-        if (!section?.items.length) break;
+        const section = content.customSections?.find((s) => `custom:${s.id}` === key);
+        if (!section?.items?.length) break;
         parts.push(heading(title));
         for (const item of section.items) {
           parts.push(entry([item.title, item.subtitle].filter(Boolean).join(' — '), item.date), list(bulletLines(item.description)));

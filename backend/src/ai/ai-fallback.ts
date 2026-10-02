@@ -302,8 +302,9 @@ export function offlineCoverLetter(
 ): CoverLetter {
   const name = content.personal.fullName || '[Your Name]';
   const titleLine = /(?:job title|position|role)\s*[:-]\s*([^\n.]{3,60})/i.exec(jobDescription)?.[1];
-  const firstLine = jobDescription.trim().split('\n')[0];
-  const role = (titleLine ?? (firstLine.split(' ').length <= 8 ? firstLine : '')) || content.personal.jobTitle || 'this';
+  const extractedRole = (titleLine ?? (firstLine.split(' ').length <= 8 ? firstLine : '')) || content.personal.jobTitle;
+  const role = extractedRole && extractedRole.toLowerCase() !== 'this' ? extractedRole.trim() : '';
+  const positionPhrase = role ? `the ${role} position` : 'this position';
   const target = company || 'your company';
   const years = totalYears(content);
   const skills = detectSkills(jobDescription).filter((s) => containsKeyword(JSON.stringify(content), s)).slice(0, 4);
@@ -312,7 +313,7 @@ export function offlineCoverLetter(
 
   const paragraphs = [
     `Dear ${hiringManager || 'Hiring Manager'},`,
-    `I am excited to apply for the ${role.trim()} position at ${target}. With ${
+    `I am excited to apply for ${positionPhrase} at ${target}. With ${
       years ? `${years}+ years of experience` : 'solid experience'
     }${recent?.jobTitle ? ` as a ${recent.jobTitle}` : ''}${
       skills.length ? ` and expertise in ${skills.join(', ')}` : ''
@@ -326,7 +327,7 @@ export function offlineCoverLetter(
     'Thank you for your time and consideration.',
     `Sincerely,\n${name}`,
   ];
-  return { subject: `Application for ${role.trim()} – ${name}`, body: paragraphs.join('\n\n') };
+  return { subject: `${role ? `Application for ${role}` : 'Job Application'} – ${name}`, body: paragraphs.join('\n\n') };
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +452,17 @@ export function offlineParseResume(text: string): ResumeContent {
   const content = createEmptyContent();
   const header = buckets['header'];
   const email = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.exec(text)?.[0] ?? '';
-  const phone = /\+?[\d(][\d\s().-]{7,}\d/.exec(header.join(' '))?.[0]?.trim() ?? '';
+  const findPhone = (src: string) => {
+    const matches = src.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+?[\d(][\d\s().-]{7,}\d/g) ?? [];
+    for (const m of matches) {
+      const digits = m.replace(/\D/g, '');
+      if (digits.length >= 7 && digits.length <= 15 && !/^\d{4}\s*[-–—]\s*\d{4}$/.test(m.trim())) {
+        return m.trim();
+      }
+    }
+    return '';
+  };
+  const phone = findPhone(header.join(' ')) || findPhone(text.slice(0, 1000));
   const nameLine = header.find(
     (l) => /^[A-Za-z][A-Za-z.'\s-]{2,50}$/.test(l) && l.split(/\s+/).length >= 2 && l.split(/\s+/).length <= 5,
   );
