@@ -302,6 +302,7 @@ export function offlineCoverLetter(
 ): CoverLetter {
   const name = content.personal.fullName || '[Your Name]';
   const titleLine = /(?:job title|position|role)\s*[:-]\s*([^\n.]{3,60})/i.exec(jobDescription)?.[1];
+  const firstLine = jobDescription.trim().split('\n')[0] ?? '';
   const extractedRole = (titleLine ?? (firstLine.split(' ').length <= 8 ? firstLine : '')) || content.personal.jobTitle;
   const role = extractedRole && extractedRole.toLowerCase() !== 'this' ? extractedRole.trim() : '';
   const positionPhrase = role ? `the ${role} position` : 'this position';
