@@ -28,20 +28,34 @@ export class TemplatesService implements OnApplicationBootstrap {
   constructor(@InjectRepository(Template) private readonly templates: Repository<Template>) {}
 
   /** Seeds (or refreshes) the generated catalog so a fresh database is usable immediately. */
-  async onApplicationBootstrap(): Promise<void> {
-    const generated = generateTemplates();
-    const [count, outdated] = await Promise.all([
-      this.templates.count(),
-      this.templates.count({ where: { catalogVersion: LessThan(CATALOG_VERSION) } }),
-    ]);
-    if (count === generated.length && outdated === 0) return;
+  async seedCatalog(): Promise<void> {
+    try {
+      if (!this.templates.manager?.connection?.isInitialized) {
+        this.logger.debug('Cannot seed template catalog: database not yet initialized.');
+        return;
+      }
+      const generated = generateTemplates();
+      const [count, outdated] = await Promise.all([
+        this.templates.count(),
+        this.templates.count({ where: { catalogVersion: LessThan(CATALOG_VERSION) } }),
+      ]);
+      if (count === generated.length && outdated === 0) return;
 
-    this.logger.log(`Seeding template catalog (${generated.length} templates)…`);
-    const chunkSize = 400;
-    for (let i = 0; i < generated.length; i += chunkSize) {
-      await this.templates.upsert(generated.slice(i, i + chunkSize), ['id']);
+      this.logger.log(`Seeding template catalog (${generated.length} templates)…`);
+      const chunkSize = 400;
+      for (let i = 0; i < generated.length; i += chunkSize) {
+        await this.templates.upsert(generated.slice(i, i + chunkSize), ['id']);
+      }
+      this.logger.log('Template catalog ready.');
+    } catch (err) {
+      this.logger.warn(`Template catalog seed skipped: ${(err as Error).message}`);
     }
-    this.logger.log('Template catalog ready.');
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (this.templates.manager?.connection?.isInitialized) {
+      await this.seedCatalog();
+    }
   }
 
   async list(query: QueryTemplatesDto): Promise<TemplatePage> {

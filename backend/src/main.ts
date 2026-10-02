@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module.js';
 import { setLastDatabaseError } from './health.controller.js';
+import { TemplatesService } from './templates/templates.service.js';
 
 /** TRUST_PROXY=1 (one proxy hop), true, false, or a list of proxy IPs — see Express "trust proxy". */
 function trustProxySetting(value: string | undefined): boolean | number | string | undefined {
@@ -18,7 +19,7 @@ function trustProxySetting(value: string | undefined): boolean | number | string
   return /^\d+$/.test(value) ? Number(value) : value;
 }
 
-async function initDatabaseInBackground(dataSource: DataSource, config: ConfigService) {
+async function initDatabaseInBackground(app: NestExpressApplication, dataSource: DataSource, config: ConfigService) {
   let attempt = 0;
   const maxAttempts = 60; // Retry up to 5 minutes with 5s delay
   while (!dataSource.isInitialized && attempt < maxAttempts) {
@@ -29,6 +30,13 @@ async function initDatabaseInBackground(dataSource: DataSource, config: ConfigSe
       await dataSource.initialize();
       setLastDatabaseError(null);
       Logger.log('Supabase PostgreSQL database connection established! Tables synchronized.', 'Database');
+      
+      try {
+        const templatesService = app.get(TemplatesService);
+        await templatesService.seedCatalog();
+      } catch (seedErr) {
+        Logger.warn(`Catalog seed notice: ${(seedErr as Error).message}`, 'Database');
+      }
       return;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -112,7 +120,7 @@ async function bootstrap() {
   Logger.log(`API ready on ${typeof port === 'number' ? `http://localhost:${port}/api` : port}`, 'Bootstrap');
 
   // Initiate database connection in background so startup is never blocked
-  initDatabaseInBackground(dataSource, config).catch((err) => {
+  initDatabaseInBackground(app, dataSource, config).catch((err) => {
     Logger.error(`Database background initialization error: ${err.message}`, 'Bootstrap');
   });
 }
