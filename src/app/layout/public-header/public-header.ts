@@ -102,7 +102,7 @@ interface NavLink {
     }
     .pill.on { opacity: 1; }
     .actions { display: flex; gap: 8px; align-items: center; }
-    .cta { box-shadow: 0 10px 30px -10px rgba(217, 70, 239, 0.8); }
+    .cta { box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.8); }
     .burger {
       display: none; position: relative; width: 40px; height: 40px; border-radius: 12px;
       border: 1px solid var(--border); background: var(--input-bg); cursor: pointer;

@@ -11,14 +11,14 @@
   padding: 34px 36px;
   border-radius: 28px;
   color: #fff;
-  background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #831843 100%);
-  box-shadow: 0 30px 80px -40px rgba(139, 92, 246, 0.8);
+  background: linear-gradient(180deg, #13213d 0%, #0c1629 100%);
+  box-shadow: 0 24px 60px -36px rgba(15, 23, 42, 0.6);
 }
 
 .welcome-bg {
-  --aurora-1: rgba(99, 102, 241, 0.5);
-  --aurora-2: rgba(236, 72, 153, 0.35);
-  --aurora-3: rgba(34, 211, 238, 0.25);
+  --aurora-1: rgba(59, 130, 246, 0.22);
+  --aurora-2: rgba(14, 165, 233, 0.1);
+  --aurora-3: rgba(255, 255, 255, 0.04);
   --border: rgba(255, 255, 255, 0.06);
   position: absolute;
   inset: 0;
@@ -148,7 +148,7 @@
   place-items: center;
   border-radius: 11px;
   background: var(--grad-brand);
-  box-shadow: 0 8px 20px -8px rgba(139, 92, 246, 0.9);
+  box-shadow: 0 8px 20px -8px rgba(37, 99, 235, 0.9);
   .i {
     font-size: 19px;
   }
@@ -226,7 +226,7 @@
 }
 
 .action {
-  --tone: #8b5cf6;
+  --tone: #2563eb;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -289,7 +289,7 @@
   place-items: center;
   border-radius: 14px;
   color: #fff;
-  background: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 55%, #ec4899));
+  background: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 80%, #000));
   box-shadow: 0 10px 24px -10px var(--tone);
   transition: transform 0.5s var(--ease-spring);
   .i {
@@ -392,7 +392,7 @@
   font-size: 12.5px;
   font-weight: 700;
   white-space: nowrap;
-  box-shadow: 0 10px 24px -10px rgba(139, 92, 246, 0.9);
+  box-shadow: 0 10px 24px -10px rgba(37, 99, 235, 0.9);
   opacity: 0;
   transform: translate(-50%, 12px);
   transition:

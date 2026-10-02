@@ -36,7 +36,7 @@
   width: 300px;
   height: 300px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.24), transparent 65%);
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.24), transparent 65%);
   pointer-events: none;
   animation: float-y 9s var(--ease-in-out) infinite;
 }
@@ -144,13 +144,13 @@ nav a {
       width: 3px;
       border-radius: 0 4px 4px 0;
       background: var(--grad-brand);
-      box-shadow: 0 0 14px rgba(217, 70, 239, 0.85);
+      box-shadow: 0 0 14px rgba(37, 99, 235, 0.85);
       animation: active-bar 0.5s var(--ease-spring) both;
     }
     .ni {
       color: #fff;
       background: var(--grad-brand);
-      box-shadow: 0 8px 18px -8px rgba(139, 92, 246, 0.95);
+      box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.95);
     }
   }
 }
@@ -181,7 +181,7 @@ nav a {
   padding: 14px;
   border-radius: 16px;
   background:
-    radial-gradient(circle at 100% 0%, rgba(217, 70, 239, 0.16), transparent 60%),
+    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.16), transparent 60%),
     var(--surface-2);
   animation: rise-in 0.7s var(--ease-out) 0.35s backwards;
   .btn {
@@ -308,7 +308,7 @@ nav + .side-foot {
   background: var(--grad-brand);
   box-shadow:
     0 0 0 2px var(--bg),
-    0 0 0 3.5px rgba(167, 139, 250, 0.6);
+    0 0 0 3.5px rgba(96, 165, 250, 0.6);
 }
 
 .who {

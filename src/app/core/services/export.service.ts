@@ -90,7 +90,7 @@ p { margin: 0 0 8pt; } ul, ol { margin: 0 0 8pt; padding-left: 22pt; } img { max
 blockquote { margin: 0 0 8pt; padding-left: 12pt; border-left: 3px solid #cbd5e1; color: #475569; }
 pre { background: #f1f5f9; padding: 8pt; border-radius: 4pt; white-space: pre-wrap; }
 table { border-collapse: collapse; } td, th { border: 1px solid #cbd5e1; padding: 4pt 6pt; }
-a { color: #4f46e5; }
+a { color: #2563eb; }
 </style>
 </head>
 <body>${bodyHtml}</body>

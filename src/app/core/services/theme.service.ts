@@ -4,7 +4,7 @@ import { inject, Injectable, signal } from '@angular/core';
 export type Theme = 'dark' | 'light';
 
 const STORAGE_KEY = 'rs_theme';
-const THEME_COLORS: Record<Theme, string> = { dark: '#07060e', light: '#f7f6fc' };
+const THEME_COLORS: Record<Theme, string> = { dark: '#0a0c10', light: '#f7f8fa' };
 
 interface ViewTransitionLike {
   ready: Promise<void>;

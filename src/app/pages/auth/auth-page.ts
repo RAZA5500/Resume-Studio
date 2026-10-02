@@ -40,7 +40,7 @@ export class AuthPage {
 
   protected readonly isRegister = computed(() => this.mode() === 'register');
   protected readonly sample = SAMPLE_CONTENT;
-  protected readonly sampleDesign = { ...DEFAULT_DESIGN, layout: 'modern', primaryColor: '#4c1d95', accentColor: '#8b5cf6', headingStyle: 'line' as const, uppercaseHeadings: true, skillStyle: 'inline' as const };
+  protected readonly sampleDesign = { ...DEFAULT_DESIGN, layout: 'modern', primaryColor: '#1e3a8a', accentColor: '#2563eb', headingStyle: 'line' as const, uppercaseHeadings: true, skillStyle: 'inline' as const };
   protected readonly features = [
     '4,608 ATS-friendly templates',
     'AI help with summaries, bullets and cover letters',

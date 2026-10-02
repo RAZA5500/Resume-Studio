@@ -32,7 +32,7 @@ export class BillingPage implements OnInit {
     x: (i * 53 + 4) % 100,
     delay: (i % 6) * 0.35,
     r: (i * 47) % 360,
-    color: ['#8b5cf6', '#d946ef', '#f472b6', '#22d3ee', '#fbbf24', '#34d399'][i % 6],
+    color: ['#2563eb', '#0d9488', '#14b8a6', '#22d3ee', '#fbbf24', '#34d399'][i % 6],
   }));
 
   protected readonly methods = computed(() => this.billing.config()?.methods ?? []);

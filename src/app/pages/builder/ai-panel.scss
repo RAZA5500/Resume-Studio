@@ -27,7 +27,7 @@
   &.on {
     border-color: var(--primary-100);
     background:
-      radial-gradient(circle at 0% 50%, rgba(139, 92, 246, 0.2), transparent 60%),
+      radial-gradient(circle at 0% 50%, rgba(37, 99, 235, 0.2), transparent 60%),
       var(--primary-50);
     .i {
       color: var(--primary-700);
@@ -78,7 +78,7 @@
   flex-shrink: 0;
   color: #fff;
   background: var(--grad-brand);
-  box-shadow: 0 8px 18px -8px rgba(139, 92, 246, 0.9);
+  box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.9);
   .i {
     font-size: 19px;
   }

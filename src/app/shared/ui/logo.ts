@@ -22,7 +22,7 @@ import { RouterLink } from '@angular/router';
       position: relative; width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
       display: grid; place-items: center; overflow: hidden;
       background: var(--grad-brand); background-size: 220% 220%;
-      box-shadow: 0 8px 22px -8px rgba(139, 92, 246, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      box-shadow: 0 8px 22px -8px rgba(37, 99, 235, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
       animation: gradient-pan 7s ease-in-out infinite;
       transition: transform 0.55s var(--ease-spring);
     }

@@ -42,7 +42,7 @@
     border-radius: 9px;
     color: #fff;
     background: var(--grad-brand);
-    box-shadow: 0 6px 16px -6px rgba(139, 92, 246, 0.9);
+    box-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.9);
     display: grid;
     place-items: center;
     font-size: 13px;
@@ -86,7 +86,7 @@
   border-radius: 14px;
   color: #fff;
   background: var(--grad-brand);
-  box-shadow: 0 10px 24px -10px rgba(139, 92, 246, 0.9);
+  box-shadow: 0 10px 24px -10px rgba(37, 99, 235, 0.9);
   .i {
     font-size: 24px;
   }
@@ -153,7 +153,7 @@
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: conic-gradient(from 0deg, transparent 0deg, rgba(139, 92, 246, 0.55) 60deg, transparent 61deg);
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(37, 99, 235, 0.55) 60deg, transparent 61deg);
     animation: spin 1.6s linear infinite;
     -webkit-mask-image: radial-gradient(circle, #000 66%, transparent 67%);
     mask-image: radial-gradient(circle, #000 66%, transparent 67%);
@@ -169,7 +169,7 @@
     color: #fff;
     font-size: 26px;
     background: var(--grad-brand);
-    box-shadow: 0 12px 30px -10px rgba(139, 92, 246, 0.95);
+    box-shadow: 0 12px 30px -10px rgba(37, 99, 235, 0.95);
     animation: float-y 2.4s var(--ease-in-out) infinite;
   }
   &.small {

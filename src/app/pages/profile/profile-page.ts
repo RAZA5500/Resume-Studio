@@ -110,7 +110,7 @@ import { errorMessage } from '../../core/utils/http';
       width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0;
       display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px;
       background: var(--grad-brand); background-size: 200% 200%;
-      box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px rgba(167, 139, 250, 0.6), 0 16px 34px -12px rgba(139, 92, 246, 0.9);
+      box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px rgba(96, 165, 250, 0.6), 0 16px 34px -12px rgba(37, 99, 235, 0.9);
       animation: gradient-pan 6s ease-in-out infinite, pop-in 0.6s var(--ease-spring) both;
     }
     .card-pad p { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-2); }

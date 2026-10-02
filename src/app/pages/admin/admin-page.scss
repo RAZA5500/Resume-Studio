@@ -20,7 +20,7 @@
 }
 
 .stat {
-  --tone: #8b5cf6;
+  --tone: #2563eb;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -69,7 +69,7 @@
   place-items: center;
   border-radius: 11px;
   color: #fff;
-  background: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 55%, #6366f1));
+  background: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 80%, #000));
   box-shadow: 0 8px 18px -8px var(--tone);
   .i {
     font-size: 19px;

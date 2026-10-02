@@ -111,8 +111,8 @@ export class Landing {
 
   protected readonly heroDesign = design({
     layout: 'modern',
-    primaryColor: '#4c1d95',
-    accentColor: '#8b5cf6',
+    primaryColor: '#1e3a8a',
+    accentColor: '#2563eb',
     headingStyle: 'line',
     uppercaseHeadings: true,
     skillStyle: 'inline',

@@ -30,7 +30,7 @@ import { ThemeService } from '../../core/services/theme.service';
     .icons { position: relative; width: 18px; height: 18px; flex-shrink: 0; }
     .icons .i { position: absolute; inset: 0; font-size: 18px; transition: transform .6s var(--ease-spring), opacity .35s var(--ease); }
     .sun { opacity: 0; transform: rotate(-120deg) scale(.4); color: var(--amber); }
-    .moon { color: #c4b5fd; }
+    .moon { color: #93c5fd; }
     .is-light .sun { opacity: 1; transform: none; }
     .is-light .moon { opacity: 0; transform: rotate(120deg) scale(.4); }
     .with-label { width: 100%; padding: 0 11px; }

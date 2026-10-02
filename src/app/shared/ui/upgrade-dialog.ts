@@ -64,7 +64,7 @@ const TITLES: Record<string, string> = {
     .hero {
       position: relative; overflow: hidden; padding: 30px 24px 22px; text-align: center;
       border-bottom: 1px solid var(--border);
-      background: radial-gradient(circle at 50% -20%, rgba(139, 92, 246, 0.35), transparent 70%);
+      background: radial-gradient(circle at 50% -20%, rgba(37, 99, 235, 0.35), transparent 70%);
     }
     .hero > :not(.aurora) { position: relative; z-index: 1; }
     .close { position: absolute !important; top: 12px; right: 12px; }

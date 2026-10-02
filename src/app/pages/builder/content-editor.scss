@@ -36,7 +36,7 @@
     .sec-ic {
       color: #fff;
       background: var(--grad-brand);
-      box-shadow: 0 8px 18px -8px rgba(139, 92, 246, 0.9);
+      box-shadow: 0 8px 18px -8px rgba(37, 99, 235, 0.9);
     }
   }
   &.is-hidden .sec-title {
@@ -243,7 +243,7 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--primary-100);
   background:
-    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.14), transparent 60%),
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.14), transparent 60%),
     var(--input-bg);
   animation: pop-in 0.35s var(--ease-out) both;
 }

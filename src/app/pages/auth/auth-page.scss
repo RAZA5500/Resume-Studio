@@ -184,8 +184,8 @@
   gap: 32px;
   border-radius: 32px;
   color: #fff;
-  background: linear-gradient(150deg, #1e1b4b 0%, #3b0764 50%, #6b0f45 100%);
-  box-shadow: 0 40px 100px -40px rgba(139, 92, 246, 0.7);
+  background: linear-gradient(180deg, #13213d 0%, #0c1629 100%);
+  box-shadow: 0 40px 100px -40px rgba(37, 99, 235, 0.7);
   animation: panel-in 1s var(--ease-out) both;
   &::before {
     content: '';
@@ -209,7 +209,7 @@
   width: 560px;
   height: 560px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(244, 114, 182, 0.28), transparent 62%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.28), transparent 62%);
   transform: translate(calc(var(--mx, 60%) - 50%), calc(var(--my, 30%) - 50%));
   transition: transform 0.9s var(--ease-out);
   pointer-events: none;
@@ -248,7 +248,7 @@
   right: 0;
   top: 0;
   height: 80px;
-  background: linear-gradient(180deg, transparent, rgba(139, 92, 246, 0.16) 75%, rgba(167, 139, 250, 0.5));
+  background: linear-gradient(180deg, transparent, rgba(37, 99, 235, 0.16) 75%, rgba(96, 165, 250, 0.5));
   border-bottom: 2px solid rgba(196, 181, 253, 0.9);
   animation: auth-scan 4.2s var(--ease-in-out) 1.4s infinite;
   opacity: 0;
