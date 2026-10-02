@@ -23,7 +23,11 @@ import { UsersModule } from './users/users.module.js';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const url = config.get<string>('DATABASE_URL');
-        const ssl = config.get<string>('DATABASE_SSL') === 'true' ? { rejectUnauthorized: false } : false;
+        const sslSetting = config.get<string>('DATABASE_SSL');
+        const isRemote = !!url && !url.includes('localhost') && !url.includes('127.0.0.1');
+        const enableSsl = sslSetting !== undefined ? sslSetting === 'true' : isRemote;
+        const ssl = enableSsl ? { rejectUnauthorized: false } : false;
+
         return {
           type: 'postgres' as const,
           ...(url
@@ -36,6 +40,13 @@ import { UsersModule } from './users/users.module.js';
                 database: config.get<string>('DATABASE_NAME', 'resumestudio'),
               }),
           ssl,
+          extra: enableSsl
+            ? {
+                ssl: { rejectUnauthorized: false },
+                max: Number(config.get<string>('DATABASE_MAX_CONNECTIONS', '10')),
+                connectionTimeoutMillis: 10_000,
+              }
+            : undefined,
           autoLoadEntities: true,
           // Auto-creates tables in development. Set DB_SYNC=false and use migrations in production.
           synchronize: config.get<string>('DB_SYNC', 'true') === 'true',
