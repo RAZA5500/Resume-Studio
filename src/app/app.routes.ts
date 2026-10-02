@@ -1,12 +1,15 @@
 import { Routes } from '@angular/router';
 import { adminGuard, authGuard, guestGuard, homeGuard, serverGuard } from './core/guards/auth.guards';
+import { Landing } from './pages/landing/landing';
 
 export const routes: Routes = [
   {
     path: '',
     title: 'ResumeStudio — Resume Builder, ATS Checker & PDF Editor',
     canActivate: [homeGuard],
-    loadComponent: () => import('./pages/landing/landing').then((m) => m.Landing),
+    // Eager: most first visits land here, and a lazy chunk would cost one more round trip before
+    // anything renders. Every other page stays lazy.
+    component: Landing,
   },
   {
     // Android test builds only (no API_URL baked in): asks for the backend address.
