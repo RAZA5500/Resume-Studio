@@ -34,17 +34,15 @@ describe('BillingConfigService', () => {
     expect(config.resetsAt(new Date('2026-09-25T20:30:00Z')).toISOString()).toBe('2026-09-26T19:00:00.000Z');
   });
 
-  it('reads price, limits, payment accounts and admins from the environment', () => {
+  it('reads price, limits and admins from the environment and accepts every payment method', () => {
     const { config } = setup({
       LIFETIME_PRICE_PKR: '149',
       FREE_DAILY_RESUMES: '2',
-      PAYMENT_JAZZCASH_NUMBER: '0300-1234567',
-      PAYMENT_JAZZCASH_TITLE: 'Owner',
       ADMIN_EMAILS: 'Admin@Example.com, other@x.com',
     });
     expect(config.price).toBe(149);
     expect(config.limits).toEqual({ resume: 2, cover_letter: 1, document: 1 });
-    expect(config.methods.map((m) => m.key)).toEqual(['jazzcash']);
+    expect(config.methods.map((m) => m.key)).toEqual(['jazzcash', 'easypaisa', 'bank']);
     expect(config.isAdmin('admin@example.com')).toBe(true);
     expect(config.isAdmin('someone@example.com')).toBe(false);
   });

@@ -6,18 +6,26 @@ import type { PaymentMethodInfo } from '../../core/models/app.models';
 import { AuthService } from '../../core/services/auth.service';
 import { BillingService, METHOD_LABELS, USAGE_LABELS } from '../../core/services/billing.service';
 import { ToastService } from '../../core/services/ui.service';
-import { compressImage } from '../../core/utils/files';
+import { isNativeApp } from '../../core/native/platform';
+import { compressImage, downloadBlob } from '../../core/utils/files';
 import { errorMessage } from '../../core/utils/http';
 import { CountUp } from '../../shared/motion/count-up';
 
 const SCREENSHOT_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 
+/**
+ * The merchant QR shown at checkout (JazzCash + Raast, so every wallet and bank app can scan it).
+ * Images in public/payment/ come from `npm run payment-qr`; keep these details in step with them.
+ */
+const PAYMENT_QR = { merchant: 'RAZA Shop', tillId: '984636545', width: 906, height: 1280 };
+
 @Component({
   selector: 'app-billing-page',
   imports: [FormsModule, DatePipe, RouterLink, CountUp],
   templateUrl: './billing-page.html',
   styleUrl: './billing-page.scss',
+  host: { '(document:keydown.escape)': 'qrOpen.set(false)' },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BillingPage implements OnInit {
@@ -36,11 +44,16 @@ export class BillingPage implements OnInit {
     color: ['#2563eb', '#0d9488', '#14b8a6', '#22d3ee', '#fbbf24', '#34d399'][i % 6],
   }));
 
-  protected readonly methods = computed(() => this.billing.config()?.methods ?? []);
-  protected readonly methodKey = signal<PaymentMethodInfo['key'] | null>(null);
-  protected readonly method = computed<PaymentMethodInfo | null>(
-    () => this.methods().find((m) => m.key === this.methodKey()) ?? this.methods().at(0) ?? null,
+  protected readonly qr = PAYMENT_QR;
+  /** Enlarged QR (easier to scan from another phone). */
+  protected readonly qrOpen = signal(false);
+
+  /** "Paid with" choices: any of them can pay the QR code. */
+  protected readonly methods: PaymentMethodInfo[] = (Object.keys(METHOD_LABELS) as PaymentMethodInfo['key'][]).map(
+    (key) => ({ key, label: METHOD_LABELS[key] }),
   );
+  protected readonly methodKey = signal<PaymentMethodInfo['key']>('jazzcash');
+  protected readonly method = computed(() => this.methods.find((m) => m.key === this.methodKey()) ?? this.methods[0]);
   protected readonly payment = computed(() => this.billing.summary()?.payment ?? null);
   protected readonly rejected = computed(() => {
     const payment = this.payment();
@@ -103,6 +116,22 @@ export class BillingPage implements OnInit {
       this.toast.success('Copied');
     } catch {
       this.toast.info(value);
+    }
+  }
+
+  /**
+   * Saves the QR so someone paying on this phone can open it from their app's "Scan QR → Gallery".
+   * The download is the JPEG original: every banking app's gallery scanner can read it.
+   */
+  protected async saveQr(): Promise<void> {
+    try {
+      const response = await fetch('payment/payment-qr.jpg');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      downloadBlob(await response.blob(), 'ResumeStudio-payment-QR.jpg');
+      // The Android app shows its own "saved" message and share sheet.
+      if (!isNativeApp()) this.toast.success('QR saved. In your app tap Scan QR, then pick it from the gallery.');
+    } catch {
+      this.toast.error('Could not save the QR. Press and hold the image to save it instead.');
     }
   }
 

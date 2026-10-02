@@ -5,12 +5,17 @@ export type UsageKind = 'resume' | 'cover_letter' | 'document';
 /** Stored usage rows: the plan limits above plus AI model calls (fair-use cap). */
 export type UsageEventKind = UsageKind | 'ai';
 
+/** How the buyer paid; checkout shows one JazzCash / Raast QR code that all of these can scan. */
 export interface PaymentMethodInfo {
   key: 'jazzcash' | 'easypaisa' | 'bank';
   label: string;
-  accountTitle: string;
-  accountNumber: string;
 }
+
+const PAYMENT_METHODS: PaymentMethodInfo[] = [
+  { key: 'jazzcash', label: 'JazzCash' },
+  { key: 'easypaisa', label: 'Easypaisa' },
+  { key: 'bank', label: 'Bank app' },
+];
 
 function intSetting(value: string | undefined, fallback: number): number {
   if (value === undefined || value.trim() === '') return fallback;
@@ -18,7 +23,7 @@ function intSetting(value: string | undefined, fallback: number): number {
   return Number.isFinite(n) ? Math.trunc(n) : fallback;
 }
 
-/** Pricing, free-plan limits, payment accounts and admin list — all from backend/.env. */
+/** Pricing, free-plan limits, support contact and admin list — all from backend/.env. */
 @Injectable()
 export class BillingConfigService {
   readonly price: number;
@@ -45,17 +50,9 @@ export class BillingConfigService {
       free: intSetting(get('AI_DAILY_LIMIT_FREE'), 20),
       lifetime: intSetting(get('AI_DAILY_LIMIT_LIFETIME'), 100),
     };
-    const methods: PaymentMethodInfo[] = [
-      { key: 'jazzcash', label: 'JazzCash', accountTitle: get('PAYMENT_JAZZCASH_TITLE'), accountNumber: get('PAYMENT_JAZZCASH_NUMBER') },
-      { key: 'easypaisa', label: 'Easypaisa', accountTitle: get('PAYMENT_EASYPAISA_TITLE'), accountNumber: get('PAYMENT_EASYPAISA_NUMBER') },
-      {
-        key: 'bank',
-        label: get('PAYMENT_BANK_NAME') || 'Bank transfer',
-        accountTitle: get('PAYMENT_BANK_TITLE'),
-        accountNumber: get('PAYMENT_BANK_ACCOUNT'),
-      },
-    ];
-    this.methods = methods.filter((m) => m.accountNumber);
+    // Payments go to the merchant QR code on the billing page (public/payment/), which JazzCash,
+    // Easypaisa and every bank app can scan through Raast, so all methods are always accepted.
+    this.methods = PAYMENT_METHODS;
     this.supportWhatsapp = get('SUPPORT_WHATSAPP') || null;
     this.adminEmails = new Set(
       get('ADMIN_EMAILS')

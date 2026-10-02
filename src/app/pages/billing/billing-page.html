@@ -107,60 +107,71 @@
             </div>
           }
 
-          @if (!methods().length) {
-            <div class="alert">
-              <span class="i">info</span>
-              <span>
-                Online payment details are being set up. Please check back soon.
-                @if (auth.user()?.isAdmin) {
-                  <br /><b>Admin:</b> add PAYMENT_JAZZCASH_NUMBER, PAYMENT_EASYPAISA_NUMBER or PAYMENT_BANK_ACCOUNT (with titles) to
-                  <code>backend/.env</code> and restart the backend.
-                }
-              </span>
-            </div>
-          } @else {
-            <ol class="steps">
-              <li>
-                <h4><span class="num">1</span> Send PKR {{ billing.price() }}</h4>
-                @if (methods().length > 1) {
-                  <div class="segmented block">
-                    @for (m of methods(); track m.key) {
-                      <button type="button" [class.active]="method()?.key === m.key" (click)="methodKey.set(m.key)">{{ m.label }}</button>
-                    }
-                  </div>
-                }
-                @if (method(); as m) {
-                  <div class="account">
-                    <div class="acc-row">
-                      <span class="subtle small">{{ m.key === 'bank' ? 'Bank' : 'Wallet' }}</span>
-                      <b>{{ m.label }}</b>
-                    </div>
-                    @if (m.accountTitle) {
-                      <div class="acc-row">
-                        <span class="subtle small">Account title</span>
-                        <b>{{ m.accountTitle }}</b>
-                      </div>
-                    }
-                    <div class="acc-row">
-                      <span class="subtle small">{{ m.key === 'bank' ? 'Account / IBAN' : 'Mobile number' }}</span>
-                      <span class="copy">
-                        <b class="mono">{{ m.accountNumber }}</b>
-                        <button class="btn btn-ghost btn-xs" type="button" (click)="copy(m.accountNumber)" aria-label="Copy account number">
-                          <span class="i">content_copy</span>
-                        </button>
-                      </span>
-                    </div>
-                    <div class="acc-row">
-                      <span class="subtle small">Amount</span>
-                      <b>PKR {{ billing.price() }}</b>
-                    </div>
-                  </div>
-                }
-              </li>
+          <ol class="steps">
+            <li>
+              <h4><span class="num">1</span> Scan &amp; pay PKR {{ billing.price() }}</h4>
+              <div class="qr-card">
+                <button class="qr-poster" type="button" (click)="qrOpen.set(true)" aria-label="Show the payment QR code larger">
+                  <span class="scan-me" aria-hidden="true"><span class="i sm">qr_code_scanner</span> Scan me</span>
+                  <span class="frame">
+                    <img
+                      src="payment/payment-qr-full.webp"
+                      srcset="payment/payment-qr-600.webp 600w, payment/payment-qr-full.webp 906w"
+                      sizes="(max-width: 600px) 64vw, 220px"
+                      [width]="qr.width"
+                      [height]="qr.height"
+                      [alt]="'JazzCash and Raast payment QR code for ' + qr.merchant + ', Till ID ' + qr.tillId"
+                      decoding="async" />
+                    <span class="scan-beam" aria-hidden="true"></span>
+                  </span>
+                  <span class="zoom" aria-hidden="true"><span class="i">zoom_in</span></span>
+                </button>
 
-              <li>
-                <h4><span class="num">2</span> Submit your payment details</h4>
-                <form class="stack" (ngSubmit)="submit()" novalidate>
+                <div class="qr-info">
+                  <p class="qr-lead">Scan with any app — it takes less than a minute.</p>
+                  <div class="apps">
+                    <span class="app"><i class="dot jazz"></i> JazzCash</span>
+                    <span class="app"><i class="dot easy"></i> Easypaisa</span>
+                    <span class="app"><i class="dot bank"></i> Any bank app</span>
+                  </div>
+                  <ol class="qr-steps">
+                    <li>Open your app and tap <b>Scan QR</b></li>
+                    <li>Pay <b>PKR {{ billing.price() }}</b> to <b>{{ qr.merchant }}</b></li>
+                    <li>Keep the <b>Transaction ID</b> from your receipt</li>
+                  </ol>
+                  <div class="till">
+                    <span>Till ID</span>
+                    <b class="mono">{{ qr.tillId }}</b>
+                    <button class="btn btn-ghost btn-xs" type="button" (click)="copy(qr.tillId)" aria-label="Copy Till ID">
+                      <span class="i">content_copy</span>
+                    </button>
+                  </div>
+                  <div class="qr-actions">
+                    <button class="btn btn-sm btn-soft" type="button" (click)="saveQr()"><span class="i">download</span> Save QR</button>
+                    <button class="btn btn-sm btn-ghost" type="button" (click)="qrOpen.set(true)"><span class="i">zoom_in</span> Enlarge</button>
+                  </div>
+                </div>
+              </div>
+              <p class="phone-tip">
+                <span class="i">smartphone</span>
+                <span>
+                  Paying from this phone? Tap <b>Save QR</b>, then in your app choose <b>Scan QR → Gallery</b> and pick it.
+                  No app? Dial <b>*786*10#</b> and enter the Till ID.
+                </span>
+              </p>
+            </li>
+
+            <li>
+              <h4><span class="num">2</span> Submit your payment details</h4>
+              <form class="stack" (ngSubmit)="submit()" novalidate>
+                <div class="field">
+                  <span class="label">Paid with</span>
+                  <div class="segmented block">
+                    @for (m of methods; track m.key) {
+                      <button type="button" [class.active]="methodKey() === m.key" (click)="methodKey.set(m.key)">{{ m.label }}</button>
+                    }
+                  </div>
+                </div>
                   <div class="grid-2">
                     <div class="field">
                       <label for="tid">Transaction ID (TID)</label>

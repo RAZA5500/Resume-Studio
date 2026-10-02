@@ -256,11 +256,10 @@ export interface ExtractionResult {
 // ---------------------------------------------------------------- billing
 export type UsageKind = 'resume' | 'cover_letter' | 'document';
 
+/** How the buyer paid; checkout shows one JazzCash / Raast QR code that all of these can scan. */
 export interface PaymentMethodInfo {
   key: 'jazzcash' | 'easypaisa' | 'bank';
   label: string;
-  accountTitle: string;
-  accountNumber: string;
 }
 
 export interface BillingConfig {

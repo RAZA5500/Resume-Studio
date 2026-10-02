@@ -45,7 +45,7 @@ const TITLES: Record<string, string> = {
               </div>
             </div>
             <p class="small subtle">
-              One-time payment via {{ methods() }} — no subscription.
+              One-time payment — scan our QR code with JazzCash, Easypaisa or any bank app. No subscription.
               @if (reason.resetsAt) {
                 Free limits reset at {{ reason.resetsAt | date: 'h:mm a' }}.
               }
@@ -96,12 +96,6 @@ export class UpgradeDialog {
   protected readonly upgrade = inject(UpgradeService);
   protected readonly billing = inject(BillingService);
   private readonly router = inject(Router);
-
-  protected readonly methods = computed(() => {
-    const labels = (this.billing.config()?.methods ?? []).map((m) => m.label);
-    if (!labels.length) return 'JazzCash, Easypaisa or bank transfer';
-    return labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`;
-  });
 
   protected readonly title = computed(() => {
     const kind = this.upgrade.reason()?.kind;

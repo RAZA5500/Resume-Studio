@@ -24,7 +24,7 @@ export const USAGE_LABELS: Record<UsageKind, string> = {
 export const METHOD_LABELS: Record<PaymentMethodInfo['key'], string> = {
   jazzcash: 'JazzCash',
   easypaisa: 'Easypaisa',
-  bank: 'Bank transfer',
+  bank: 'Bank app',
 };
 
 @Injectable({ providedIn: 'root' })
