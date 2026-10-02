@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter } from 'rxjs';
@@ -152,7 +152,6 @@ interface NavLink {
   `,
   host: {
     '[class.overlay]': 'overlay()',
-    '(window:scroll)': 'onScroll()',
     '(document:keydown.escape)': 'open.set(false)',
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -193,9 +192,28 @@ export class PublicHeader {
       body.style.overflow = 'hidden';
       onCleanup(() => (body.style.overflow = ''));
     });
+
+    // A plain passive listener batched to one read per frame: a (window:scroll) host listener
+    // would run change detection for the whole page on every scroll event.
+    const view = this.document.defaultView;
+    if (view) {
+      let frame = 0;
+      const onScroll = () => {
+        if (!frame)
+          frame = requestAnimationFrame(() => {
+            frame = 0;
+            this.onScroll();
+          });
+      };
+      view.addEventListener('scroll', onScroll, { passive: true });
+      inject(DestroyRef).onDestroy(() => {
+        cancelAnimationFrame(frame);
+        view.removeEventListener('scroll', onScroll);
+      });
+    }
   }
 
-  protected onScroll(): void {
+  private onScroll(): void {
     const y = this.document.defaultView?.scrollY ?? 0;
     const scrolled = y > 12;
     if (scrolled !== this.scrolled()) this.scrolled.set(scrolled);

@@ -1,5 +1,5 @@
 import { DestroyRef, Directive, ElementRef, inject, input } from '@angular/core';
-import { hasFinePointer, prefersReducedMotion } from './motion-utils';
+import { hasFinePointer, isLite, listen, prefersReducedMotion } from './motion-utils';
 
 /**
  * Makes an element lean towards the cursor and spring back when it leaves.
@@ -8,27 +8,28 @@ import { hasFinePointer, prefersReducedMotion } from './motion-utils';
  *   <a class="btn btn-primary" appMagnetic>…</a>
  *   <a [appMagnetic]="0.45">…</a>
  */
-@Directive({
-  selector: '[appMagnetic]',
-  host: {
-    '(pointermove)': 'onMove($event)',
-    '(pointerleave)': 'reset()',
-  },
-})
+@Directive({ selector: '[appMagnetic]' })
 export class Magnetic {
   /** Pull strength from 0 to 1 (default 0.3). */
   readonly appMagnetic = input<number | string>('');
 
   private readonly el = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly enabled = hasFinePointer() && !prefersReducedMotion();
   private frame = 0;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => cancelAnimationFrame(this.frame));
+    const destroyRef = inject(DestroyRef);
+    destroyRef.onDestroy(() => cancelAnimationFrame(this.frame));
+    if (!hasFinePointer() || prefersReducedMotion()) return;
+    const offMove = listen(this.el, 'pointermove', (event) => this.onMove(event));
+    const offLeave = listen(this.el, 'pointerleave', () => this.reset());
+    destroyRef.onDestroy(() => {
+      offMove();
+      offLeave();
+    });
   }
 
-  protected onMove(event: PointerEvent): void {
-    if (!this.enabled || event.pointerType !== 'mouse') return;
+  private onMove(event: PointerEvent): void {
+    if (event.pointerType !== 'mouse' || isLite()) return;
     const { clientX, clientY } = event;
     cancelAnimationFrame(this.frame);
     this.frame = requestAnimationFrame(() => {
@@ -40,7 +41,7 @@ export class Magnetic {
     });
   }
 
-  protected reset(): void {
+  private reset(): void {
     cancelAnimationFrame(this.frame);
     this.el.style.translate = '';
   }

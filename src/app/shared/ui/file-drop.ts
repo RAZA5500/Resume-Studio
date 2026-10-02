@@ -16,9 +16,9 @@ import { ChangeDetectionStrategy, Component, input, output, signal } from '@angu
     :host { display: block; }
     .ic {
       display: inline-grid; place-items: center; width: 58px; height: 58px; margin-bottom: 14px;
-      border-radius: 18px; color: #fff; background: var(--grad-brand); background-size: 200% 200%;
-      box-shadow: 0 14px 34px -12px rgba(37, 99, 235, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-      animation: float-y 4s var(--ease-in-out) infinite, gradient-pan 6s ease-in-out infinite;
+      border-radius: 18px; color: #fff; background: var(--grad-brand);
+      box-shadow: 0 10px 24px -12px rgba(37, 99, 235, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      animation: float-y 4s var(--ease-in-out) infinite;
       transition: scale 0.4s var(--ease-spring), rotate 0.4s var(--ease-spring);
     }
     .ic .i { font-size: 28px; }

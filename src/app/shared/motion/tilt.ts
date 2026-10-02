@@ -1,5 +1,5 @@
 import { DestroyRef, Directive, ElementRef, inject, input } from '@angular/core';
-import { hasFinePointer, prefersReducedMotion } from './motion-utils';
+import { hasFinePointer, isLite, listen, prefersReducedMotion } from './motion-utils';
 
 /**
  * 3D tilt that follows the mouse, with an optional glare highlight.
@@ -12,8 +12,6 @@ import { hasFinePointer, prefersReducedMotion } from './motion-utils';
   host: {
     class: 'tilt',
     '[class.tilt-glare]': 'tiltGlare()',
-    '(pointermove)': 'onMove($event)',
-    '(pointerleave)': 'reset()',
   },
 })
 export class Tilt {
@@ -23,15 +21,22 @@ export class Tilt {
   readonly tiltGlare = input(true);
 
   private readonly el = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
-  private readonly enabled = hasFinePointer() && !prefersReducedMotion();
   private frame = 0;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => cancelAnimationFrame(this.frame));
+    const destroyRef = inject(DestroyRef);
+    destroyRef.onDestroy(() => cancelAnimationFrame(this.frame));
+    if (!hasFinePointer() || prefersReducedMotion()) return;
+    const offMove = listen(this.el, 'pointermove', (event) => this.onMove(event));
+    const offLeave = listen(this.el, 'pointerleave', () => this.reset());
+    destroyRef.onDestroy(() => {
+      offMove();
+      offLeave();
+    });
   }
 
-  protected onMove(event: PointerEvent): void {
-    if (!this.enabled || event.pointerType !== 'mouse') return;
+  private onMove(event: PointerEvent): void {
+    if (event.pointerType !== 'mouse' || isLite()) return;
     const { clientX, clientY } = event;
     cancelAnimationFrame(this.frame);
     this.frame = requestAnimationFrame(() => {
@@ -50,7 +55,7 @@ export class Tilt {
     });
   }
 
-  protected reset(): void {
+  private reset(): void {
     cancelAnimationFrame(this.frame);
     this.el.classList.remove('is-tilting');
   }

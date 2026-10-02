@@ -20,6 +20,7 @@ import { ScaledResume } from '../../shared/resume/scaled-resume';
 import { CountUp } from '../../shared/motion/count-up';
 import { InView } from '../../shared/motion/in-view';
 import { Magnetic } from '../../shared/motion/magnetic';
+import { observeVisibility } from '../../shared/motion/motion-utils';
 import { PointerFx } from '../../shared/motion/pointer-fx';
 import { Reveal } from '../../shared/motion/reveal';
 import { Tilt } from '../../shared/motion/tilt';
@@ -100,7 +101,7 @@ export class Landing {
   protected readonly auth = inject(AuthService);
   protected readonly billing = inject(BillingService);
   private readonly document = inject(DOCUMENT);
-  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly scrollBar = viewChild<ElementRef<HTMLElement>>('scrollBar');
   private readonly stepsList = viewChild<ElementRef<HTMLElement>>('stepsList');
 
   protected readonly sample = SAMPLE_CONTENT;
@@ -183,17 +184,21 @@ export class Landing {
   });
 
   constructor() {
-    // Scroll-linked effects write CSS variables directly (no change detection per frame).
+    // Scroll-linked effects write styles straight onto the two elements that use them — no change
+    // detection, and no CSS variable on the page root (that would restyle every element per frame).
     let frame = 0;
+    let stepsNear = false;
+    let stopSteps: (() => void) | null = null;
     const view = this.document.defaultView;
     const update = () => {
       frame = 0;
       if (!view) return;
       const root = this.document.documentElement;
       const max = root.scrollHeight - view.innerHeight;
-      this.host.style.setProperty('--scroll', String(max > 0 ? Math.min(1, view.scrollY / max) : 0));
+      const bar = this.scrollBar()?.nativeElement;
+      if (bar) bar.style.transform = `scaleX(${max > 0 ? Math.min(1, view.scrollY / max).toFixed(4) : 0})`;
       const list = this.stepsList()?.nativeElement;
-      if (list) {
+      if (list && stepsNear) {
         const rect = list.getBoundingClientRect();
         const progress = (view.innerHeight * 0.7 - rect.top) / Math.max(1, rect.height);
         list.style.setProperty('--progress', Math.min(1, Math.max(0, progress)).toFixed(3));
@@ -206,9 +211,21 @@ export class Landing {
       update();
       view?.addEventListener('scroll', onScroll, { passive: true });
       view?.addEventListener('resize', onScroll, { passive: true });
+      const list = this.stepsList()?.nativeElement;
+      if (list) {
+        stopSteps = observeVisibility(
+          list,
+          (entry) => {
+            stepsNear = entry.isIntersecting;
+            if (stepsNear) onScroll();
+          },
+          { threshold: 0, rootMargin: '25% 0px' },
+        );
+      }
     });
     inject(DestroyRef).onDestroy(() => {
       cancelAnimationFrame(frame);
+      stopSteps?.();
       view?.removeEventListener('scroll', onScroll);
       view?.removeEventListener('resize', onScroll);
     });

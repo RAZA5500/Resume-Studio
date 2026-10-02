@@ -21,9 +21,8 @@ import { RouterLink } from '@angular/router';
     .mark {
       position: relative; width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
       display: grid; place-items: center; overflow: hidden;
-      background: var(--grad-brand); background-size: 220% 220%;
-      box-shadow: 0 8px 22px -8px rgba(37, 99, 235, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-      animation: gradient-pan 7s ease-in-out infinite;
+      background: var(--grad-brand);
+      box-shadow: 0 4px 12px -6px rgba(37, 99, 235, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.3);
       transition: transform 0.55s var(--ease-spring);
     }
     .mark::after {
@@ -36,18 +35,11 @@ import { RouterLink } from '@angular/router';
     .mark svg { position: relative; width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .spark {
       position: absolute; top: 5px; right: 5px; width: 4px; height: 4px; border-radius: 50%;
-      background: #fff; box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.8);
-      animation: twinkle 2.6s ease-in-out infinite;
+      background: #fff; opacity: 0.85;
     }
     .word { font-family: var(--font-display); font-size: 19px; font-weight: 700; letter-spacing: -0.035em; line-height: 1; }
     .word b {
-      font-weight: 700; background: var(--grad-brand); background-size: 200% 100%;
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-      animation: gradient-pan 7s ease-in-out infinite;
-    }
-    @keyframes twinkle {
-      0%, 100% { opacity: 0.25; transform: scale(0.6); }
-      50% { opacity: 1; transform: scale(1.15); }
+      font-weight: 700; color: var(--primary);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

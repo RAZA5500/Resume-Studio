@@ -1,5 +1,5 @@
-import { afterNextRender, ChangeDetectionStrategy, Component, DestroyRef, inject, input, signal } from '@angular/core';
-import { prefersReducedMotion } from './motion-utils';
+import { afterNextRender, ChangeDetectionStrategy, Component, DestroyRef, ElementRef, inject, input, signal } from '@angular/core';
+import { observeVisibility, prefersReducedMotion } from './motion-utils';
 
 /**
  * Types a list of words one after another, deleting each before the next.
@@ -20,7 +20,7 @@ import { prefersReducedMotion } from './motion-utils';
       margin-left: 0.06em;
       vertical-align: -0.08em;
       border-radius: 2px;
-      background: linear-gradient(180deg, var(--violet), var(--fuchsia));
+      background: var(--primary);
       animation: caret-blink 1s steps(1) infinite;
     }
   `,
@@ -35,15 +35,38 @@ export class Typewriter {
 
   protected readonly text = signal('');
   private timer = 0;
+  private visible = true;
+  /** Where typing stopped while scrolled out of view (resumed when it comes back). */
+  private paused: [number, number, boolean] | null = null;
 
   constructor() {
+    const el = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+    const stop = observeVisibility(
+      el,
+      (entry) => {
+        this.visible = entry.isIntersecting;
+        if (this.visible && this.paused) {
+          const [wordIndex, chars, deleting] = this.paused;
+          this.paused = null;
+          this.step(wordIndex, chars, deleting);
+        }
+      },
+      { threshold: 0, rootMargin: '0px' },
+    );
     afterNextRender(() => this.step(0, 0, false));
-    inject(DestroyRef).onDestroy(() => clearTimeout(this.timer));
+    inject(DestroyRef).onDestroy(() => {
+      stop();
+      clearTimeout(this.timer);
+    });
   }
 
   private step(wordIndex: number, chars: number, deleting: boolean): void {
     const words = this.words();
     if (!words.length) return;
+    if (!this.visible) {
+      this.paused = [wordIndex, chars, deleting];
+      return;
+    }
     const word = words[wordIndex % words.length];
 
     if (prefersReducedMotion()) {

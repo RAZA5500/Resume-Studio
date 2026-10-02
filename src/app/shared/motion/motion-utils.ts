@@ -8,6 +8,26 @@ export function hasFinePointer(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
 }
 
+/** True in the lite performance tier (set in index.html, may be switched on by PerfService). */
+export function isLite(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset['perf'] === 'lite';
+}
+
+/**
+ * addEventListener with automatic cleanup. Pointer effects use this instead of host listeners:
+ * in this zoneless app every template/host listener schedules change detection, which would
+ * run on each mouse move although these handlers only write styles.
+ */
+export function listen<K extends keyof HTMLElementEventMap>(
+  element: HTMLElement,
+  type: K,
+  handler: (event: HTMLElementEventMap[K]) => void,
+  options: AddEventListenerOptions = { passive: true },
+): () => void {
+  element.addEventListener(type, handler, options);
+  return () => element.removeEventListener(type, handler, options);
+}
+
 /** easeOutExpo — fast start, gentle landing. */
 export function easeOutExpo(t: number): number {
   return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);

@@ -109,9 +109,9 @@ import { errorMessage } from '../../core/utils/http';
     .avatar {
       width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0;
       display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px;
-      background: var(--grad-brand); background-size: 200% 200%;
-      box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px rgba(96, 165, 250, 0.6), 0 16px 34px -12px rgba(37, 99, 235, 0.9);
-      animation: gradient-pan 6s ease-in-out infinite, pop-in 0.6s var(--ease-spring) both;
+      background: var(--grad-brand);
+      box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px rgba(96, 165, 250, 0.45);
+      animation: pop-in 0.6s var(--ease-spring) both;
     }
     .card-pad p { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-2); }
     code { font-size: 12px; background: var(--surface-3); padding: 1px 5px; border-radius: 5px; }
