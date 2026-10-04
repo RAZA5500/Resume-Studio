@@ -39,7 +39,7 @@ async function markedPages(bytes: Uint8Array): Promise<Set<number>> {
       const content = await (await doc.getPage(p)).getTextContent();
       if (WATERMARK_MARKER.test(content.items.map((item) => ('str' in item ? item.str : '')).join(' '))) marked.add(p - 1);
     }
-    void doc.destroy();
+    void doc.loadingTask.destroy();
   } catch {
     // unreadable text layer: stamp every page
   }
