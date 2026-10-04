@@ -61,6 +61,8 @@ interface ContactItem {
   key: 'email' | 'phone' | 'location' | 'linkedin' | 'website' | 'github';
   value: string;
   href: string | null;
+  /** The value split after "@" and "/", rendered with <wbr> so a narrow sidebar wraps there, not mid-word. */
+  parts: string[];
 }
 
 @Component({
@@ -147,7 +149,7 @@ export class ResumeRenderer {
   protected readonly contacts = computed<ContactItem[]>(() => {
     const p = this.c().personal ?? {};
     const url = (value: string) => (/^https?:\/\//i.test(value) ? value : `https://${value}`);
-    const items: ContactItem[] = [
+    const items: Omit<ContactItem, 'parts'>[] = [
       { key: 'email', value: p.email ?? '', href: p.email ? `mailto:${p.email}` : null },
       { key: 'phone', value: p.phone ?? '', href: p.phone ? `tel:${p.phone.replace(/[^\d+]/g, '')}` : null },
       { key: 'location', value: p.location ?? '', href: null },
@@ -155,7 +157,13 @@ export class ResumeRenderer {
       { key: 'website', value: p.website ?? '', href: p.website ? url(p.website) : null },
       { key: 'github', value: p.github ?? '', href: p.github ? url(p.github) : null },
     ];
-    return items.filter((i) => i.value?.trim());
+    return items
+      .filter((i) => i.value?.trim())
+      .map((i) => ({
+        ...i,
+        // No look-behind split: it is a syntax error on Safari < 16.4.
+        parts: i.key === 'phone' || i.key === 'location' ? [i.value] : i.value.replace(/[@/]/g, '$&\u0001').split('\u0001').filter(Boolean),
+      }));
   });
 
   /** Visible sections that actually contain data, in the user's order. */
