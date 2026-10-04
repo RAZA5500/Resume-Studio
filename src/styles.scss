@@ -615,6 +615,11 @@ code {
   &:focus-within > label {
     color: var(--primary-700);
   }
+  // A checkbox label keeps its text next to the box (the rule above spreads label parts apart).
+  > label.checkbox {
+    justify-content: flex-start;
+    font-weight: 500;
+  }
   .hint {
     font-size: 12px;
     font-weight: 500;
