@@ -15,7 +15,8 @@
     <header class="topbar">
       <button class="btn btn-ghost btn-icon" type="button" (click)="back()" title="Back to dashboard"><span class="i">arrow_back</span></button>
       <div class="title-wrap">
-        <input class="title-input" [ngModel]="store.title()" (ngModelChange)="store.setTitle($event)" aria-label="Resume title" />
+        <input class="title-input" [ngModel]="store.title()" (ngModelChange)="store.setTitle($event)"
+          (blur)="store.title().trim() || store.setTitle('Untitled Resume')" aria-label="Resume title" />
         <span class="save-state" [attr.data-state]="store.saveState()">
           @switch (store.saveState()) {
             @case ('saving') {

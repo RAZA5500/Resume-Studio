@@ -248,7 +248,8 @@ export class Builder implements OnDestroy {
 
   @HostListener('window:beforeunload', ['$event'])
   protected beforeUnload(event: BeforeUnloadEvent): void {
-    if (this.store.saveState() === 'dirty' || this.store.saveState() === 'saving') {
+    // 'error' too: a failed save means the latest edits only exist in this tab.
+    if (this.store.saveState() !== 'saved') {
       void this.store.flush();
       event.preventDefault();
     }

@@ -187,7 +187,8 @@ export class BuilderStore implements OnDestroy {
   }
 
   private snapshot(): string {
-    return JSON.stringify({ content: this.content(), design: this.design() });
+    // templateId travels with the design, so undoing a template switch restores both.
+    return JSON.stringify({ content: this.content(), design: this.design(), templateId: this.templateId() });
   }
 
   private pushSnapshot(): void {
@@ -201,9 +202,14 @@ export class BuilderStore implements OnDestroy {
   }
 
   private restore(snap: string): void {
-    const { content, design } = JSON.parse(snap) as { content: ResumeContent; design: DesignSettings };
+    const { content, design, templateId } = JSON.parse(snap) as {
+      content: ResumeContent;
+      design: DesignSettings;
+      templateId: string | null;
+    };
     this.content.set(content);
     this.design.set(design);
+    this.templateId.set(templateId);
     this.syncHistoryFlags();
     this.scheduleSave();
   }

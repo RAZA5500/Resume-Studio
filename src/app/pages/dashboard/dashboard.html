@@ -31,7 +31,11 @@
       </div>
       <div class="ws">
         <span class="ws-ic green"><span class="i">verified</span></span>
-        <b [appCountUp]="bestScore()" [countDuration]="1400"></b>
+        @if (bestScore() === null) {
+          <b title="No resume has been scanned yet">—</b>
+        } @else {
+          <b [appCountUp]="bestScore()" [countDuration]="1400"></b>
+        }
         <span>Best ATS score</span>
       </div>
       <div class="ws">

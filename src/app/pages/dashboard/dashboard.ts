@@ -63,9 +63,9 @@ export class Dashboard implements OnInit {
     return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   });
 
-  /** Highest ATS score across the user's resumes (0 when none has been scanned). */
+  /** Highest ATS score across the user's resumes (null when none has been scanned — shown as "—", not 0). */
   protected readonly bestScore = computed(() =>
-    this.resumes().reduce((best, r) => (r.atsScore !== null && r.atsScore > best ? r.atsScore : best), 0),
+    this.resumes().reduce<number | null>((best, r) => (r.atsScore !== null && (best === null || r.atsScore > best) ? r.atsScore : best), null),
   );
 
   /** Today's free-plan usage; null for lifetime members. */
@@ -114,6 +114,7 @@ export class Dashboard implements OnInit {
   }
 
   protected generateWithAi(): void {
+    if (this.busy()) return;
     const prompt = this.aiPrompt().trim();
     if (prompt.length < 10) {
       this.toast.warning('Tell the AI a bit more about your experience (at least a sentence).');
@@ -139,8 +140,9 @@ export class Dashboard implements OnInit {
   }
 
   protected async importResume(): Promise<void> {
+    if (this.busy()) return;
     const [file] = await pickFile('.pdf,.docx,.doc,.txt,.rtf,.png,.jpg,.jpeg,.webp');
-    if (!file) return;
+    if (!file || this.busy()) return;
     this.busy.set('import');
     this.ai.parseResume(file).subscribe({
       next: ({ content, warnings }) => {
