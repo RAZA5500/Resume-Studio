@@ -3,8 +3,12 @@
  * files. Server-made PDFs/DOCX are stamped by the backend — these helpers cover
  * the files the browser builds itself (print, canvas editor, PDF tools).
  */
+import { openPdf } from './pdf';
+
 export const WATERMARK_TEXT = 'ResumeStudio AI';
 export const WATERMARK_FOOTER = 'Made with ResumeStudio AI (Free plan) — upgrade to Lifetime to remove this watermark';
+/** Matches the footer in extracted text, whichever dash it was drawn with. */
+export const WATERMARK_MARKER = /remove\s+this\s+watermark/i;
 
 const WATERMARK_CSS = `
 .rs-wm { position: fixed; inset: 0; z-index: 2147483647; pointer-events: none; overflow: hidden;
@@ -26,14 +30,36 @@ export function watermarkText(text: string): string {
   return `${text.replace(/\s+$/, '')}\n\n---\n${WATERMARK_FOOTER}\n`;
 }
 
-/** Stamps every page of a PDF with the diagonal mark and footer line. */
-export async function watermarkPdf(bytes: Uint8Array): Promise<Uint8Array> {
+/** Indexes of pages that already carry the watermark (e.g. a free export that was uploaded again). */
+async function markedPages(bytes: Uint8Array): Promise<Set<number>> {
+  const marked = new Set<number>();
+  try {
+    const doc = await openPdf(bytes);
+    for (let p = 1; p <= doc.numPages; p++) {
+      const content = await (await doc.getPage(p)).getTextContent();
+      if (WATERMARK_MARKER.test(content.items.map((item) => ('str' in item ? item.str : '')).join(' '))) marked.add(p - 1);
+    }
+    void doc.destroy();
+  } catch {
+    // unreadable text layer: stamp every page
+  }
+  return marked;
+}
+
+/**
+ * Stamps every page of a PDF with the diagonal mark and footer line, except pages that are
+ * already marked and the indexes in `skip` (pages the caller knows are marked, e.g. rasterised).
+ */
+export async function watermarkPdf(bytes: Uint8Array, skip: ReadonlySet<number> = new Set()): Promise<Uint8Array> {
+  const already = await markedPages(bytes);
   const { PDFDocument, StandardFonts, degrees, rgb } = await import('pdf-lib');
   const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = pdf.getPages().filter((_, index) => !already.has(index) && !skip.has(index));
+  if (!pages.length) return bytes;
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   // Standard fonts are WinAnsi only — swap the em dash for a plain hyphen.
   const footer = WATERMARK_FOOTER.replace('—', '-');
-  for (const page of pdf.getPages()) {
+  for (const page of pages) {
     const { width, height } = page.getSize();
     const size = Math.min(width, height) / 8;
     const markWidth = bold.widthOfTextAtSize(WATERMARK_TEXT, size);

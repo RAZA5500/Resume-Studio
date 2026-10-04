@@ -50,6 +50,7 @@ import {
   safeFileName,
 } from '../../../core/utils/files';
 import { loadFonts } from '../../../core/utils/fonts';
+import { WATERMARK_MARKER } from '../../../core/utils/watermark';
 import { errorMessage, isLimitReached } from '../../../core/utils/http';
 import { loadPdfJs, openPdf, pdfBlob, renderPdfPage, textToHtml } from '../../../core/utils/pdf';
 import { ClickOutside } from '../../../shared/ui/click-outside';
@@ -762,6 +763,31 @@ export class CanvasEditor {
     return items;
   }
 
+  /**
+   * Indexes of pages whose original PDF page already carries the free-plan watermark (an export
+   * that was uploaded again), so exports do not stamp it twice. A footer hidden under a whiteout
+   * does not count.
+   */
+  private async markedPages(pages: RuntimePage[]): Promise<Set<number>> {
+    const marked = new Set<number>();
+    for (const [index, page] of pages.entries()) {
+      const covers = (page.state.objects ?? []).filter((o) => o['name'] === 'whiteout' || o['name'] === 'pdf-whiteout');
+      const visible = (await this.pdfTextItems(page)).filter((item) => {
+        const cx = item.x + item.width / 2;
+        const cy = item.y + item.height / 2;
+        return !covers.some((o) => {
+          const w = Number(o['width']) * Number(o['scaleX'] ?? 1);
+          const h = Number(o['height']) * Number(o['scaleY'] ?? 1);
+          const left = Number(o['left']) - w / 2;
+          const top = Number(o['top']) - h / 2;
+          return cx >= left && cx <= left + w && cy >= top && cy <= top + h;
+        });
+      });
+      if (WATERMARK_MARKER.test(visible.map((item) => item.str).join(' '))) marked.add(index);
+    }
+    return marked;
+  }
+
   private async showTextHints(): Promise<void> {
     this.clearHints();
     const page = this.currentPage();
@@ -1275,7 +1301,10 @@ export class CanvasEditor {
     this.exportMenu.set(false);
     this.busy.set('export');
     try {
-      downloadBlob(pdfBlob(await this.exporter.stampPdf(await this.buildPdf(flatten))), `${safeFileName(this.name())}.pdf`);
+      const bytes = await this.buildPdf(flatten);
+      // A flattened page has no text left to recognise its watermark by, so ask the source pages.
+      const marked = this.exporter.watermarked() && flatten ? await this.markedPages(this.pages()) : undefined;
+      downloadBlob(pdfBlob(await this.exporter.stampPdf(bytes, marked)), `${safeFileName(this.name())}.pdf`);
     } catch (e) {
       this.toast.error(errorMessage(e, 'PDF export failed'));
     } finally {
@@ -1290,9 +1319,10 @@ export class CanvasEditor {
     try {
       const pages = allPages ? this.pages() : [this.currentPage()!];
       const multiplier = this.pageKind() === 'image' ? 1 : 2;
+      const marked = this.exporter.watermarked() ? await this.markedPages(pages) : new Set<number>();
       for (const [i, page] of pages.entries()) {
         const raw = await this.renderPageImage(page, { background: true, multiplier, format, quality: 0.92 });
-        const url = await this.exporter.stampImage(raw, `image/${format}`, 0.92);
+        const url = await this.exporter.stampImage(raw, `image/${format}`, 0.92, marked.has(i));
         const suffix = pages.length > 1 ? `-page-${i + 1}` : '';
         downloadBlob(dataUrlToBlob(url), `${safeFileName(this.name())}${suffix}.${format === 'jpeg' ? 'jpg' : format}`);
       }

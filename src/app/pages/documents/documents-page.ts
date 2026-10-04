@@ -9,7 +9,7 @@ import { ExportService } from '../../core/services/export.service';
 import { DocumentService } from '../../core/services/document.service';
 import { DialogService, ToastService } from '../../core/services/ui.service';
 import { downloadBlob, formatBytes, pickFile, timeAgo } from '../../core/utils/files';
-import { watermarkCanvas } from '../../core/utils/watermark';
+import { WATERMARK_MARKER, watermarkCanvas } from '../../core/utils/watermark';
 import { errorMessage, errorMessageAsync } from '../../core/utils/http';
 import {
   canvasToBlob,
@@ -25,6 +25,12 @@ import { ClickOutside } from '../../shared/ui/click-outside';
 import { PointerFx } from '../../shared/motion/pointer-fx';
 import { Reveal } from '../../shared/motion/reveal';
 import { FileDrop } from '../../shared/ui/file-drop';
+
+/** True when the page already carries the free-plan footer (an export that was uploaded again). */
+async function pageIsWatermarked(pdf: Awaited<ReturnType<typeof openPdf>>, pageNumber: number): Promise<boolean> {
+  const content = await (await pdf.getPage(pageNumber)).getTextContent();
+  return WATERMARK_MARKER.test(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
+}
 
 interface Tool {
   key: string;
@@ -220,7 +226,7 @@ export class DocumentsPage implements OnInit {
           const count = Math.min(pdf.numPages, 30);
           for (let p = 1; p <= count; p++) {
             const canvas = await renderPdfPage(pdf, p, 2);
-            if (this.exporter.watermarked()) watermarkCanvas(canvas);
+            if (this.exporter.watermarked() && !(await pageIsWatermarked(pdf, p))) watermarkCanvas(canvas);
             downloadBlob(await canvasToBlob(canvas), `${file.name.replace(/\.pdf$/i, '')}-page-${p}.png`);
           }
           this.toast.success(`Exported ${count} page${count > 1 ? 's' : ''} as PNG`);

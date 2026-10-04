@@ -17,9 +17,12 @@ export class ExportService {
   /** Free plan exports are watermarked; Lifetime removes it. The server enforces this for its own exports. */
   readonly watermarked = computed(() => !this.billing.isLifetime());
 
-  /** Applies the free plan watermark to files built in the browser. */
-  stampPdf(bytes: Uint8Array): Promise<Uint8Array> {
-    return this.watermarked() ? watermarkPdf(bytes) : Promise.resolve(bytes);
+  /**
+   * Applies the free plan watermark to files built in the browser. Pages that already carry it
+   * are left alone; `skip` lists pages the caller knows are marked (e.g. flattened to images).
+   */
+  stampPdf(bytes: Uint8Array, skip?: ReadonlySet<number>): Promise<Uint8Array> {
+    return this.watermarked() ? watermarkPdf(bytes, skip) : Promise.resolve(bytes);
   }
 
   stampHtml(html: string): string {
@@ -30,8 +33,9 @@ export class ExportService {
     return this.watermarked() ? watermarkText(text) : text;
   }
 
-  stampImage(dataUrl: string, type: string, quality?: number): Promise<string> {
-    return this.watermarked() ? watermarkDataUrl(dataUrl, type, quality) : Promise.resolve(dataUrl);
+  /** `alreadyMarked`: the picture shows a page that carries the watermark already. */
+  stampImage(dataUrl: string, type: string, quality?: number, alreadyMarked = false): Promise<string> {
+    return this.watermarked() && !alreadyMarked ? watermarkDataUrl(dataUrl, type, quality) : Promise.resolve(dataUrl);
   }
 
   /** Server side HTML → PDF (real text, ATS readable). */
