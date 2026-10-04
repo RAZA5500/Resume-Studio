@@ -1,6 +1,6 @@
 import { extractJobKeywords } from '../ats/ats-scorer.js';
 import { createSampleContent } from '../common/resume/resume-defaults.js';
-import { improveLine, offlineGenerateResume, offlineParseResume, offlineSummaries } from './ai-fallback.js';
+import { improveLine, offlineCoverLetter, offlineGenerateResume, offlineParseResume, offlineSummaries } from './ai-fallback.js';
 
 describe('offline AI fallback', () => {
   it('rewrites weak bullet openings', () => {
@@ -23,6 +23,35 @@ describe('offline AI fallback', () => {
     expect(content.personal.fullName).toBe('Sara Khan');
     expect(content.personal.email).toBe('sara@mail.com');
     expect(content.education[0]).toMatchObject({ degree: 'BBA', institution: 'LUMS' });
+  });
+
+  it('keeps the employer, graduation year and achievements the candidate wrote', () => {
+    const content = offlineGenerateResume(
+      "I'm Sara Khan, a frontend developer with 4 years of experience at Systems Ltd building Angular dashboards for banking clients. " +
+        'I led a migration to Angular 17 and improved load time by 40%. BS Computer Science from FAST (2020). Skills: Angular, TypeScript.',
+    );
+    expect(content.personal).toMatchObject({ fullName: 'Sara Khan', jobTitle: 'Frontend Developer' });
+    expect(content.experience[0].company).toBe('Systems Ltd');
+    expect(content.experience[0].description.split('\n')[0]).toBe('Led a migration to Angular 17 and improved load time by 40%');
+    expect(content.education[0]).toMatchObject({ degree: 'BS Computer Science', institution: 'FAST', endDate: '2020' });
+  });
+
+  it('addresses the cover letter to the advertised role', () => {
+    const letter = offlineCoverLetter(
+      createSampleContent(),
+      'Systems Ltd is hiring a Senior Frontend Engineer to build Angular dashboards. Requirements: TypeScript, RxJS.',
+      'Systems Ltd',
+    );
+    expect(letter.subject).toMatch(/^Application for Senior Frontend Engineer/);
+    expect(letter.body).toContain('the Senior Frontend Engineer position at Systems Ltd');
+  });
+
+  it('does not mistake a job title or a university for a name or employer', () => {
+    const content = offlineGenerateResume('I am Senior Developer at Acme Corp. I studied at LUMS and work with React.');
+    expect(content.personal.fullName).toBe('');
+    expect(content.experience[0].company).toBe('Acme Corp');
+    const student = offlineGenerateResume('I studied at LUMS and want a marketing role.');
+    expect(student.experience[0].company).toBe('[Company Name]');
   });
 
   it('parses a plain text resume into sections', () => {

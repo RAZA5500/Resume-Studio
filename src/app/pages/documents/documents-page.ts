@@ -125,7 +125,9 @@ export class DocumentsPage implements OnInit {
       if (!value) return;
       const match = /(\d+)\s*[x×*,]\s*(\d+)/.exec(value);
       if (!match) return this.toast.error('Use the format 1080x1080');
-      [width, height] = [Math.min(5000, Number(match[1])), Math.min(5000, Number(match[2]))];
+      // The server accepts 50–5000 px per side.
+      const clamp = (n: number) => Math.min(5000, Math.max(50, n));
+      [width, height] = [clamp(Number(match[1])), clamp(Number(match[2]))];
     }
     const name = kind === 'rich' ? 'Untitled document' : `Untitled design ${width}×${height}`;
     this.documents.create({ name, kind, width, height }).subscribe({

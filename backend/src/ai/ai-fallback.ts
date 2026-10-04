@@ -302,8 +302,10 @@ export function offlineCoverLetter(
 ): CoverLetter {
   const name = content.personal.fullName || '[Your Name]';
   const titleLine = /(?:job title|position|role)\s*[:-]\s*([^\n.]{3,60})/i.exec(jobDescription)?.[1];
+  // "… is hiring a Senior Frontend Engineer to …" → the role being applied for, not the current one
+  const hiringFor = /\b(?:hiring|looking for|seeking|recruiting)\s+an?\s+([A-Z][\w+#./-]*(?:\s+[A-Z][\w+#./-]*){0,5})/.exec(jobDescription)?.[1];
   const firstLine = jobDescription.trim().split('\n')[0] ?? '';
-  const extractedRole = (titleLine ?? (firstLine.split(' ').length <= 8 ? firstLine : '')) || content.personal.jobTitle;
+  const extractedRole = (titleLine ?? hiringFor ?? (firstLine.split(' ').length <= 8 ? firstLine : '')) || content.personal.jobTitle;
   const role = extractedRole && extractedRole.toLowerCase() !== 'this' ? extractedRole.trim() : '';
   const positionPhrase = role ? `the ${role} position` : 'this position';
   const target = company || 'your company';
@@ -537,16 +539,41 @@ export function offlineParseResume(text: string): ResumeContent {
   return normalizeContent(content);
 }
 
+/** "I led a migration to Angular 17 and improved load time by 40%." → a bullet in the candidate's own words. */
+function achievementsFrom(prompt: string): string[] {
+  return prompt
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter(
+      (sentence) =>
+        /^(?:i|we)\s+\w/i.test(sentence) &&
+        /\d|\b(?:led|built|launched|improved|increased|reduced|cut|grew|managed|mentor|created|designed|developed|delivered|migrated|automated|saved|won)/i.test(sentence),
+    )
+    .map((sentence) => improveLine(sentence))
+    .filter((bullet) => !/^(?:am|have|has|was|were|work|live|studied|graduated)\b/i.test(bullet) && bullet.split(' ').length >= 4)
+    .slice(0, 4);
+}
+
 export function offlineGenerateResume(prompt: string, targetRole?: string): ResumeContent {
   const content = createEmptyContent();
   const roleFromPrompt =
-    /(?:work as|working as|i am|i'm|as)\s+an?\s+([a-z][a-z /&-]{2,40}?)(?=\s+(?:with|at|in|for|and)\b|[,.]|$)/i.exec(prompt)?.[1];
+    /(?:work as|working as|i am|i'm|as|,)\s+an?\s+([a-z][a-z /&-]{2,40}?)(?=\s+(?:with|at|in|for|and)\b|[,.]|$)/i.exec(prompt)?.[1];
   const role = titleCase((targetRole || roleFromPrompt || 'Professional').trim());
   const years = Number(/(\d+)\+?\s*(?:years|yrs)/i.exec(prompt)?.[1] ?? 0);
-  const namePrefix = /(?:my name is|name\s*:)\s*/i.exec(prompt);
-  const name = namePrefix
-    ? (/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})/.exec(prompt.slice(namePrefix.index + namePrefix[0].length))?.[1] ?? '')
-    : '';
+  // "My name is Sara Khan", "Name: Sara Khan" or "I'm Sara Khan," (the name must end the phrase,
+  // so "I am Senior Developer at …" is not taken for a name).
+  const name =
+    /(?:[Mm]y [Nn]ame [Ii]s|[Nn]ame\s*:|\b[Ii] am|\b[Ii]'m)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})(?=\s*(?:[,.;]|$)|\s+(?:and|from|based)\b)/.exec(
+      prompt,
+    )?.[1] ?? '';
+  // "… at Systems Ltd building …" → employer, unless it is where the candidate studied.
+  // Words may contain inner dots ("S.P.A") but a dot followed by a space ends the sentence.
+  const employer = /\bat\s+([A-Z][\w&'-]*(?:\.[\w&'-]+)*(?:\s+(?:[A-Z][\w&'-]*(?:\.[\w&'-]+)*|&|of))*)/.exec(prompt);
+  const company =
+    employer && !/(?:stud(?:y|ied|ying)|graduat\w*|degree|bachelor\w*|master\w*|school|college|university)\W+(?:\w+\W+){0,3}$/i.test(prompt.slice(0, employer.index))
+      ? employer[1].replace(/[.,]+$/, '')
+      : '';
+  const location = /\b(?:based in|located in|living in|live in)\s+([A-Z][a-z]+(?:,?\s+[A-Z][a-z]+)?)/.exec(prompt)?.[1] ?? '';
   const skills = unique([...detectSkills(prompt), ...roleSkills(role).hard.slice(0, 9), ...roleSkills(role).soft.slice(0, 3)]).slice(
     0,
     14,
@@ -562,16 +589,17 @@ export function offlineGenerateResume(prompt: string, targetRole?: string): Resu
   };
   content.skills = skills.map((s) => ({ id: uid(), name: s, level: 0 }));
   const startYear = new Date().getFullYear() - (years || 2);
+  const achievements = achievementsFrom(prompt);
   content.experience = [
     {
       id: uid(),
       jobTitle: role,
-      company: '[Company Name]',
-      location: '[City, Country]',
+      company: company || '[Company Name]',
+      location: location || '[City, Country]',
       startDate: `${startYear}-01`,
       endDate: '',
       current: true,
-      description: offlineBullets(role, 5).join('\n'),
+      description: [...achievements, ...offlineBullets(role, Math.max(0, 5 - achievements.length), achievements)].join('\n'),
     },
   ];
   const degree =
@@ -579,15 +607,18 @@ export function offlineGenerateResume(prompt: string, targetRole?: string): Resu
       prompt,
     )?.[0];
   if (degree) {
-    const [degreeName, institution] = degree.split(/\s+(?:from|at)\s+/i);
+    const [degreeName, institution = ''] = degree.split(/\s+(?:from|at)\s+/i);
+    // "FAST (2020)" → institution "FAST", graduation year 2020
+    const year = /\b((?:19|20)\d{2})\b/.exec(institution)?.[1] ?? '';
+    const school = institution.replace(/\(?\b(?:19|20)\d{2}\b\)?/g, '').replace(/[\s,–-]+$/, '').trim();
     content.education = [
       {
         id: uid(),
         degree: capitalize(degreeName.trim()),
-        institution: institution?.trim() || '[University Name]',
+        institution: school || '[University Name]',
         location: '',
         startDate: '',
-        endDate: '',
+        endDate: year,
         current: false,
         gpa: '',
         description: '',
