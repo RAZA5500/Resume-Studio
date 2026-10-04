@@ -23,9 +23,15 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
         billing.refresh(true);
       }
       const isAuthCall = /\/api\/auth\/(login|register)/.test(request.url);
-      if (error instanceof HttpErrorResponse && error.status === 401 && token && !isAuthCall) {
+      // Several requests can fail together; only the first one (token still set) redirects.
+      if (error instanceof HttpErrorResponse && error.status === 401 && token && !isAuthCall && auth.token() === token) {
+        // On a fresh page load the 401 arrives while the first navigation is still running and
+        // router.url is still "/", so prefer the URL being navigated to.
+        const navigation = router.currentNavigation();
+        const target = navigation ? router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl) : router.url;
         auth.logout(false);
-        void router.navigate(['/login'], { queryParams: { returnUrl: router.url, expired: 1 } });
+        const returnUrl = target === '/' || target.startsWith('/login') ? undefined : target;
+        void router.navigate(['/login'], { queryParams: { returnUrl, expired: 1 } });
       }
       return throwError(() => error);
     }),
