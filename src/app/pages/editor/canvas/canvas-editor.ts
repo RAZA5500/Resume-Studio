@@ -38,6 +38,7 @@ import { firstValueFrom } from 'rxjs';
 import type { DocumentFile, ImproveMode } from '../../../core/models/app.models';
 import { AiService } from '../../../core/services/ai.service';
 import { DocumentService } from '../../../core/services/document.service';
+import { ExportService } from '../../../core/services/export.service';
 import { DialogService, ToastService } from '../../../core/services/ui.service';
 import {
   canEncodeWebp,
@@ -125,6 +126,7 @@ function hexToRgba(hex: string, alpha: number): string {
 })
 export class CanvasEditor {
   private readonly documents = inject(DocumentService);
+  private readonly exporter = inject(ExportService);
   protected readonly ai = inject(AiService);
   private readonly toast = inject(ToastService);
   private readonly dialogs = inject(DialogService);
@@ -1273,7 +1275,7 @@ export class CanvasEditor {
     this.exportMenu.set(false);
     this.busy.set('export');
     try {
-      downloadBlob(pdfBlob(await this.buildPdf(flatten)), `${safeFileName(this.name())}.pdf`);
+      downloadBlob(pdfBlob(await this.exporter.stampPdf(await this.buildPdf(flatten))), `${safeFileName(this.name())}.pdf`);
     } catch (e) {
       this.toast.error(errorMessage(e, 'PDF export failed'));
     } finally {
@@ -1289,7 +1291,8 @@ export class CanvasEditor {
       const pages = allPages ? this.pages() : [this.currentPage()!];
       const multiplier = this.pageKind() === 'image' ? 1 : 2;
       for (const [i, page] of pages.entries()) {
-        const url = await this.renderPageImage(page, { background: true, multiplier, format, quality: 0.92 });
+        const raw = await this.renderPageImage(page, { background: true, multiplier, format, quality: 0.92 });
+        const url = await this.exporter.stampImage(raw, `image/${format}`, 0.92);
         const suffix = pages.length > 1 ? `-page-${i + 1}` : '';
         downloadBlob(dataUrlToBlob(url), `${safeFileName(this.name())}${suffix}.${format === 'jpeg' ? 'jpg' : format}`);
       }

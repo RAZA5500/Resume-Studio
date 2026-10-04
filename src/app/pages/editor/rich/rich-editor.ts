@@ -289,9 +289,9 @@ export class RichEditor {
   protected exportAs(format: 'pdf' | 'docx' | 'html' | 'txt'): void {
     this.exportMenu.set(false);
     if (!this.quill) return;
-    if (format === 'txt') return downloadText(this.quill.getText(), `${this.fileBase()}.txt`);
+    if (format === 'txt') return downloadText(this.exporter.stampText(this.quill.getText()), `${this.fileBase()}.txt`);
     const html = this.exportHtml();
-    if (format === 'html') return downloadText(html, `${this.fileBase()}.html`, 'text/html;charset=utf-8');
+    if (format === 'html') return downloadText(this.exporter.stampHtml(html), `${this.fileBase()}.html`, 'text/html;charset=utf-8');
     this.exporting.set(true);
     const request = format === 'pdf' ? this.exporter.pdf(html, this.fileBase()) : this.exporter.docx(html, this.fileBase());
     request.subscribe({

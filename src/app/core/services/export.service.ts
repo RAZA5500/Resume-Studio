@@ -1,15 +1,38 @@
 import { HttpClient } from '@angular/common/http';
-import { inject, Injectable } from '@angular/core';
+import { computed, inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { nativeHooks } from '../native/platform';
 import { RESUME_CSS } from '../../shared/resume/resume-styles';
 import { type DesignSettings, TWO_COLUMN_LAYOUTS } from '../models/resume.models';
 import { escapeHtml } from '../utils/files';
 import { googleFontsUrl } from '../utils/fonts';
+import { watermarkDataUrl, watermarkHtml, watermarkPdf, watermarkText } from '../utils/watermark';
+import { BillingService } from './billing.service';
 
 @Injectable({ providedIn: 'root' })
 export class ExportService {
   private readonly http = inject(HttpClient);
+  private readonly billing = inject(BillingService);
+
+  /** Free plan exports are watermarked; Lifetime removes it. The server enforces this for its own exports. */
+  readonly watermarked = computed(() => !this.billing.isLifetime());
+
+  /** Applies the free plan watermark to files built in the browser. */
+  stampPdf(bytes: Uint8Array): Promise<Uint8Array> {
+    return this.watermarked() ? watermarkPdf(bytes) : Promise.resolve(bytes);
+  }
+
+  stampHtml(html: string): string {
+    return this.watermarked() ? watermarkHtml(html) : html;
+  }
+
+  stampText(text: string): string {
+    return this.watermarked() ? watermarkText(text) : text;
+  }
+
+  stampImage(dataUrl: string, type: string, quality?: number): Promise<string> {
+    return this.watermarked() ? watermarkDataUrl(dataUrl, type, quality) : Promise.resolve(dataUrl);
+  }
 
   /** Server side HTML → PDF (real text, ATS readable). */
   pdf(html: string, fileName: string, pageSize: 'A4' | 'Letter' = 'A4', landscape = false): Observable<Blob> {
@@ -22,6 +45,7 @@ export class ExportService {
 
   /** Browser print dialog fallback (also produces a text based PDF via "Save as PDF"). */
   print(html: string): void {
+    html = this.stampHtml(html);
     // Android app: the system print service ("Save as PDF") renders the same HTML.
     if (nativeHooks.printHtml) {
       nativeHooks.printHtml(html, /<title>([^<]*)<\/title>/.exec(html)?.[1] || 'ResumeStudio');

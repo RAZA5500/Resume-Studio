@@ -33,6 +33,7 @@ const TITLES: Record<string, string> = {
                   <li><span class="i sm">remove</span> 1 new resume per day</li>
                   <li><span class="i sm">remove</span> 1 cover letter per day</li>
                   <li><span class="i sm">remove</span> 1 document edit per day</li>
+                  <li><span class="i sm">remove</span> Watermark on downloads</li>
                 </ul>
               </div>
               <div class="plan featured border-anim">
@@ -41,6 +42,7 @@ const TITLES: Record<string, string> = {
                   <li><span class="i sm">check</span> Unlimited resumes</li>
                   <li><span class="i sm">check</span> Unlimited cover letters</li>
                   <li><span class="i sm">check</span> Unlimited document edits</li>
+                  <li><span class="i sm">check</span> No watermark</li>
                 </ul>
               </div>
             </div>

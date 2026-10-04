@@ -173,8 +173,8 @@ export class Landing {
         ? `AI writing has a daily fair-use limit of ${ai.free} requests on Free and ${ai.lifetime} on Lifetime, which is plenty for building and tailoring several resumes. It resets at midnight.`
         : 'AI writing is included on every plan. A daily fair-use limit keeps the service fast for everyone and resets at midnight.';
     return [
-      { q: 'What do I get on the free plan?', a: 'Every day you can create 1 new resume, write 1 cover letter and edit 1 document. All templates, the ATS checker and PDF/Word downloads are included. Limits reset at midnight Pakistan time.' },
-      { q: 'What does Lifetime access include?', a: `One payment of PKR ${this.billing.price()} removes the daily limits for good: unlimited resumes, cover letters and document edits. There is no subscription and nothing to renew.` },
+      { q: 'What do I get on the free plan?', a: 'Every day you can create 1 new resume, write 1 cover letter and edit 1 document. All templates, the ATS checker and PDF/Word downloads are included (downloads carry a small ResumeStudio watermark). Limits reset at midnight Pakistan time.' },
+      { q: 'What does Lifetime access include?', a: `One payment of PKR ${this.billing.price()} removes the daily limits for good: unlimited resumes, cover letters and document edits, and downloads without a watermark. There is no subscription and nothing to renew.` },
       { q: 'How do I pay?', a: 'Send the amount by JazzCash, Easypaisa or bank transfer, then submit your transaction ID on the Billing page. Your account is upgraded as soon as the payment is verified.' },
       { q: 'Is AI usage unlimited?', a: aiAnswer },
       { q: 'Are the templates ATS-friendly?', a: 'Single-column templates use real, selectable text in reading order with standard section headings — the format applicant tracking systems parse best. Two-column designs are clearly labelled.' },

@@ -5,9 +5,11 @@ import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import type { DocumentFile, ExtractionResult } from '../../core/models/app.models';
 import { BillingService } from '../../core/services/billing.service';
+import { ExportService } from '../../core/services/export.service';
 import { DocumentService } from '../../core/services/document.service';
 import { DialogService, ToastService } from '../../core/services/ui.service';
 import { downloadBlob, formatBytes, pickFile, timeAgo } from '../../core/utils/files';
+import { watermarkCanvas } from '../../core/utils/watermark';
 import { errorMessage, errorMessageAsync } from '../../core/utils/http';
 import {
   canvasToBlob,
@@ -51,6 +53,7 @@ const TOOLS: Tool[] = [
 export class DocumentsPage implements OnInit {
   private readonly documents = inject(DocumentService);
   protected readonly billing = inject(BillingService);
+  private readonly exporter = inject(ExportService);
   private readonly toast = inject(ToastService);
   private readonly dialogs = inject(DialogService);
   private readonly router = inject(Router);
@@ -181,7 +184,7 @@ export class DocumentsPage implements OnInit {
           const files = await pickFile('application/pdf,.pdf', true);
           if (files.length < 2) return files.length ? this.toast.info('Select at least two PDFs to merge.') : undefined;
           this.busyTool.set(key);
-          downloadBlob(pdfBlob(await mergePdfs(files)), 'merged.pdf');
+          downloadBlob(pdfBlob(await this.exporter.stampPdf(await mergePdfs(files))), 'merged.pdf');
           this.toast.success(`Merged ${files.length} PDFs`);
           break;
         }
@@ -196,14 +199,14 @@ export class DocumentsPage implements OnInit {
           });
           if (!ranges) return;
           this.busyTool.set(key);
-          downloadBlob(pdfBlob(await extractPdfPages(file, ranges)), `${file.name.replace(/\.pdf$/i, '')}-pages.pdf`);
+          downloadBlob(pdfBlob(await this.exporter.stampPdf(await extractPdfPages(file, ranges))), `${file.name.replace(/\.pdf$/i, '')}-pages.pdf`);
           break;
         }
         case 'img2pdf': {
           const files = await pickFile('image/*', true);
           if (!files.length) return;
           this.busyTool.set(key);
-          downloadBlob(pdfBlob(await imagesToPdf(files)), 'images.pdf');
+          downloadBlob(pdfBlob(await this.exporter.stampPdf(await imagesToPdf(files))), 'images.pdf');
           this.toast.success(`Created a ${files.length}-page PDF`);
           break;
         }
@@ -215,6 +218,7 @@ export class DocumentsPage implements OnInit {
           const count = Math.min(pdf.numPages, 30);
           for (let p = 1; p <= count; p++) {
             const canvas = await renderPdfPage(pdf, p, 2);
+            if (this.exporter.watermarked()) watermarkCanvas(canvas);
             downloadBlob(await canvasToBlob(canvas), `${file.name.replace(/\.pdf$/i, '')}-page-${p}.png`);
           }
           this.toast.success(`Exported ${count} page${count > 1 ? 's' : ''} as PNG`);

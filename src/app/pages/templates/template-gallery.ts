@@ -32,22 +32,19 @@ export class TemplateGallery {
   private readonly templates = inject(TemplateService);
 
   constructor() {
-    effect(
-      () => {
-        // Track filter changes to reset page back to 1
-        this.search();
-        this.category();
-        this.layout();
-        this.color();
-        this.font();
-        this.atsOnly();
-        this.photo();
-        this.columns();
-        this.sort();
-        this.page.set(1);
-      },
-      { allowSignalWrites: true },
-    );
+    effect(() => {
+      // Track filter changes to reset page back to 1
+      this.search();
+      this.category();
+      this.layout();
+      this.color();
+      this.font();
+      this.atsOnly();
+      this.photo();
+      this.columns();
+      this.sort();
+      this.page.set(1);
+    });
   }
 
   /** Content used for thumbnails (the user's own resume inside the builder). */

@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import HTMLtoDOCX from '@turbodocx/html-to-docx';
+import { WATERMARK_DOCX_FOOTER } from './watermark.js';
 
 export interface DocxOptions {
   title?: string;
@@ -7,6 +8,8 @@ export interface DocxOptions {
   font?: string;
   /** Margin in twips (1 inch = 1440). */
   margin?: number;
+  /** Free plan: adds the ResumeStudio footer to every page. */
+  watermark?: boolean;
 }
 
 const PAGE_SIZES = {
@@ -43,7 +46,8 @@ export class DocxService {
         fontSize: 22,
         decodeUnicode: true,
         table: { row: { cantSplit: true } },
-      });
+        footer: !!options.watermark,
+      }, options.watermark ? WATERMARK_DOCX_FOOTER : null);
       if (Buffer.isBuffer(result)) return result;
       if (result instanceof ArrayBuffer) return Buffer.from(result);
       return Buffer.from(await (result as Blob).arrayBuffer());

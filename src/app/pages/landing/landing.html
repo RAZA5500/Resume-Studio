@@ -396,7 +396,7 @@
         <p class="price">PKR 0</p>
         <p class="muted small">For a quick application</p>
         <ul>
-          @for (f of ['1 new resume per day', '1 cover letter per day', '1 document edit per day', 'All 4,608 templates', 'ATS score checker', 'PDF, Word & text downloads']; track f) {
+          @for (f of ['1 new resume per day', '1 cover letter per day', '1 document edit per day', 'All 4,608 templates', 'ATS score checker', 'PDF, Word & text downloads (watermarked)']; track f) {
             <li><span class="i sm">check</span> {{ f }}</li>
           }
         </ul>
@@ -411,7 +411,7 @@
         <p class="price">PKR <span [appCountUp]="billing.price()" [countDuration]="1200"></span></p>
         <p class="muted small">Pay once, use forever</p>
         <ul>
-          @for (f of ['Unlimited resumes', 'Unlimited cover letters', 'Unlimited document edits', 'Everything in Free', 'Pay via JazzCash, Easypaisa or bank', 'No subscription, no renewals']; track f) {
+          @for (f of ['Unlimited resumes', 'Unlimited cover letters', 'Unlimited document edits', 'No watermark on downloads', 'Everything in Free', 'Pay via JazzCash, Easypaisa or bank', 'No subscription, no renewals']; track f) {
             <li><span class="i sm">check</span> {{ f }}</li>
           }
         </ul>

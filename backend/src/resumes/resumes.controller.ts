@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, StreamableFile } from '@nestjs/common';
+import { UsageService } from '../billing/usage.service.js';
 import { CurrentUser, type AuthUser } from '../common/auth/auth.decorators.js';
 import { contentDisposition, MIME_TYPES, safeFileBase } from '../common/files.js';
 import { resumeToDocxHtml, resumeToPlainText } from '../common/resume/resume-text.js';
 import { DocxService } from '../export/docx.service.js';
+import { watermarkText } from '../export/watermark.js';
 import { CreateResumeDto, UpdateResumeDto } from './dto/resume.dto.js';
 import { ResumesService } from './resumes.service.js';
 
@@ -11,6 +13,7 @@ export class ResumesController {
   constructor(
     private readonly resumes: ResumesService,
     private readonly docx: DocxService,
+    private readonly usage: UsageService,
   ) {}
 
   @Get()
@@ -51,6 +54,7 @@ export class ResumesController {
       title: resume.title,
       pageSize: resume.design.pageSize,
       font: resume.design.bodyFont,
+      watermark: !(await this.usage.isLifetime(user.id)),
     });
     return new StreamableFile(buffer, {
       type: MIME_TYPES.docx,
@@ -61,7 +65,9 @@ export class ResumesController {
   @Get(':id/export/txt')
   async exportText(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     const resume = await this.resumes.get(user.id, id);
-    return new StreamableFile(Buffer.from(resumeToPlainText(resume.content), 'utf8'), {
+    const text = resumeToPlainText(resume.content);
+    const lifetime = await this.usage.isLifetime(user.id);
+    return new StreamableFile(Buffer.from(lifetime ? text : watermarkText(text), 'utf8'), {
       type: MIME_TYPES.txt,
       disposition: contentDisposition(`${safeFileBase(resume.title, 'resume')}.txt`),
     });

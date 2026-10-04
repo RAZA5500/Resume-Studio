@@ -99,7 +99,7 @@ export class CoverLetterPage implements OnInit {
   }
 
   protected download(format: 'pdf' | 'docx' | 'txt'): void {
-    if (format === 'txt') return downloadText(this.body(), `${this.fileBase()}.txt`);
+    if (format === 'txt') return downloadText(this.exporter.stampText(this.body()), `${this.fileBase()}.txt`);
     this.exporting.set(true);
     const request = format === 'pdf' ? this.exporter.pdf(this.html(), this.fileBase()) : this.exporter.docx(this.html(), this.fileBase());
     request.subscribe({
