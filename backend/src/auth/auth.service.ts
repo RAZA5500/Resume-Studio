@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { BillingConfigService } from '../billing/billing-config.service.js';
 import type { JwtPayload } from '../common/auth/auth.decorators.js';
+import type { IdentityProvider } from '../users/user-identity.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
 import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto.js';
@@ -18,6 +19,10 @@ export interface AuthResponse {
 
 export type PublicUser = Pick<User, 'id' | 'email' | 'fullName' | 'headline' | 'plan' | 'planActivatedAt' | 'createdAt'> & {
   isAdmin: boolean;
+  /** False for accounts that only sign in with Google / Apple (they can set one in the profile). */
+  hasPassword: boolean;
+  /** Linked sign-in providers. */
+  providers: IdentityProvider[];
 };
 
 /** 400 with a machine-readable code next to the message (the app reacts to some codes). */
@@ -93,7 +98,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
     this.attempts.loginSucceeded(dto.email, ip);
-    if (this.hasher.needsRehash(user.passwordHash)) this.upgradeHash(user.id, dto.password);
+    if (user.passwordHash && this.hasher.needsRehash(user.passwordHash)) this.upgradeHash(user.id, dto.password);
     return this.issue(user);
   }
 
@@ -109,17 +114,22 @@ export class AuthService {
     return this.toPublic(user);
   }
 
-  /** Changes the password, signs out every other session and returns a fresh token for this one. */
+  /**
+   * Changes the password — or sets a first one on an account that signs in with Google / Apple —
+   * signs out every other session and returns a fresh token for this one.
+   */
   async changePassword(userId: string, dto: ChangePasswordDto, ip: string): Promise<{ success: true; accessToken: string }> {
     // A stolen session must not be able to guess the current password either.
     const account = `user:${userId}`;
     this.attempts.assertLoginAllowed(account, ip);
     const user = await this.users.findById(userId, true);
-    if (!(await this.hasher.verify(dto.currentPassword, user.passwordHash))) {
-      this.attempts.loginFailed(account, ip);
-      throw new BadRequestException('Current password is incorrect');
+    if (user.passwordHash) {
+      if (!dto.currentPassword || !(await this.hasher.verify(dto.currentPassword, user.passwordHash))) {
+        this.attempts.loginFailed(account, ip);
+        throw new BadRequestException('Current password is incorrect');
+      }
+      this.attempts.loginSucceeded(account, ip);
     }
-    this.attempts.loginSucceeded(account, ip);
     if (dto.newPassword === dto.currentPassword) {
       throw rejected('WEAK_PASSWORD', 'Choose a new password that is different from the current one.');
     }
@@ -129,8 +139,13 @@ export class AuthService {
 
     await this.users.update(userId, { passwordHash: await this.hasher.hash(dto.newPassword) });
     const version = await this.users.revokeSessions(userId);
-    this.logger.log(`Password changed for ${maskEmail(user.email)}; other sessions signed out.`);
+    this.logger.log(`Password ${user.passwordHash ? 'changed' : 'set'} for ${maskEmail(user.email)}; other sessions signed out.`);
     return { success: true, accessToken: await this.sign(user, version) };
+  }
+
+  /** A session for an account that proved who it is another way (Google / Apple sign-in). */
+  sessionFor(user: User): Promise<AuthResponse> {
+    return this.issue(user);
   }
 
   /** "Sign out everywhere": every token issued so far stops working, this one included. */
@@ -169,7 +184,7 @@ export class AuthService {
   }
 
   private async issue(user: User): Promise<AuthResponse> {
-    return { accessToken: await this.sign(user, user.tokenVersion ?? 0), user: this.toPublic(user) };
+    return { accessToken: await this.sign(user, user.tokenVersion ?? 0), user: await this.toPublic(user) };
   }
 
   private sign(user: Pick<User, 'id' | 'email'>, version: number): Promise<string> {
@@ -177,7 +192,8 @@ export class AuthService {
     return this.jwt.signAsync(payload);
   }
 
-  private toPublic(user: User): PublicUser {
+  private async toPublic(user: User): Promise<PublicUser> {
+    const { hasPassword, providers } = await this.users.loginMethods(user.id);
     return {
       id: user.id,
       email: user.email,
@@ -187,6 +203,8 @@ export class AuthService {
       planActivatedAt: user.planActivatedAt ?? null,
       createdAt: user.createdAt,
       isAdmin: this.billing.isAdmin(user.email),
+      hasPassword,
+      providers,
     };
   }
 }

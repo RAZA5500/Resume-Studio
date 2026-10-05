@@ -5,6 +5,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { OAuthController } from './oauth/oauth.controller.js';
+import { createOAuthProviders } from './oauth/oauth-providers.js';
+import { OAUTH_PROVIDERS, OAuthService } from './oauth/oauth.service.js';
 import { AuthAttemptsService } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { ProofOfWorkService } from './security/proof-of-work.service.js';
@@ -36,7 +39,14 @@ import { ProofOfWorkService } from './security/proof-of-work.service.js';
       },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, AuthAttemptsService, PasswordHasher, ProofOfWorkService],
+  controllers: [AuthController, OAuthController],
+  providers: [
+    AuthService,
+    AuthAttemptsService,
+    PasswordHasher,
+    ProofOfWorkService,
+    OAuthService,
+    { provide: OAUTH_PROVIDERS, inject: [ConfigService], useFactory: (config: ConfigService) => createOAuthProviders(config) },
+  ],
 })
 export class AuthModule {}

@@ -34,7 +34,7 @@ function solve(challenge: PowChallenge): string {
 /** AuthService with an in-memory users table and the real security services. */
 function setup(env: Record<string, string> = {}) {
   const config = configOf({ AUTH_POW_MAX_NUMBER: '1000', PASSWORD_BREACH_CHECK: 'false', ...env });
-  const rows: (User & { passwordHash: string })[] = [];
+  const rows: User[] = [];
   const users = {
     findByEmail: (email: string) => Promise.resolve(rows.find((u) => u.email === email.toLowerCase()) ?? null),
     findById: (id: string) => Promise.resolve(rows.find((u) => u.id === id)!),
@@ -49,6 +49,7 @@ function setup(env: Record<string, string> = {}) {
     }),
     revokeSessions: vi.fn((id: string) => Promise.resolve(++rows.find((u) => u.id === id)!.tokenVersion)),
     sessionVersion: (id: string) => Promise.resolve(rows.find((u) => u.id === id)?.tokenVersion ?? null),
+    loginMethods: (id: string) => Promise.resolve({ hasPassword: !!rows.find((u) => u.id === id)?.passwordHash, providers: [] }),
   };
   const jwt = new JwtService({ secret: 'test-secret-that-is-long-enough-1234', signOptions: { expiresIn: 3600 } });
   const hasher = new PasswordHasher();

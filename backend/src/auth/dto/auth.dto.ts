@@ -68,10 +68,24 @@ export class UpdateProfileDto {
   headline?: string;
 }
 
+/** Finishes a Google / Apple sign-in (see OAuthService). */
+export class OAuthExchangeDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,100}$/)
+  code: string;
+
+  /** The PKCE verifier the app kept when it started the sign-in. */
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{43,128}$/)
+  verifier: string;
+}
+
 export class ChangePasswordDto {
+  /** Left out by accounts that only sign in with Google / Apple and are setting their first password. */
+  @IsOptional()
   @IsString()
   @MaxLength(128)
-  currentPassword: string;
+  currentPassword?: string;
 
   @IsString()
   @MinLength(8, { message: 'New password must be at least 8 characters' })
