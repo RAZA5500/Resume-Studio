@@ -19,7 +19,8 @@ function trustProxySetting(value: string | undefined): boolean | number | string
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: payment gateways sign the exact bytes of their webhooks (see checkout/).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   const config = app.get(ConfigService);
   const database = app.get(DatabaseService);
 

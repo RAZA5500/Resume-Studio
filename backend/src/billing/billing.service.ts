@@ -92,6 +92,7 @@ export class BillingService implements OnModuleInit {
         amount: this.config.price,
         currency: this.config.currency,
         method: dto.method,
+        provider: null,
         transactionId,
         senderNumber: dto.senderNumber.replace(/\s+/g, ' ').trim(),
         senderName: dto.senderName?.trim() || null,

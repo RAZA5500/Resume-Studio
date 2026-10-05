@@ -11,10 +11,14 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity.js';
 
-export type PaymentMethod = 'jazzcash' | 'easypaisa' | 'bank';
+/** jazzcash / easypaisa / bank: paid to the QR code, approved by an admin. gateway: paid online, approved automatically. */
+export type PaymentMethod = 'jazzcash' | 'easypaisa' | 'bank' | 'gateway';
 export type PaymentStatus = 'pending' | 'approved' | 'rejected';
 
-/** A manual (JazzCash / Easypaisa / bank) payment submitted by a user and reviewed by an admin. */
+/**
+ * The payments ledger: QR payments (JazzCash / Easypaisa / bank) submitted by users and reviewed by
+ * an admin, plus online gateway payments, which arrive already approved (see checkout/).
+ */
 @Entity('payments')
 @Index(['method', 'transactionId'], { unique: true, where: `"status" <> 'rejected'` })
 export class Payment {
@@ -41,12 +45,17 @@ export class Payment {
   @Column({ type: 'varchar', length: 20 })
   method: PaymentMethod;
 
-  /** Transaction ID / TID from the JazzCash, Easypaisa or bank receipt. */
+  /** Gateway adapter key (PAYMENT_GATEWAY) for online payments; null for QR payments. */
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  provider: string | null;
+
+  /** Transaction ID / TID from the JazzCash, Easypaisa or bank receipt, or the gateway's transaction id. */
   @Column({ type: 'varchar', length: 64 })
   transactionId: string;
 
-  @Column({ type: 'varchar', length: 40 })
-  senderNumber: string;
+  /** Number / account paid from (QR), or the wallet / masked card a gateway reports (may be unknown). */
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  senderNumber: string | null;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
   senderName: string | null;

@@ -6,6 +6,7 @@ import { AiModule } from './ai/ai.module.js';
 import { AtsModule } from './ats/ats.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BillingModule } from './billing/billing.module.js';
+import { CheckoutModule } from './checkout/checkout.module.js';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module.js';
     DatabaseModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
     BillingModule,
+    CheckoutModule,
     UsersModule,
     AuthModule,
     TemplatesModule,
