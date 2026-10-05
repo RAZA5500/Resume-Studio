@@ -1,14 +1,42 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, firstValueFrom, from, Observable, switchMap, tap, throwError } from 'rxjs';
-import type { AuthResponse, User } from '../models/app.models';
-import { type PowChallenge, solveChallenge } from '../utils/proof-of-work';
+import { catchError, firstValueFrom, from, map, Observable, switchMap, tap, throwError } from 'rxjs';
+import type { AuthResponse, OAuthProvider, User } from '../models/app.models';
+import { isNativeApp } from '../native/platform';
+import { type PowChallenge, sha256, solveChallenge } from '../utils/proof-of-work';
+import { apiOrigin } from './api-url.interceptor';
 
 const TOKEN_KEY = 'rs_token';
 const USER_KEY = 'rs_user';
 /** The API's security checks expire after 10 minutes; a solved one is used within 8. */
 const PROOF_LIFETIME_MS = 8 * 60_000;
+/** A Google / Apple sign-in in progress: the PKCE verifier and where to go afterwards. */
+const OAUTH_KEY = 'rs_oauth';
+const OAUTH_MAX_MS = 15 * 60_000;
+
+/** Where to continue after signing in (same as the log-in page's returnUrl / template). */
+export interface AfterSignIn {
+  returnUrl?: string;
+  template?: string;
+}
+
+export interface OAuthResult extends AuthResponse {
+  /** "password_removed": an unverified password on this email was turned off (see the API's OAuthService). */
+  notice: 'password_removed' | null;
+  after: AfterSignIn;
+}
+
+function base64url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function sha256Bytes(text: string): Promise<Uint8Array> {
+  const data = new TextEncoder().encode(text);
+  return globalThis.crypto?.subtle ? new Uint8Array(await crypto.subtle.digest('SHA-256', data)) : sha256(data);
+}
 
 /** The API no longer accepts this security check (expired, used, or the server restarted). */
 function proofRejected(error: unknown): boolean {
@@ -50,6 +78,8 @@ export class AuthService {
   readonly user = signal<User | null>(null);
   /** The anti-bot check being solved for the next sign-in / sign-up. */
   private proof: { answer: Promise<string>; expires: number } | null = null;
+  /** Which "Continue with …" buttons the server supports (null until loaded). */
+  readonly oauthProviders = signal<Record<OAuthProvider, boolean> | null>(null);
   readonly isAuthenticated = computed(() => !!this.token());
   readonly firstName = computed(() => this.user()?.fullName.split(' ')[0] ?? '');
   readonly initials = computed(() =>
@@ -90,6 +120,50 @@ export class AuthService {
     this.proof = entry;
   }
 
+  loadOAuthProviders(): void {
+    if (this.oauthProviders()) return;
+    this.http.get<Record<OAuthProvider, boolean>>('/api/auth/providers').subscribe({
+      next: (providers) => this.oauthProviders.set(providers),
+      error: () => this.oauthProviders.set({ google: false, apple: false }),
+    });
+  }
+
+  /**
+   * Leaves for Google / Apple. A random verifier stays on this device and only its hash goes along;
+   * the API brings the browser back to /auth/callback with a one-time code that works only together
+   * with the verifier (in the Android app the sign-in runs in the phone's browser and returns
+   * through the app's deep link).
+   */
+  async startOAuth(provider: OAuthProvider, after: AfterSignIn = {}): Promise<void> {
+    const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
+    const challenge = base64url(await sha256Bytes(verifier));
+    write(OAUTH_KEY, JSON.stringify({ verifier, at: Date.now(), ...after }));
+    const client = isNativeApp() ? 'app' : 'web';
+    window.location.assign(`${apiOrigin()}/api/auth/oauth/${provider}/start?client=${client}&challenge=${challenge}`);
+  }
+
+  /** Trades the one-time code from /auth/callback (plus the kept verifier) for a session. */
+  completeOAuth(code: string): Observable<OAuthResult> {
+    type Pending = { verifier?: string; at?: number } & AfterSignIn;
+    let pending: Pending | null;
+    try {
+      pending = JSON.parse(read(OAUTH_KEY) ?? 'null') as Pending | null;
+    } catch {
+      pending = null;
+    }
+    write(OAUTH_KEY, null);
+    if (!pending?.verifier || !pending.at || Date.now() - pending.at > OAUTH_MAX_MS) {
+      return throwError(() => new Error('This sign-in has expired. Please try again.'));
+    }
+    const after: AfterSignIn = { returnUrl: pending.returnUrl, template: pending.template };
+    return this.http
+      .post<AuthResponse & { notice: OAuthResult['notice'] }>('/api/auth/oauth/exchange', { code, verifier: pending.verifier })
+      .pipe(
+        tap((r) => this.setSession(r)),
+        map((r) => ({ ...r, after })),
+      );
+  }
+
   /** `website` is the form's honeypot field: hidden from people, filled in only by bots. */
   login(email: string, password: string, website = ''): Observable<AuthResponse> {
     return this.withProof((pow) => this.http.post<AuthResponse>('/api/auth/login', { email, password, website, pow })).pipe(
@@ -111,8 +185,11 @@ export class AuthService {
     return this.http.patch<User>('/api/auth/me', patch).pipe(tap((u) => this.setUser(u)));
   }
 
-  /** Other devices are signed out; this one continues with the fresh token the API returns. */
-  changePassword(currentPassword: string, newPassword: string): Observable<{ success: true; accessToken?: string }> {
+  /**
+   * Other devices are signed out; this one continues with the fresh token the API returns.
+   * Accounts made with Google / Apple set their first password without a current one.
+   */
+  changePassword(currentPassword: string | undefined, newPassword: string): Observable<{ success: true; accessToken?: string }> {
     return this.http
       .post<{ success: true; accessToken?: string }>('/api/auth/change-password', { currentPassword, newPassword })
       .pipe(

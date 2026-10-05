@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AiService } from '../../core/services/ai.service';
@@ -65,21 +65,32 @@ import { errorMessage } from '../../core/utils/http';
       </section>
 
       <section class="card">
-        <div class="card-header"><h3><span class="i">lock</span> Password &amp; sessions</h3></div>
+        <div class="card-header"><h3><span class="i">lock</span> Sign-in &amp; security</h3></div>
         <div class="card-pad stack">
-          <div class="grid-2">
-            <div class="field">
-              <label>Current password</label>
-              <input class="input" type="password" autocomplete="current-password" [ngModel]="current()" (ngModelChange)="current.set($event)" />
-            </div>
+          @if (providerNames(); as names) {
+            <p class="methods"><span class="i">verified</span> You sign in with {{ names }}{{ noPassword() ? '' : ' or your email and password' }}.</p>
+          }
+          @if (noPassword()) {
             <div class="field">
               <label>New password</label>
               <input class="input" type="password" autocomplete="new-password" [ngModel]="next()" (ngModelChange)="next.set($event)" placeholder="At least 8 characters" />
             </div>
-          </div>
-          <p class="small subtle">Changing your password signs you out on every other device. Avoid common passwords and your name or email.</p>
+            <p class="small subtle">Add a password to also sign in with your email address. Avoid common passwords and your name or email.</p>
+          } @else {
+            <div class="grid-2">
+              <div class="field">
+                <label>Current password</label>
+                <input class="input" type="password" autocomplete="current-password" [ngModel]="current()" (ngModelChange)="current.set($event)" />
+              </div>
+              <div class="field">
+                <label>New password</label>
+                <input class="input" type="password" autocomplete="new-password" [ngModel]="next()" (ngModelChange)="next.set($event)" placeholder="At least 8 characters" />
+              </div>
+            </div>
+            <p class="small subtle">Changing your password signs you out on every other device. Avoid common passwords and your name or email.</p>
+          }
           <div class="row row-wrap">
-            <button class="btn" type="button" (click)="changePassword()" [disabled]="saving()">Update password</button>
+            <button class="btn" type="button" (click)="changePassword()" [disabled]="saving()">{{ noPassword() ? 'Set password' : 'Update password' }}</button>
             <button class="btn btn-ghost" type="button" (click)="logoutEverywhere()" [disabled]="saving()">
               <span class="i">devices</span> Sign out of all devices
             </button>
@@ -122,6 +133,7 @@ import { errorMessage } from '../../core/utils/http';
     .card-pad p { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-2); }
     code { font-size: 12px; background: var(--surface-3); padding: 1px 5px; border-radius: 5px; }
     .btn-danger-soft { align-self: flex-start; }
+    .methods .i { color: var(--success); }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -137,6 +149,16 @@ export class ProfilePage {
   protected readonly current = signal('');
   protected readonly next = signal('');
   protected readonly saving = signal(false);
+  /** Accounts made with Google / Apple have no password until they set one here. */
+  protected readonly noPassword = computed(() => this.auth.user()?.hasPassword === false);
+  protected readonly providerNames = computed(() =>
+    (this.auth.user()?.providers ?? []).map((p) => (p === 'google' ? 'Google' : 'Apple')).join(' and '),
+  );
+
+  constructor() {
+    // Fresh sign-in methods (they change when an account is linked to Google / Apple).
+    this.auth.refreshProfile().subscribe({ error: () => undefined });
+  }
 
   protected saveProfile(): void {
     this.saving.set(true);
@@ -173,12 +195,14 @@ export class ProfilePage {
   protected changePassword(): void {
     if (this.next().length < 8) return this.toast.info('New password must be at least 8 characters.');
     this.saving.set(true);
-    this.auth.changePassword(this.current(), this.next()).subscribe({
+    const setting = this.noPassword();
+    this.auth.changePassword(setting ? undefined : this.current(), this.next()).subscribe({
       next: () => {
         this.saving.set(false);
         this.current.set('');
         this.next.set('');
-        this.toast.success('Password updated. Other devices were signed out.');
+        this.auth.refreshProfile().subscribe({ error: () => undefined });
+        this.toast.success(setting ? 'Password set. You can now also sign in with your email.' : 'Password updated. Other devices were signed out.');
       },
       error: (e: unknown) => {
         this.saving.set(false);

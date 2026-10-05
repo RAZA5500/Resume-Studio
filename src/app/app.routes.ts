@@ -32,6 +32,13 @@ export const routes: Routes = [
     data: { mode: 'register', preload: true },
   },
   {
+    // Google / Apple sign-in comes back here (through the API); open whether signed in or not.
+    path: 'auth/callback',
+    title: 'Signing in — ResumeStudio',
+    canActivate: [serverGuard],
+    loadComponent: () => import('./pages/auth/oauth-callback').then((m) => m.OAuthCallback),
+  },
+  {
     path: 'templates',
     title: 'Resume Templates — ResumeStudio',
     canActivate: [serverGuard],

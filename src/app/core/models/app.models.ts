@@ -12,12 +12,18 @@ export interface User {
   planActivatedAt: string | null;
   isAdmin: boolean;
   createdAt: string;
+  /** False for accounts that only sign in with Google / Apple. */
+  hasPassword?: boolean;
+  /** Linked sign-in providers. */
+  providers?: OAuthProvider[];
 }
 
 export interface AuthResponse {
   accessToken: string;
   user: User;
 }
+
+export type OAuthProvider = 'google' | 'apple';
 
 // ---------------------------------------------------------------- templates
 export interface Template {

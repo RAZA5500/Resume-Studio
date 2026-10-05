@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import type { OAuthProvider } from '../../core/models/app.models';
 import { SAMPLE_CONTENT } from '../../core/models/resume.models';
 import { apiOrigin, serverIsConfigurable } from '../../core/services/api-url.interceptor';
 import { AuthService } from '../../core/services/auth.service';
@@ -57,6 +58,10 @@ export class AuthPage {
   protected readonly showPassword = signal(false);
   /** Honeypot (see the hidden field in the template). */
   protected readonly website = signal('');
+  /** "Continue with Google / Apple" buttons the server supports. */
+  protected readonly oauthProviders = this.auth.oauthProviders;
+  /** The provider being opened (its button shows a spinner). */
+  protected readonly oauthBusy = signal<OAuthProvider | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal('');
 
@@ -117,7 +122,21 @@ export class AuthPage {
   constructor() {
     // The anti-bot check is solved while the visitor fills in the form.
     this.auth.prepareProof();
+    this.auth.loadOAuthProviders();
     inject(DestroyRef).onDestroy(() => clearInterval(this.ticker));
+  }
+
+  protected async social(provider: OAuthProvider): Promise<void> {
+    if (this.oauthBusy()) return;
+    this.error.set('');
+    this.oauthBusy.set(provider);
+    try {
+      await this.auth.startOAuth(provider, { returnUrl: this.returnUrl(), template: this.template() });
+    } catch {
+      this.error.set('Could not open the sign-in page. Please try again.');
+    }
+    // The website is leaving now; the Android app stays here while the phone's browser signs in.
+    setTimeout(() => this.oauthBusy.set(null), 4000);
   }
 
   protected submit(): void {

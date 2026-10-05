@@ -64,6 +64,25 @@ export function initNativeApp(injector: Injector): void {
     history.back();
   });
 
+  // Google / Apple sign-in runs in the phone's browser and comes back through the app's deep link
+  // (com.resumestudio.app://oauth?code=… — see AndroidManifest.xml); /auth/callback finishes it.
+  const openLink = (url: string | undefined) => {
+    let link: URL;
+    try {
+      link = new URL(url ?? '');
+    } catch {
+      return;
+    }
+    if (link.protocol === 'com.resumestudio.app:' && link.hostname === 'oauth') {
+      void router.navigateByUrl(`/auth/callback${link.search}`);
+    }
+  };
+  void App.addListener('appUrlOpen', ({ url }) => openLink(url));
+  // Android may have closed the app while the browser was open: then the link starts it.
+  void App.getLaunchUrl()
+    .then((launch) => openLink(launch?.url))
+    .catch(() => undefined);
+
   nativeHooks.saveFile = (blob, fileName) => void saveFile(blob, fileName, toast);
   nativeHooks.printHtml = (html, title) =>
     void AppNative.print({ html, name: title }).catch(() => toast.error('Printing is not available on this phone.'));
