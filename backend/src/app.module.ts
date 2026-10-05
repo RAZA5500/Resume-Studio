@@ -13,6 +13,7 @@ import { DocumentsModule } from './documents/documents.module.js';
 import { ExportModule } from './export/export.module.js';
 import { ExtractionModule } from './extraction/extraction.module.js';
 import { HealthController } from './health.controller.js';
+import { MailModule } from './mail/mail.module.js';
 import { ResumesModule } from './resumes/resumes.module.js';
 import { TemplatesModule } from './templates/templates.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module.js';
       throttlers: [{ ttl: 60_000, limit: 300 }],
       errorMessage: 'Too many requests. Please wait a minute and try again.',
     }),
+    MailModule,
     BillingModule,
     CheckoutModule,
     UsersModule,

@@ -112,6 +112,39 @@ export class OAuthExchangeDto {
   devices?: string[];
 }
 
+/** The 6-digit code from the verification email. */
+export class EmailCodeDto {
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.replace(/\s+/g, '') : value))
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'Enter the 6-digit code from the email.' })
+  code: string;
+}
+
+/** The token from the link in the verification email. */
+export class EmailLinkDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{43}$/, { message: 'This link is incomplete. Please open it from the email again.' })
+  token: string;
+
+  /** The person pressed "Verify" (needed where the link's own account is not signed in). */
+  @IsOptional()
+  @IsBoolean()
+  confirm?: boolean;
+}
+
+/** "Wrong email?" on the verification page (accounts that have not verified theirs yet). */
+export class ChangeEmailDto {
+  @Transform(normalizeEmail)
+  @IsEmail({}, { message: 'Please enter a valid email address' })
+  @MaxLength(160)
+  email: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  password: string;
+}
+
 export class ChangePasswordDto {
   /** Left out by accounts that only sign in with Google / Apple and are setting their first password. */
   @IsOptional()

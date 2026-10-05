@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Header, HttpCode, Ip, Patch, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { CurrentUser, Public, type AuthUser } from '../common/auth/auth.decorators.js';
+import { AllowUnverified, CurrentUser, Public, type AuthUser } from '../common/auth/auth.decorators.js';
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto.js';
 
@@ -32,6 +32,7 @@ export class AuthController {
     return this.auth.login(dto, ip);
   }
 
+  @AllowUnverified()
   @Get('me')
   me(@CurrentUser() user: AuthUser) {
     return this.auth.me(user.id);
@@ -49,6 +50,7 @@ export class AuthController {
     return this.auth.changePassword(user.id, dto, ip);
   }
 
+  @AllowUnverified()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   @Post('logout-all')

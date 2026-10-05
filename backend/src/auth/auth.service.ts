@@ -6,7 +6,8 @@ import type { JwtPayload } from '../common/auth/auth.decorators.js';
 import type { IdentityProvider } from '../users/user-identity.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
-import { ChangePasswordDto, LoginDto, RegisterDto, TwoFactorVerifyDto, UpdateProfileDto } from './dto/auth.dto.js';
+import { ChangeEmailDto, ChangePasswordDto, LoginDto, RegisterDto, TwoFactorVerifyDto, UpdateProfileDto } from './dto/auth.dto.js';
+import { EmailVerificationService } from './email-verification/email-verification.service.js';
 import { AuthAttemptsService, maskEmail } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { breachCount, passwordProblem } from './security/password-policy.js';
@@ -28,6 +29,9 @@ export type PublicUser = Pick<User, 'id' | 'email' | 'fullName' | 'headline' | '
   providers: IdentityProvider[];
   twoFactorEnabled: boolean;
   backupCodesLeft: number;
+  emailVerified: boolean;
+  /** The app opens only the verification page until the email address is confirmed. */
+  mustVerifyEmail: boolean;
 };
 
 /** 400 with a machine-readable code next to the message (the app reacts to some codes). */
@@ -40,12 +44,13 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 const EMAIL_TAKEN = 'An account with this email already exists. Please log in instead.';
+const EMAIL_IN_USE = 'Another account already uses this email address.';
 
 /**
  * Sign-up, sign-in and account security. Public forms pass a honeypot and a proof-of-work check,
  * brute force is locked out per account and per network (AuthAttemptsService), passwords follow
- * PasswordPolicy and are checked against known breaches, and changing the password signs out
- * every other session.
+ * PasswordPolicy and are checked against known breaches, changing the password signs out
+ * every other session, and new accounts confirm their email address (EmailVerificationService).
  */
 @Injectable()
 export class AuthService {
@@ -60,6 +65,7 @@ export class AuthService {
     private readonly attempts: AuthAttemptsService,
     private readonly pow: ProofOfWorkService,
     private readonly twoFactor: TwoFactorService,
+    private readonly verification: EmailVerificationService,
     config: ConfigService,
   ) {
     this.breachCheck = !/^(0|false|off|no)$/i.test(config.get<string>('PASSWORD_BREACH_CHECK')?.trim() ?? '');
@@ -164,6 +170,38 @@ export class AuthService {
     return { success: true, accessToken: await this.sign(user, version) };
   }
 
+  /**
+   * "Wrong email?" on the verification page: moves an account that has not verified its address
+   * to another one (password required, so a stolen session cannot redirect the account).
+   */
+  async changeEmail(userId: string, dto: ChangeEmailDto, ip: string): Promise<PublicUser> {
+    const account = `user:${userId}`;
+    this.attempts.assertLoginAllowed(account, ip);
+    const user = await this.users.findById(userId, true);
+    if (!user.passwordHash || !this.verification.needsVerification(user)) {
+      throw rejected('EMAIL_CHANGE_UNAVAILABLE', 'The email address of this account can no longer be changed here.');
+    }
+    if (!(await this.hasher.verify(dto.password, user.passwordHash))) {
+      this.attempts.loginFailed(account, ip);
+      throw rejected('WRONG_PASSWORD', 'That password is not right.');
+    }
+    this.attempts.loginSucceeded(account, ip);
+    if (dto.email === user.email) return this.toPublic(user);
+
+    const taken = await this.users.findByEmail(dto.email);
+    if (taken && taken.id !== userId) throw new ConflictException(EMAIL_IN_USE);
+    let moved: User;
+    try {
+      moved = await this.users.changeEmail(userId, dto.email);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      throw new ConflictException(EMAIL_IN_USE);
+    }
+    await this.verification.expireCode(userId);
+    this.logger.log(`Unverified account moved from ${maskEmail(user.email)} to ${maskEmail(moved.email)}.`);
+    return this.toPublic(moved);
+  }
+
   /** "Sign out everywhere": every token issued so far stops working, this one included. */
   async logoutEverywhere(userId: string): Promise<{ success: true }> {
     await this.users.revokeSessions(userId);
@@ -223,6 +261,8 @@ export class AuthService {
       providers,
       twoFactorEnabled,
       backupCodesLeft,
+      emailVerified: !!user.emailVerifiedAt,
+      mustVerifyEmail: this.verification.needsVerification(user),
     };
   }
 }

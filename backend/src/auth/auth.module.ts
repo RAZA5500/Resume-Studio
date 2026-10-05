@@ -2,9 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { EmailVerificationController } from './email-verification/email-verification.controller.js';
+import { EmailVerification } from './email-verification/email-verification.entity.js';
+import { EmailVerificationService } from './email-verification/email-verification.service.js';
 import { OAuthController } from './oauth/oauth.controller.js';
 import { createOAuthProviders } from './oauth/oauth-providers.js';
 import { OAUTH_PROVIDERS, OAuthService } from './oauth/oauth.service.js';
@@ -17,6 +21,7 @@ import { TwoFactorService } from './two-factor/two-factor.service.js';
 @Module({
   imports: [
     UsersModule,
+    TypeOrmModule.forFeature([EmailVerification]),
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
@@ -41,13 +46,14 @@ import { TwoFactorService } from './two-factor/two-factor.service.js';
       },
     }),
   ],
-  controllers: [AuthController, OAuthController, TwoFactorController],
+  controllers: [AuthController, OAuthController, TwoFactorController, EmailVerificationController],
   providers: [
     AuthService,
     AuthAttemptsService,
     PasswordHasher,
     ProofOfWorkService,
     TwoFactorService,
+    EmailVerificationService,
     OAuthService,
     { provide: OAUTH_PROVIDERS, inject: [ConfigService], useFactory: (config: ConfigService) => createOAuthProviders(config) },
   ],
