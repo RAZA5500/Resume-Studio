@@ -7,6 +7,7 @@ import { SignInFlow } from '../../core/services/sign-in-flow';
 import { ToastService } from '../../core/services/ui.service';
 import { errorMessage } from '../../core/utils/http';
 import { Logo } from '../../shared/ui/logo';
+import { NameStep } from '../../shared/ui/name-step';
 import { TwoFactorStep } from '../../shared/ui/two-factor-step';
 
 /** Error codes the API's OAuthService sends back (…/auth/callback?error=…). */
@@ -22,17 +23,20 @@ const MESSAGES: Record<string, string> = {
 
 /**
  * Where Google / Apple sign-in ends (through the API, which has already verified the account):
- * trades the one-time code for a session, then continues like the log-in page would.
+ * trades the one-time code for a session, then continues like the log-in page would. A brand-new
+ * account first confirms the name it got from the provider (keep it or change it).
  */
 @Component({
   selector: 'app-oauth-callback',
-  imports: [RouterLink, Logo, TwoFactorStep],
+  imports: [RouterLink, Logo, NameStep, TwoFactorStep],
   template: `
     <div class="wrap">
       <app-logo />
       <div class="card box" aria-live="polite">
         @if (pending(); as signIn) {
           <app-two-factor-step class="step" [challenge]="signIn.challenge" (done)="finish(signIn)" (cancel)="backToLogin()" />
+        } @else if (naming(); as signUp) {
+          <app-name-step class="step" (done)="proceed(signUp)" />
         } @else if (error(); as message) {
           <span class="ic"><span class="i">error</span></span>
           <h1>Sign-in did not finish</h1>
@@ -107,6 +111,8 @@ export class OAuthCallback implements OnInit {
   protected readonly error = signal('');
   /** Google / Apple was fine, but the account has two-factor on: the code is next. */
   protected readonly pending = signal<(OAuthResult & { challenge: string }) | null>(null);
+  /** A new account: keep or change the name it got from Google / Apple before going on. */
+  protected readonly naming = signal<OAuthResult | null>(null);
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -131,6 +137,14 @@ export class OAuthCallback implements OnInit {
     if (result.notice === 'password_removed') {
       this.toast.info('Signed in. For your security, the password set earlier on this email was turned off — you can set a new one in Profile.');
     }
+    if (result.created) {
+      this.naming.set(result);
+      return;
+    }
+    this.proceed(result);
+  }
+
+  protected proceed(result: OAuthResult): void {
     // Returning accounts without two-factor get the optional offer; new ones go straight in.
     this.flow.continue(result.after, { offerTwoFactor: !result.created, replaceUrl: true });
   }
