@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { createTransport } from 'nodemailer';
 import { MailService } from './mail.service.js';
@@ -7,14 +8,14 @@ const { sendMail } = vi.hoisted(() => ({ sendMail: vi.fn((_message: object) => P
 vi.mock('nodemailer', () => ({ createTransport: vi.fn(() => ({ sendMail, verify: () => Promise.resolve(true) })) }));
 
 function mailWith(env: Record<string, string>): MailService {
-  const service = new MailService({ get: (key: string) => env[key] } as unknown as ConfigService);
-  Object.assign(service, { logger: { log: () => undefined, error: () => undefined } });
-  return service;
+  return new MailService({ get: (key: string) => env[key] } as unknown as ConfigService);
 }
 
 const SMTP = { SMTP_HOST: 'smtp.hostinger.com', SMTP_USER: 'no-reply@resumestudio.pk', SMTP_PASS: 'mailbox-password' };
 
 describe('MailService', () => {
+  beforeAll(() => vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined));
+  afterAll(() => vi.restoreAllMocks());
   beforeEach(() => vi.mocked(createTransport).mockClear());
 
   it('is off until host, user and password are all set', async () => {
