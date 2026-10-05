@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { type IdentityProvider, UserIdentity } from './user-identity.entity.js';
 import { User } from './user.entity.js';
 
-/** How long the auth guard trusts a cached session version (revocations here apply at once). */
+/** How long the auth guard trusts a cached session state (changes made here apply at once). */
 const SESSION_CACHE_MS = 60_000;
 
 type UserPatch = Partial<
@@ -21,6 +21,13 @@ type UserPatch = Partial<
   >
 >;
 
+/** What the auth guard checks on every request. */
+export interface SessionState {
+  /** Tokens carry the version they were issued with; older ones are signed out. */
+  version: number;
+  emailVerified: boolean;
+}
+
 export interface TwoFactorState {
   secret: string | null;
   enabledAt: Date | null;
@@ -30,7 +37,7 @@ export interface TwoFactorState {
 
 @Injectable()
 export class UsersService {
-  private readonly sessions = new Map<string, { version: number; at: number }>();
+  private readonly sessions = new Map<string, SessionState & { at: number }>();
 
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
@@ -57,6 +64,14 @@ export class UsersService {
 
   async update(id: string, patch: UserPatch): Promise<User> {
     await this.users.update({ id }, patch);
+    if ('emailVerifiedAt' in patch) this.sessions.delete(id);
+    return this.findById(id);
+  }
+
+  /** New address for an account that has not verified its email yet (it stays unverified). */
+  async changeEmail(id: string, email: string): Promise<User> {
+    await this.users.update({ id }, { email: email.toLowerCase().trim(), emailVerifiedAt: null });
+    this.sessions.delete(id);
     return this.findById(id);
   }
 
@@ -131,32 +146,32 @@ export class UsersService {
   }
 
   /**
-   * The account's current session version, checked on every authenticated request (cached for a
-   * minute). Null when the account no longer exists.
+   * The account's current session version and email status, checked on every authenticated request
+   * (cached for a minute). Null when the account no longer exists.
    */
-  async sessionVersion(id: string): Promise<number | null> {
+  async session(id: string): Promise<SessionState | null> {
     const cached = this.sessions.get(id);
-    if (cached && Date.now() - cached.at < SESSION_CACHE_MS) return cached.version;
-    const row = await this.users.findOne({ where: { id }, select: { id: true, tokenVersion: true } });
+    if (cached && Date.now() - cached.at < SESSION_CACHE_MS) return { version: cached.version, emailVerified: cached.emailVerified };
+    const row = await this.users.findOne({ where: { id }, select: { id: true, tokenVersion: true, emailVerifiedAt: true } });
     if (!row) {
       this.sessions.delete(id);
       return null;
     }
-    this.remember(id, row.tokenVersion);
-    return row.tokenVersion;
+    return this.remember(id, row);
   }
 
   /** Signs the account out on every device: tokens issued before now stop working. Returns the new version. */
   async revokeSessions(id: string): Promise<number> {
     await this.users.increment({ id }, 'tokenVersion', 1);
-    const row = await this.users.findOne({ where: { id }, select: { id: true, tokenVersion: true } });
+    const row = await this.users.findOne({ where: { id }, select: { id: true, tokenVersion: true, emailVerifiedAt: true } });
     if (!row) throw new NotFoundException('User not found');
-    this.remember(id, row.tokenVersion);
-    return row.tokenVersion;
+    return this.remember(id, row).version;
   }
 
-  private remember(id: string, version: number): void {
+  private remember(id: string, row: Pick<User, 'tokenVersion' | 'emailVerifiedAt'>): SessionState {
     if (this.sessions.size >= 10_000) this.sessions.clear();
-    this.sessions.set(id, { version, at: Date.now() });
+    const state = { version: row.tokenVersion, emailVerified: !!row.emailVerifiedAt };
+    this.sessions.set(id, { ...state, at: Date.now() });
+    return state;
   }
 }
