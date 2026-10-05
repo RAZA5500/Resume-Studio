@@ -3,7 +3,6 @@ import { BadRequestException, ServiceUnavailableException } from '@nestjs/common
 import type { ConfigService } from '@nestjs/config';
 import type { DataSource, Repository } from 'typeorm';
 import { BillingConfigService } from '../billing/billing-config.service.js';
-import type { Payment } from '../billing/payment.entity.js';
 import { User } from '../users/user.entity.js';
 import { CheckoutOrder } from './checkout-order.entity.js';
 import { CheckoutService } from './checkout.service.js';

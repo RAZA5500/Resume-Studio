@@ -50,8 +50,12 @@ export class CheckoutPage implements OnInit {
   protected readonly gateway = this.checkout.gateway;
   protected readonly price = computed(() => this.checkout.config()?.price ?? this.billing.price());
   protected readonly currency = computed(() => this.checkout.config()?.currency ?? 'PKR');
+  /** Stops waiting for the plan summary (offline, server busy): the account's cached plan is used. */
+  private readonly summaryTimedOut = signal(false);
   /** Plan and gateway are known, so the right state and method can be shown. */
-  protected readonly ready = computed(() => this.checkout.loaded() && !!this.billing.summary());
+  protected readonly ready = computed(
+    () => this.checkout.loaded() && (!!this.billing.summary() || this.summaryTimedOut()),
+  );
 
   private readonly picked = signal<PayMethod | null>(null);
   /** The buyer's choice; online by default whenever the gateway is connected. */
@@ -86,7 +90,11 @@ export class CheckoutPage implements OnInit {
     const timer = setInterval(() => {
       if (!this.billing.isLifetime() && (this.billing.pendingPayment() || this.openedOrder())) this.billing.refresh(true);
     }, 15_000);
-    this.destroyRef.onDestroy(() => clearInterval(timer));
+    const fallback = setTimeout(() => this.summaryTimedOut.set(true), 5_000);
+    this.destroyRef.onDestroy(() => {
+      clearInterval(timer);
+      clearTimeout(fallback);
+    });
   }
 
   protected choose(method: PayMethod): void {
