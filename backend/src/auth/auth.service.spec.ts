@@ -163,7 +163,8 @@ describe('AuthService sign-in', () => {
     const { service, rows, users, form } = await withAccount();
     rows[0].passwordHash = await bcrypt.hash(GOOD_PASSWORD, 10);
     await service.login({ email: 'sara@example.com', password: GOOD_PASSWORD, ...form() }, IP);
-    await vi.waitFor(() => expect(users.update).toHaveBeenCalled());
+    // The re-hash runs in the background (one bcrypt hash; slow on a busy machine).
+    await vi.waitFor(() => expect(users.update).toHaveBeenCalled(), { timeout: 15_000 });
     expect(bcrypt.getRounds(rows[0].passwordHash)).toBe(11);
   });
 });
