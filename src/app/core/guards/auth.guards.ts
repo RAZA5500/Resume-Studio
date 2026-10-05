@@ -12,6 +12,12 @@ export const authGuard: CanActivateFn = (_route, state) => {
     : inject(Router).createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };
 
+/** Signed-in accounts that still have to confirm their email address only see /verify-email. */
+export const verifiedGuard: CanActivateFn = (_route, state) =>
+  inject(AuthService).mustVerifyEmail()
+    ? inject(Router).createUrlTree(['/verify-email'], { queryParams: { returnUrl: state.url } })
+    : true;
+
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   return auth.isAuthenticated() ? inject(Router).createUrlTree(['/app/dashboard']) : true;

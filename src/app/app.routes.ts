@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, guestGuard, homeGuard, serverGuard } from './core/guards/auth.guards';
+import { adminGuard, authGuard, guestGuard, homeGuard, serverGuard, verifiedGuard } from './core/guards/auth.guards';
 import { Landing } from './pages/landing/landing';
 
 export const routes: Routes = [
@@ -32,10 +32,18 @@ export const routes: Routes = [
     data: { mode: 'register', preload: true },
   },
   {
+    // After sign-up (and the first sign-in of older accounts) until the email is confirmed; the
+    // link in the email opens here too, also on devices where nobody is signed in.
+    path: 'verify-email',
+    title: 'Verify your email — ResumeStudio',
+    canActivate: [serverGuard],
+    loadComponent: () => import('./pages/verify-email/verify-email-page').then((m) => m.VerifyEmailPage),
+  },
+  {
     // Two-factor setup: the optional offer after signing in, and "Turn on" from Profile.
     path: 'two-factor',
     title: 'Two-factor authentication — ResumeStudio',
-    canActivate: [serverGuard, authGuard],
+    canActivate: [serverGuard, authGuard, verifiedGuard],
     loadComponent: () => import('./pages/two-factor/two-factor-page').then((m) => m.TwoFactorPage),
   },
   {
@@ -54,7 +62,7 @@ export const routes: Routes = [
   },
   {
     path: 'app',
-    canActivate: [serverGuard, authGuard],
+    canActivate: [serverGuard, authGuard, verifiedGuard],
     loadComponent: () => import('./layout/shell/shell').then((m) => m.Shell),
     data: { preload: 'signed-in' },
     children: [
@@ -118,21 +126,21 @@ export const routes: Routes = [
   {
     path: 'builder/:id',
     title: 'Resume Builder — ResumeStudio',
-    canActivate: [serverGuard, authGuard],
+    canActivate: [serverGuard, authGuard, verifiedGuard],
     loadComponent: () => import('./pages/builder/builder').then((m) => m.Builder),
     data: { preload: 'signed-in' },
   },
   {
     path: 'editor/:id',
     title: 'Document Editor — ResumeStudio',
-    canActivate: [serverGuard, authGuard],
+    canActivate: [serverGuard, authGuard, verifiedGuard],
     loadComponent: () => import('./pages/editor/doc-editor').then((m) => m.DocEditor),
   },
   {
     // Full-page checkout outside the app shell: online gateway first, the QR code as the alternative.
     path: 'checkout',
     title: 'Checkout — ResumeStudio',
-    canActivate: [serverGuard, authGuard],
+    canActivate: [serverGuard, authGuard, verifiedGuard],
     loadComponent: () => import('./pages/checkout/checkout-page').then((m) => m.CheckoutPage),
     data: { preload: 'signed-in' },
   },

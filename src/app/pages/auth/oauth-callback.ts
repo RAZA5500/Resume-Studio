@@ -2,8 +2,8 @@ import { Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { type AfterSignIn, AuthService, isTwoFactorChallenge, type OAuthResult } from '../../core/services/auth.service';
-import { ResumeService } from '../../core/services/resume.service';
+import { AuthService, isTwoFactorChallenge, type OAuthResult } from '../../core/services/auth.service';
+import { SignInFlow } from '../../core/services/sign-in-flow';
 import { ToastService } from '../../core/services/ui.service';
 import { errorMessage } from '../../core/utils/http';
 import { Logo } from '../../shared/ui/logo';
@@ -98,7 +98,7 @@ const MESSAGES: Record<string, string> = {
 })
 export class OAuthCallback implements OnInit {
   private readonly auth = inject(AuthService);
-  private readonly resumes = inject(ResumeService);
+  private readonly flow = inject(SignInFlow);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly location = inject(Location);
@@ -131,28 +131,11 @@ export class OAuthCallback implements OnInit {
     if (result.notice === 'password_removed') {
       this.toast.info('Signed in. For your security, the password set earlier on this email was turned off — you can set a new one in Profile.');
     }
-    this.continue(result.after, result.created);
+    // Returning accounts without two-factor get the optional offer; new ones go straight in.
+    this.flow.continue(result.after, { offerTwoFactor: !result.created, replaceUrl: true });
   }
 
   protected backToLogin(): void {
     void this.router.navigateByUrl('/login', { replaceUrl: true });
-  }
-
-  private continue(after: AfterSignIn, created: boolean): void {
-    if (after.template) {
-      this.resumes.create({ templateId: after.template }).subscribe({
-        next: (resume) => void this.router.navigate(['/builder', resume.id], { replaceUrl: true }),
-        error: () => void this.router.navigateByUrl('/app/dashboard', { replaceUrl: true }),
-      });
-      return;
-    }
-    const target = after.returnUrl;
-    const safe = target && target.startsWith('/') && !target.startsWith('//') ? target : '/app/dashboard';
-    // Returning accounts without two-factor get the optional offer; new ones go straight in.
-    if (!created && this.auth.shouldOfferTwoFactor()) {
-      void this.router.navigate(['/two-factor'], { queryParams: { next: safe }, replaceUrl: true });
-      return;
-    }
-    void this.router.navigateByUrl(safe, { replaceUrl: true });
   }
 }

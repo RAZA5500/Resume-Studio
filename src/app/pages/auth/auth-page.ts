@@ -1,12 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import type { OAuthProvider } from '../../core/models/app.models';
 import { SAMPLE_CONTENT } from '../../core/models/resume.models';
 import { apiOrigin, serverIsConfigurable } from '../../core/services/api-url.interceptor';
 import { AuthService, isTwoFactorChallenge } from '../../core/services/auth.service';
-import { ResumeService } from '../../core/services/resume.service';
+import { SignInFlow } from '../../core/services/sign-in-flow';
 import { errorMessage } from '../../core/utils/http';
 import { DEFAULT_DESIGN } from '../../shared/resume/resume-renderer';
 import { ScaledResume } from '../../shared/resume/scaled-resume';
@@ -41,8 +41,7 @@ function retryAfterSeconds(error: unknown): number {
 })
 export class AuthPage {
   private readonly auth = inject(AuthService);
-  private readonly resumes = inject(ResumeService);
-  private readonly router = inject(Router);
+  private readonly flow = inject(SignInFlow);
 
   /** Bound from route data. */
   readonly mode = input<'login' | 'register'>('login');
@@ -186,22 +185,8 @@ export class AuthPage {
     }, 1000);
   }
 
+  /** New accounts confirm their email first; returning ones get the optional two-factor offer. */
   protected afterAuth(): void {
-    const templateId = this.template();
-    if (templateId) {
-      this.resumes.create({ templateId }).subscribe({
-        next: (resume) => void this.router.navigate(['/builder', resume.id]),
-        error: () => void this.router.navigateByUrl('/app/dashboard'),
-      });
-      return;
-    }
-    const returnUrl = this.returnUrl();
-    const target = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : '/app/dashboard';
-    // Signed in without two-factor: offer it once (optional, can be skipped). With it on, straight in.
-    if (!this.isRegister() && this.auth.shouldOfferTwoFactor()) {
-      void this.router.navigate(['/two-factor'], { queryParams: { next: target } });
-      return;
-    }
-    void this.router.navigateByUrl(target);
+    this.flow.continue({ returnUrl: this.returnUrl(), template: this.template() }, { offerTwoFactor: !this.isRegister() });
   }
 }

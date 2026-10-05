@@ -31,7 +31,7 @@ export class App implements OnInit {
     this.billing.loadConfig();
     if (this.auth.isAuthenticated()) {
       this.auth.refreshProfile().subscribe({ error: () => undefined });
-      this.billing.refresh(true);
+      if (!this.auth.mustVerifyEmail()) this.billing.refresh(true);
     }
   }
 }

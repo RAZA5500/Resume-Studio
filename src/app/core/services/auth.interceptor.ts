@@ -5,7 +5,10 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { BillingService, UpgradeService } from './billing.service';
 
-/** Adds the JWT to API calls and sends the user to /login when the session expires. */
+/**
+ * Adds the JWT to API calls, sends the user to /login when the session expires and to
+ * /verify-email when the API says the email address still needs confirming.
+ */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
@@ -32,6 +35,20 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
         auth.logout(false);
         const returnUrl = target === '/' || target.startsWith('/login') ? undefined : target;
         void router.navigate(['/login'], { queryParams: { returnUrl, expired: 1 } });
+      }
+      if (
+        error instanceof HttpErrorResponse &&
+        error.status === 403 &&
+        (error.error as { code?: string } | null)?.code === 'EMAIL_NOT_VERIFIED' &&
+        token &&
+        auth.token() === token
+      ) {
+        auth.patchUser({ emailVerified: false, mustVerifyEmail: true });
+        const navigation = router.currentNavigation();
+        const target = navigation ? router.serializeUrl(navigation.finalUrl ?? navigation.extractedUrl) : router.url;
+        if (!target.startsWith('/verify-email')) {
+          void router.navigate(['/verify-email'], { queryParams: { returnUrl: target === '/' ? undefined : target } });
+        }
       }
       return throwError(() => error);
     }),
