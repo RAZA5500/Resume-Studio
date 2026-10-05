@@ -6,6 +6,7 @@ import { AiService } from '../../core/services/ai.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BillingService } from '../../core/services/billing.service';
 import { DialogService, ToastService } from '../../core/services/ui.service';
+import { downloadBlob } from '../../core/utils/files';
 import { errorMessage } from '../../core/utils/http';
 
 @Component({
@@ -95,6 +96,45 @@ import { errorMessage } from '../../core/utils/http';
               <span class="i">devices</span> Sign out of all devices
             </button>
           </div>
+
+          <div class="tfa">
+            <div class="grow">
+              <p class="tfa-title">
+                <span class="i">phonelink_lock</span> Two-factor authentication
+                <span class="badge" [class.success]="twoFactorOn()">{{ twoFactorOn() ? 'On' : 'Off' }}</span>
+              </p>
+              <p class="small subtle">
+                @if (twoFactorOn()) {
+                  Signing in asks for a code from your authenticator app. Backup codes left: {{ auth.user()?.backupCodesLeft ?? 0 }}.
+                } @else {
+                  Add a code from your phone to every sign-in, so a stolen password alone is not enough.
+                }
+              </p>
+            </div>
+            <div class="row row-wrap">
+              @if (twoFactorOn()) {
+                <button class="btn btn-sm" type="button" (click)="newBackupCodes()" [disabled]="saving()">New backup codes</button>
+                <button class="btn btn-sm btn-danger-soft" type="button" (click)="turnOffTwoFactor()" [disabled]="saving()">Turn off</button>
+              } @else {
+                <a class="btn btn-sm btn-primary" routerLink="/two-factor" [queryParams]="{ setup: 1, next: '/app/profile' }">Turn on</a>
+              }
+            </div>
+          </div>
+          @if (freshCodes().length) {
+            <div class="fresh">
+              <p class="small"><b>Your new backup codes.</b> Save them now — the old ones no longer work, and these are shown only once.</p>
+              <div class="codes">
+                @for (c of freshCodes(); track c) {
+                  <code>{{ c }}</code>
+                }
+              </div>
+              <div class="row row-wrap">
+                <button class="btn btn-sm" type="button" (click)="copyCodes()"><span class="i">content_copy</span> Copy</button>
+                <button class="btn btn-sm" type="button" (click)="downloadCodes()"><span class="i">download</span> Download</button>
+                <button class="btn btn-sm btn-ghost" type="button" (click)="freshCodes.set([])">Done</button>
+              </div>
+            </div>
+          }
         </div>
       </section>
 
@@ -134,6 +174,12 @@ import { errorMessage } from '../../core/utils/http';
     code { font-size: 12px; background: var(--surface-3); padding: 1px 5px; border-radius: 5px; }
     .btn-danger-soft { align-self: flex-start; }
     .methods .i { color: var(--success); }
+    .tfa { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--border); }
+    .tfa-title { font-weight: 650; color: var(--text) !important; }
+    .tfa-title .i { color: var(--primary-700); }
+    .fresh { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--radius); border: 1px solid var(--warning-line); background: var(--warning-50); }
+    .codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+    .codes code { padding: 6px; text-align: center; font-size: 13.5px; background: var(--surface); }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -151,6 +197,9 @@ export class ProfilePage {
   protected readonly saving = signal(false);
   /** Accounts made with Google / Apple have no password until they set one here. */
   protected readonly noPassword = computed(() => this.auth.user()?.hasPassword === false);
+  protected readonly twoFactorOn = computed(() => this.auth.user()?.twoFactorEnabled === true);
+  /** Backup codes just created (shown once). */
+  protected readonly freshCodes = signal<string[]>([]);
   protected readonly providerNames = computed(() =>
     (this.auth.user()?.providers ?? []).map((p) => (p === 'google' ? 'Google' : 'Apple')).join(' and '),
   );
@@ -172,6 +221,60 @@ export class ProfilePage {
         this.toast.error(errorMessage(e));
       },
     });
+  }
+
+  protected async newBackupCodes(): Promise<void> {
+    const code = await this.dialogs.prompt({
+      title: 'New backup codes',
+      message: 'Enter the current code from your authenticator app. Your old backup codes stop working.',
+      label: '6-digit code',
+      confirmText: 'Create new codes',
+    });
+    if (!code?.trim()) return;
+    this.saving.set(true);
+    this.auth.twoFactorBackupCodes(code.trim()).subscribe({
+      next: ({ backupCodes }) => {
+        this.saving.set(false);
+        this.freshCodes.set(backupCodes);
+      },
+      error: (e: unknown) => {
+        this.saving.set(false);
+        this.toast.error(errorMessage(e));
+      },
+    });
+  }
+
+  protected async turnOffTwoFactor(): Promise<void> {
+    const code = await this.dialogs.prompt({
+      title: 'Turn off two-factor?',
+      message: 'Enter a code from your authenticator app (or a backup code). After this, signing in needs only your password or Google / Apple.',
+      label: 'Code',
+      confirmText: 'Turn off',
+      danger: true,
+    });
+    if (!code?.trim()) return;
+    this.saving.set(true);
+    this.auth.twoFactorDisable(code.trim()).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.freshCodes.set([]);
+        this.toast.success('Two-factor sign-in is off.');
+      },
+      error: (e: unknown) => {
+        this.saving.set(false);
+        this.toast.error(errorMessage(e));
+      },
+    });
+  }
+
+  protected async copyCodes(): Promise<void> {
+    await navigator.clipboard.writeText(this.freshCodes().join('\n')).catch(() => undefined);
+    this.toast.success('Backup codes copied');
+  }
+
+  protected downloadCodes(): void {
+    const text = `ResumeStudio backup codes for ${this.auth.user()?.email ?? ''}\nEach code works once.\n\n${this.freshCodes().join('\n')}\n`;
+    downloadBlob(new Blob([text], { type: 'text/plain' }), 'ResumeStudio-backup-codes.txt');
   }
 
   protected async logoutEverywhere(): Promise<void> {

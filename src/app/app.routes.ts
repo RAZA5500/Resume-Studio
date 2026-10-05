@@ -32,6 +32,13 @@ export const routes: Routes = [
     data: { mode: 'register', preload: true },
   },
   {
+    // Two-factor setup: the optional offer after signing in, and "Turn on" from Profile.
+    path: 'two-factor',
+    title: 'Two-factor authentication — ResumeStudio',
+    canActivate: [serverGuard, authGuard],
+    loadComponent: () => import('./pages/two-factor/two-factor-page').then((m) => m.TwoFactorPage),
+  },
+  {
     // Google / Apple sign-in comes back here (through the API); open whether signed in or not.
     path: 'auth/callback',
     title: 'Signing in — ResumeStudio',

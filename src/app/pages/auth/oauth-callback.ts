@@ -2,11 +2,12 @@ import { Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { type AfterSignIn, AuthService } from '../../core/services/auth.service';
+import { type AfterSignIn, AuthService, isTwoFactorChallenge, type OAuthResult } from '../../core/services/auth.service';
 import { ResumeService } from '../../core/services/resume.service';
 import { ToastService } from '../../core/services/ui.service';
 import { errorMessage } from '../../core/utils/http';
 import { Logo } from '../../shared/ui/logo';
+import { TwoFactorStep } from '../../shared/ui/two-factor-step';
 
 /** Error codes the API's OAuthService sends back (…/auth/callback?error=…). */
 const MESSAGES: Record<string, string> = {
@@ -25,12 +26,14 @@ const MESSAGES: Record<string, string> = {
  */
 @Component({
   selector: 'app-oauth-callback',
-  imports: [RouterLink, Logo],
+  imports: [RouterLink, Logo, TwoFactorStep],
   template: `
     <div class="wrap">
       <app-logo />
       <div class="card box" aria-live="polite">
-        @if (error(); as message) {
+        @if (pending(); as signIn) {
+          <app-two-factor-step class="step" [challenge]="signIn.challenge" (done)="finish(signIn)" (cancel)="backToLogin()" />
+        } @else if (error(); as message) {
           <span class="ic"><span class="i">error</span></span>
           <h1>Sign-in did not finish</h1>
           <p class="muted">{{ message }}</p>
@@ -86,6 +89,10 @@ const MESSAGES: Record<string, string> = {
     .btn {
       margin-top: 6px;
     }
+    .step {
+      align-self: stretch;
+      text-align: left;
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -98,6 +105,8 @@ export class OAuthCallback implements OnInit {
   private readonly toast = inject(ToastService);
 
   protected readonly error = signal('');
+  /** Google / Apple was fine, but the account has two-factor on: the code is next. */
+  protected readonly pending = signal<(OAuthResult & { challenge: string }) | null>(null);
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -111,16 +120,25 @@ export class OAuthCallback implements OnInit {
     }
     this.auth.completeOAuth(code).subscribe({
       next: (result) => {
-        if (result.notice === 'password_removed') {
-          this.toast.info('Signed in. For your security, the password set earlier on this email was turned off — you can set a new one in Profile.');
-        }
-        this.continue(result.after);
+        if (isTwoFactorChallenge(result)) this.pending.set(result);
+        else this.finish(result);
       },
       error: (e: unknown) => this.error.set(e instanceof HttpErrorResponse ? errorMessage(e) : (e as Error).message),
     });
   }
 
-  private continue(after: AfterSignIn): void {
+  protected finish(result: OAuthResult): void {
+    if (result.notice === 'password_removed') {
+      this.toast.info('Signed in. For your security, the password set earlier on this email was turned off — you can set a new one in Profile.');
+    }
+    this.continue(result.after, result.created);
+  }
+
+  protected backToLogin(): void {
+    void this.router.navigateByUrl('/login', { replaceUrl: true });
+  }
+
+  private continue(after: AfterSignIn, created: boolean): void {
     if (after.template) {
       this.resumes.create({ templateId: after.template }).subscribe({
         next: (resume) => void this.router.navigate(['/builder', resume.id], { replaceUrl: true }),
@@ -130,6 +148,11 @@ export class OAuthCallback implements OnInit {
     }
     const target = after.returnUrl;
     const safe = target && target.startsWith('/') && !target.startsWith('//') ? target : '/app/dashboard';
+    // Returning accounts without two-factor get the optional offer; new ones go straight in.
+    if (!created && this.auth.shouldOfferTwoFactor()) {
+      void this.router.navigate(['/two-factor'], { queryParams: { next: safe }, replaceUrl: true });
+      return;
+    }
     void this.router.navigateByUrl(safe, { replaceUrl: true });
   }
 }

@@ -46,7 +46,7 @@ One npm workspace: the Angular app lives in the project root, the API in `backen
     ├── .env.example            # every setting, documented
     └── src/
         ├── database/           # Supabase connection, migrations, retries, row level security
-        ├── auth/  users/       # JWT auth (bcrypt), sign-in protection (security/), Google & Apple sign-in (oauth/), profile
+        ├── auth/  users/       # JWT auth (bcrypt), sign-in protection (security/), Google & Apple sign-in (oauth/), 2FA (two-factor/), profile
         ├── templates/          # template catalog generator + seeding + search
         ├── resumes/            # resume CRUD, DOCX/TXT export
         ├── ai/                 # OpenRouter client, prompts, JSON schemas, offline fallback
@@ -127,6 +127,16 @@ Everything below is built in and on by default — no third-party service or key
 | Oversized requests | Bodies over 16 KB to `/api/auth/*` are refused before they are parsed. |
 
 Behind a proxy (Hostinger) set `TRUST_PROXY=1`, otherwise every visitor shares the proxy's IP and lockouts hit everyone together — the server log warns when it sees forwarded requests without it. Emails are logged masked (`s***@gmail.com`).
+
+### Two-factor authentication (2FA)
+
+Optional for every account, with any authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password…) — no SMS or email service needed (`backend/src/auth/two-factor/`).
+
+- **Offer after signing in.** A sign-in (password, or Google / Apple for an existing account) without 2FA opens `/two-factor`: *Set up two-factor* or *Skip for now* (plus "don't ask me again on this device"). Accounts that already have 2FA go straight to the dashboard; new sign-ups are not asked right away. *Profile → Sign-in & security* turns it on or off and makes new backup codes.
+- **Setup.** `POST auth/2fa/setup` returns a new secret as a QR code (SVG) and as text; `POST auth/2fa/enable` confirms it with a code from the app and returns 10 one-time backup codes (shown once; copy / download).
+- **Signing in with 2FA on.** After the password — or Google / Apple — the API answers with a challenge instead of a session; `POST auth/2fa/verify` with the 6-digit code (or a backup code) completes it. *Remember this device for 30 days* skips the code on that device; the remembered device stops counting when the password changes, after *Sign out of all devices*, and when 2FA is turned off or on again.
+- **Security.** RFC 6238 TOTP (SHA-1, 6 digits, 30 s, ±1 step for phone clocks); every code works only once (the last used step is stored); five wrong codes end a challenge and repeated failures lock 2FA attempts for the account like password lockouts. Secrets are stored AES-256-GCM encrypted (key from `TWO_FACTOR_KEY`, else `JWT_SECRET`), backup codes only as SHA-256 hashes. Turning it off needs a current code or a backup code. If someone had registered an unverified email with a password, the verified owner's Google / Apple sign-in also clears that account's 2FA.
+- **Keys.** Changing `JWT_SECRET` would make stored secrets unreadable — set `TWO_FACTOR_KEY` (a long random value, never changed) before anyone turns 2FA on, or keep `JWT_SECRET`. If you add `TWO_FACTOR_KEY` later, older secrets are still read with `JWT_SECRET` and re-encrypted automatically. Backup codes keep working either way.
 
 ### Sign in with Google / Apple
 
@@ -209,6 +219,7 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | `AUTH_PROOF_OF_WORK` | `true` | Invisible proof-of-work check on sign-in and sign-up (`false` only to debug) |
 | `AUTH_POW_MAX_NUMBER` | `50000` | Proof-of-work difficulty (average hashes = half of it) |
 | `PASSWORD_BREACH_CHECK` | `true` | Refuse new passwords found in the Have I Been Pwned breach corpus |
+| `TWO_FACTOR_KEY` | `JWT_SECRET` | Key that encrypts authenticator secrets (two-factor sign-in). Set once to a long random value and never change it |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Sign in with Google (OAuth client of type *Web application*); both or Google stays off |
 | `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | — | Sign in with Apple: Services ID, team ID, key ID and the `.p8` key (`\n` for line breaks); all four or Apple stays off |
 | `OPENROUTER_API_KEY` | — | Enables the AI model for all AI features (offline assistant without it) |
@@ -244,6 +255,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 | Method & path | Purpose |
 | --- | --- |
 | `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, profile, password change or first password, sign out everywhere) |
+| `POST auth/2fa/setup`, `POST auth/2fa/enable`, `POST auth/2fa/disable`, `POST auth/2fa/backup-codes`, `POST auth/2fa/verify` | Two-factor authentication (setup, turn on/off, new backup codes, sign-in step two) |
 | `GET auth/providers`, `GET auth/oauth/:provider/start`, `GET/POST auth/oauth/:provider/callback`, `POST auth/oauth/exchange` | Sign in with Google / Apple (`:provider` = `google` or `apple`) |
 | `GET templates`, `GET templates/meta`, `GET templates/:id` | Template catalog (public) |
 | `GET/POST resumes`, `GET/PATCH/DELETE resumes/:id`, `POST resumes/:id/duplicate`, `GET resumes/:id/export/docx`, `GET resumes/:id/export/txt` | Resumes |
@@ -344,4 +356,5 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 6. Payment: alag **Checkout** page (`/checkout`) par do tareeqe hain — **Pay online** (payment gateway, primary; payment confirm hote hi lifetime khud active) aur **Scan QR & pay** (merchant QR, `public/payment/`). Gateway jab tak connect nahi hota, `PAYMENT_GATEWAY` khali rakhein — online option "Coming soon" dikhata hai aur QR chalta rehta hai. Testing ke liye `PAYMENT_GATEWAY=mock` (production mein nahi chalta). Naya QR lagane ke liye `npm run payment-qr -- naya-qr.jpg`. `backend/.env` mein `ADMIN_EMAILS` mein apni email aur `SUPPORT_WHATSAPP` mein apna number daalein.
 7. QR se pay karne wala user checkout par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai. Online payments admin list mein khud "Approved" aati hain.
 8. Google / Apple login: Google Cloud console mein *OAuth client ID (Web application)* banayein, redirect URI `https://aap-ka-domain.com/api/auth/oauth/google/callback` daalein, aur `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` env mein lagayein. Apple ke liye Apple Developer account (paid) mein Services ID + Sign in with Apple key (.p8) banayein, return URL `https://aap-ka-domain.com/api/auth/oauth/apple/callback`, phir `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` lagayein. Jis provider ki settings nahi, uska button nahi dikhta. Tafseel upar "Sign in with Google / Apple" section mein.
-9. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.
+9. 2FA (two-factor): har user Profile → *Sign-in & security* se authenticator app (Google Authenticator waghera) ke saath on kar sakta hai; login ke baad agar off ho to ek optional "on karein?" page aata hai (Skip ho sakta hai). Production mein `TWO_FACTOR_KEY` ek baar lamba random value set kar dein aur kabhi na badlein (warna `JWT_SECRET` badalne par 2FA secrets parhe nahi ja sakenge).
+10. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.

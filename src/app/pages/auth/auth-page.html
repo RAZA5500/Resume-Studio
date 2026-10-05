@@ -12,6 +12,10 @@
     </div>
 
     <div class="form-card">
+      @if (challenge(); as pending) {
+        <!-- Two-factor sign-in: the password was right, now the code from the authenticator app. -->
+        <app-two-factor-step [challenge]="pending" (done)="afterAuth()" (cancel)="challenge.set(null)" />
+      } @else {
       <span class="kicker"><span class="pulse-dot"></span> {{ isRegister() ? 'Free forever plan' : 'Welcome back' }}</span>
       <h1>{{ isRegister() ? 'Create your free account' : 'Log in to your studio' }}</h1>
       <p class="muted">
@@ -139,6 +143,7 @@
       </p>
       @if (server) {
         <p class="switch-mode">Server: {{ server }} · <a routerLink="/connect">Change</a></p>
+      }
       }
     </div>
 

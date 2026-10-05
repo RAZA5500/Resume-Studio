@@ -5,7 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import type { OAuthProvider } from '../../core/models/app.models';
 import { SAMPLE_CONTENT } from '../../core/models/resume.models';
 import { apiOrigin, serverIsConfigurable } from '../../core/services/api-url.interceptor';
-import { AuthService } from '../../core/services/auth.service';
+import { AuthService, isTwoFactorChallenge } from '../../core/services/auth.service';
 import { ResumeService } from '../../core/services/resume.service';
 import { errorMessage } from '../../core/utils/http';
 import { DEFAULT_DESIGN } from '../../shared/resume/resume-renderer';
@@ -14,6 +14,7 @@ import { PointerFx } from '../../shared/motion/pointer-fx';
 import { Logo } from '../../shared/ui/logo';
 import { ScoreRing } from '../../shared/ui/score-ring';
 import { ThemeToggle } from '../../shared/ui/theme-toggle';
+import { TwoFactorStep } from '../../shared/ui/two-factor-step';
 
 /** Words that common passwords are built from (letters only; the API has the full list). */
 const COMMON_WORDS = new Set([
@@ -33,7 +34,7 @@ function retryAfterSeconds(error: unknown): number {
 
 @Component({
   selector: 'app-auth-page',
-  imports: [FormsModule, RouterLink, Logo, ScaledResume, ScoreRing, ThemeToggle, PointerFx],
+  imports: [FormsModule, RouterLink, Logo, ScaledResume, ScoreRing, ThemeToggle, PointerFx, TwoFactorStep],
   templateUrl: './auth-page.html',
   styleUrl: './auth-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +63,8 @@ export class AuthPage {
   protected readonly oauthProviders = this.auth.oauthProviders;
   /** The provider being opened (its button shows a spinner). */
   protected readonly oauthBusy = signal<OAuthProvider | null>(null);
+  /** Set when the password was right and the account needs its two-factor code next. */
+  protected readonly challenge = signal<string | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal('');
 
@@ -154,7 +157,14 @@ export class AuthPage {
       : this.auth.login(this.email().trim(), this.password(), this.website());
 
     request.subscribe({
-      next: () => this.afterAuth(),
+      next: (result) => {
+        if (isTwoFactorChallenge(result)) {
+          this.loading.set(false);
+          this.challenge.set(result.challenge);
+          return;
+        }
+        this.afterAuth();
+      },
       error: (e: unknown) => {
         this.error.set(errorMessage(e));
         this.loading.set(false);
@@ -176,7 +186,7 @@ export class AuthPage {
     }, 1000);
   }
 
-  private afterAuth(): void {
+  protected afterAuth(): void {
     const templateId = this.template();
     if (templateId) {
       this.resumes.create({ templateId }).subscribe({
@@ -185,7 +195,13 @@ export class AuthPage {
       });
       return;
     }
-    const target = this.returnUrl();
-    void this.router.navigateByUrl(target && target.startsWith('/') ? target : '/app/dashboard');
+    const returnUrl = this.returnUrl();
+    const target = returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('//') ? returnUrl : '/app/dashboard';
+    // Signed in without two-factor: offer it once (optional, can be skipped). With it on, straight in.
+    if (!this.isRegister() && this.auth.shouldOfferTwoFactor()) {
+      void this.router.navigate(['/two-factor'], { queryParams: { next: target } });
+      return;
+    }
+    void this.router.navigateByUrl(target);
   }
 }
