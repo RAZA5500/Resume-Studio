@@ -46,7 +46,7 @@ One npm workspace: the Angular app lives in the project root, the API in `backen
     ├── .env.example            # every setting, documented
     └── src/
         ├── database/           # Supabase connection, migrations, retries, row level security
-        ├── auth/  users/       # JWT auth (bcrypt), profile, change password
+        ├── auth/  users/       # JWT auth (bcrypt), sign-in protection (security/), Google & Apple sign-in (oauth/), profile
         ├── templates/          # template catalog generator + seeding + search
         ├── resumes/            # resume CRUD, DOCX/TXT export
         ├── ai/                 # OpenRouter client, prompts, JSON schemas, offline fallback
@@ -128,6 +128,33 @@ Everything below is built in and on by default — no third-party service or key
 
 Behind a proxy (Hostinger) set `TRUST_PROXY=1`, otherwise every visitor shares the proxy's IP and lockouts hit everyone together — the server log warns when it sees forwarded requests without it. Emails are logged masked (`s***@gmail.com`).
 
+### Sign in with Google / Apple
+
+The log-in and sign-up pages show **Continue with Google** and **Continue with Apple** for every provider that has credentials (`GET auth/providers`); without them the buttons stay hidden. It works on the website and in the Android app (there the sign-in runs in the phone's browser and comes back through the app's deep link `com.resumestudio.app://oauth`).
+
+How it works (`backend/src/auth/oauth/`, OpenID Connect authorization code flow):
+
+1. The app keeps a random verifier and sends only its SHA-256 (PKCE) to `GET auth/oauth/:provider/start`, which remembers it with a single-use state and nonce and sends the browser to Google / Apple.
+2. The provider returns to `auth/oauth/:provider/callback` (Google: GET, Apple: form POST). The API exchanges the code server-to-server (Google with its own PKCE, Apple with an ES256 client secret signed with your key), verifies the ID token — signature against the provider's published keys, issuer, audience, expiry, nonce — and finds, links or creates the account. The browser only gets a one-time code (2 minutes).
+3. `POST auth/oauth/exchange` trades that code plus the app's verifier for a session. A stolen or planted callback link is useless without the verifier (no login CSRF, no deep-link interception).
+
+Accounts: a returning Google / Apple account signs into the account it is linked to. Otherwise a **verified** email links to the account with that email, or a new password-less account is created (it can add a password in *Profile → Sign-in & security*). An email + password account whose email was never verified loses its password and sessions when the email's verified owner signs in with Google / Apple — whoever registered someone else's address beforehand ("pre-hijacking") keeps nothing; the owner sees a notice and can set a new password.
+
+**Google setup** — [Google Cloud console](https://console.cloud.google.com/) → *APIs & Services*:
+
+1. *OAuth consent screen*: app name, support email, your domain; scopes `openid`, `email`, `profile`; publish the app.
+2. *Credentials → Create credentials → OAuth client ID → Web application*. Authorized redirect URIs: `https://YOUR-DOMAIN/api/auth/oauth/google/callback` (for local development also `http://localhost:4200/api/auth/oauth/google/callback`).
+3. Put the client ID and secret into `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
+**Apple setup** — [Apple Developer](https://developer.apple.com/account/resources) (paid membership; Apple only allows https return URLs, so it cannot be tried on localhost):
+
+1. *Identifiers → App IDs*: an App ID with **Sign in with Apple** enabled.
+2. *Identifiers → Services IDs*: a new Services ID (e.g. `com.resumestudio.web`) → enable Sign in with Apple → *Configure*: primary App ID from step 1, domain `YOUR-DOMAIN`, return URL `https://YOUR-DOMAIN/api/auth/oauth/apple/callback`.
+3. *Keys*: a new key with Sign in with Apple → download the `.p8` file (only once) and note its Key ID.
+4. Set `APPLE_CLIENT_ID` (the Services ID), `APPLE_TEAM_ID` (top right of the developer account), `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` (the whole `.p8` file; in a one-line env field write the line breaks as `\n`).
+
+`FRONTEND_URL` (its first entry) must be the public https address: the callback URLs above are built from it. Restart the API; the log says `Social sign-in: Google and Apple.`
+
 ### Pricing, payments & admin
 
 | Plan | Limits |
@@ -182,6 +209,8 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | `AUTH_PROOF_OF_WORK` | `true` | Invisible proof-of-work check on sign-in and sign-up (`false` only to debug) |
 | `AUTH_POW_MAX_NUMBER` | `50000` | Proof-of-work difficulty (average hashes = half of it) |
 | `PASSWORD_BREACH_CHECK` | `true` | Refuse new passwords found in the Have I Been Pwned breach corpus |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Sign in with Google (OAuth client of type *Web application*); both or Google stays off |
+| `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | — | Sign in with Apple: Services ID, team ID, key ID and the `.p8` key (`\n` for line breaks); all four or Apple stays off |
 | `OPENROUTER_API_KEY` | — | Enables the AI model for all AI features (offline assistant without it) |
 | `AI_MODEL` | `anthropic/claude-sonnet-5.5` | OpenRouter model id |
 | `AI_FALLBACK_MODELS` | — | Comma-separated backup model ids |
@@ -214,7 +243,8 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 
 | Method & path | Purpose |
 | --- | --- |
-| `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, profile, password change, sign out everywhere) |
+| `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, profile, password change or first password, sign out everywhere) |
+| `GET auth/providers`, `GET auth/oauth/:provider/start`, `GET/POST auth/oauth/:provider/callback`, `POST auth/oauth/exchange` | Sign in with Google / Apple (`:provider` = `google` or `apple`) |
 | `GET templates`, `GET templates/meta`, `GET templates/:id` | Template catalog (public) |
 | `GET/POST resumes`, `GET/PATCH/DELETE resumes/:id`, `POST resumes/:id/duplicate`, `GET resumes/:id/export/docx`, `GET resumes/:id/export/txt` | Resumes |
 | `GET ai/status`, `POST ai/generate-resume`, `POST ai/parse-resume`, `POST ai/summary`, `POST ai/improve`, `POST ai/bullets`, `POST ai/skills`, `POST ai/tailor`, `POST ai/cover-letter` | AI features |
@@ -313,4 +343,5 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 5. AI ke liye `backend/.env` mein `OPENROUTER_API_KEY` (openrouter.ai/keys, account mein credits hone chahiye) aur `AI_MODEL` daalein, phir backend restart karein — bina key ke bhi app offline AI mode mein chalti hai.
 6. Payment: alag **Checkout** page (`/checkout`) par do tareeqe hain — **Pay online** (payment gateway, primary; payment confirm hote hi lifetime khud active) aur **Scan QR & pay** (merchant QR, `public/payment/`). Gateway jab tak connect nahi hota, `PAYMENT_GATEWAY` khali rakhein — online option "Coming soon" dikhata hai aur QR chalta rehta hai. Testing ke liye `PAYMENT_GATEWAY=mock` (production mein nahi chalta). Naya QR lagane ke liye `npm run payment-qr -- naya-qr.jpg`. `backend/.env` mein `ADMIN_EMAILS` mein apni email aur `SUPPORT_WHATSAPP` mein apna number daalein.
 7. QR se pay karne wala user checkout par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai. Online payments admin list mein khud "Approved" aati hain.
-8. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.
+8. Google / Apple login: Google Cloud console mein *OAuth client ID (Web application)* banayein, redirect URI `https://aap-ka-domain.com/api/auth/oauth/google/callback` daalein, aur `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` env mein lagayein. Apple ke liye Apple Developer account (paid) mein Services ID + Sign in with Apple key (.p8) banayein, return URL `https://aap-ka-domain.com/api/auth/oauth/apple/callback`, phir `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` lagayein. Jis provider ki settings nahi, uska button nahi dikhta. Tafseel upar "Sign in with Google / Apple" section mein.
+9. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.
