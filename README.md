@@ -125,8 +125,29 @@ Everything below is built in and on by default — no third-party service or key
 | Password storage | bcrypt cost 11 (older hashes are upgraded at the next sign-in); hashing runs at most 2 at a time with a bounded queue, so a flood of sign-ins cannot freeze the server. |
 | Stolen or old sessions | Tokens are HS256-only JWTs carrying the account's session version: **changing the password signs out every other device**, *Profile → Sign out of all devices* ends them all, and tokens of deleted accounts stop working. |
 | Oversized requests | Bodies over 16 KB to `/api/auth/*` are refused before they are parsed. |
+| Fake or mistyped emails | Sign-up asks for the password twice, and the account must **confirm its email address** before it can use the app (see *Email verification*). |
 
 Behind a proxy (Hostinger) set `TRUST_PROXY=1`, otherwise every visitor shares the proxy's IP and lockouts hit everyone together — the server log warns when it sees forwarded requests without it. Emails are logged masked (`s***@gmail.com`).
+
+### Email verification
+
+New accounts confirm that the email address is theirs before they can use the app, and so do older accounts that never did, at their next visit (`backend/src/auth/email-verification/`, `backend/src/mail/`). The email comes from the site's own mailbox over SMTP.
+
+- **One email, two ways.** It holds a 6-digit code (typed on `/verify-email`, sent as soon as six digits are there) and a *Verify email address* link. Either works for 30 minutes; a new email replaces the previous code and link.
+- **Until then** the API answers `403 EMAIL_NOT_VERIFIED` to everything except the profile (`GET auth/me`), *sign out everywhere* and the verification routes, and the app shows only the verification page (with *Wrong email?* — the account's password moves it to a corrected address — and *Log out*). The check reads the account, not the login token, so a link opened on another device unlocks this session too: the page notices within seconds and continues to the chosen template, the optional two-factor offer or the dashboard.
+- **Limits.** Five wrong codes end a code; a new email at most once a minute and five per hour per account; per-network rate limits on every route. Codes and links are stored only as keyed hashes (HMAC with `TWO_FACTOR_KEY`, else `JWT_SECRET`).
+- **Links and mail scanners.** A link opened where its own account is signed in verifies at once; anywhere else it asks for one click on *Verify email* first, so a mail scanner that opens links cannot verify an address on its own.
+- **Google / Apple** accounts count as verified (those providers verified the email).
+- **Off without SMTP.** While `SMTP_HOST`, `SMTP_USER` and `SMTP_PASS` are not all set, nobody is asked to verify (no one could receive the code). `/api/health` shows `"email": "off" | "checking" | "ok" | "failed"`; the server log names the SMTP error.
+
+**Setup with a Hostinger mailbox:**
+
+1. hPanel → *Emails* → your domain → create a mailbox such as `no-reply@your-domain` (any mailbox of the domain works).
+2. Environment variables: `SMTP_HOST=smtp.hostinger.com`, `SMTP_PORT=465` (SSL; `587` uses STARTTLS), `SMTP_USER=no-reply@your-domain` (the full address), `SMTP_PASS` (the mailbox password), `MAIL_FROM=ResumeStudio <no-reply@your-domain>`.
+3. Make sure the domain has its **SPF** and **DKIM** records (and ideally DMARC) — hPanel's *Emails* section shows their status. Without them verification emails tend to land in spam.
+4. Restart the app; the log says `Email is on: sending as …` (or `SMTP connection failed — …` with the reason), and `/api/health` shows `"email": "ok"` after the first check.
+
+Mailbox plans have daily sending limits. For many sign-ups use a transactional email service (Brevo, Amazon SES, Postmark…): they also give SMTP settings, so only the `SMTP_*` values change. Locally, leave the settings empty (verification off) or point them at a test SMTP server such as Mailpit (`--smtp-auth-accept-any --smtp-auth-allow-insecure`, `SMTP_PORT=1025`, `SMTP_SECURE=false`).
 
 ### Two-factor authentication (2FA)
 
@@ -220,6 +241,10 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | `AUTH_POW_MAX_NUMBER` | `50000` | Proof-of-work difficulty (average hashes = half of it) |
 | `PASSWORD_BREACH_CHECK` | `true` | Refuse new passwords found in the Have I Been Pwned breach corpus |
 | `TWO_FACTOR_KEY` | `JWT_SECRET` | Key that encrypts authenticator secrets (two-factor sign-in). Set once to a long random value and never change it |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` | — (email off) | The site's mailbox for verification emails, e.g. `smtp.hostinger.com`, `no-reply@your-domain` and its password. All three or email (and email verification) stays off |
+| `SMTP_PORT` | `465` | SMTP port: `465` (SSL) or `587` (STARTTLS) |
+| `SMTP_SECURE` | `true` on port 465 | `true` = SSL from the start, `false` = STARTTLS / plain |
+| `MAIL_FROM` | `ResumeStudio <SMTP_USER>` | Sender shown in the inbox |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | — | Sign in with Google (OAuth client of type *Web application*); both or Google stays off |
 | `APPLE_CLIENT_ID` / `APPLE_TEAM_ID` / `APPLE_KEY_ID` / `APPLE_PRIVATE_KEY` | — | Sign in with Apple: Services ID, team ID, key ID and the `.p8` key (`\n` for line breaks); all four or Apple stays off |
 | `OPENROUTER_API_KEY` | — | Enables the AI model for all AI features (offline assistant without it) |
@@ -256,6 +281,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 | --- | --- |
 | `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, profile, password change or first password, sign out everywhere) |
 | `POST auth/2fa/setup`, `POST auth/2fa/enable`, `POST auth/2fa/disable`, `POST auth/2fa/backup-codes`, `POST auth/2fa/verify` | Two-factor authentication (setup, turn on/off, new backup codes, sign-in step two) |
+| `POST auth/email/send`, `POST auth/email/resend`, `POST auth/email/verify`, `POST auth/email/verify-link` (public), `PATCH auth/email` | Email verification (email a code unless the last one still works, new code, check the code, the link from the email, correct an unverified address) |
 | `GET auth/providers`, `GET auth/oauth/:provider/start`, `GET/POST auth/oauth/:provider/callback`, `POST auth/oauth/exchange` | Sign in with Google / Apple (`:provider` = `google` or `apple`) |
 | `GET templates`, `GET templates/meta`, `GET templates/:id` | Template catalog (public) |
 | `GET/POST resumes`, `GET/PATCH/DELETE resumes/:id`, `POST resumes/:id/duplicate`, `GET resumes/:id/export/docx`, `GET resumes/:id/export/txt` | Resumes |
@@ -266,7 +292,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 | `GET billing/config` (public), `GET billing/me`, `POST billing/payments` | Price, payment accounts, today's usage, submit a QR payment |
 | `GET checkout/config` (public), `POST checkout/orders`, `GET checkout/orders/:id` (public), `GET checkout/orders/:id/pay`, `GET/POST checkout/return/:gateway`, `POST checkout/webhook/:gateway` | Online checkout: gateway info, start a payment, order status, open the gateway, gateway return and webhook |
 | `GET admin/stats`, `GET admin/payments?status=`, `GET admin/payments/:id/screenshot`, `POST admin/payments/:id/approve`, `POST admin/payments/:id/reject`, `GET admin/users?search=`, `POST admin/users/:id/plan` | Admin (emails in `ADMIN_EMAILS` only) |
-| `GET health` | Database / AI / PDF engine status |
+| `GET health` | Database / AI / PDF engine / email status |
 
 ---
 
@@ -274,7 +300,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 
 ```bash
 cd backend
-npm test        # ATS scorer, template catalog, offline AI, DOCX, billing/limits and database settings unit tests (Vitest)
+npm test        # ATS scorer, template catalog, offline AI, DOCX, billing/limits, database settings, sign-in security, 2FA, email verification and mail unit tests (Vitest)
 ```
 
 ---
@@ -284,7 +310,7 @@ npm test        # ATS scorer, template catalog, offline AI, DOCX, billing/limits
 The app runs as one Node.js process: `npm start` (`server.js`) starts the API, which also serves the built Angular app from `dist/frontend/browser` on the same domain.
 
 1. **Hostinger Node.js app** (or any Node 22+ host): build command `npm run build` (Angular app + API), start command `npm start`.
-2. **Environment variables** (hPanel → Node.js app → Environment variables): `DATABASE_URL`, `DATABASE_PASSWORD`, `JWT_SECRET` (a new long random value), `OPENROUTER_API_KEY`, `AI_MODEL`, `ADMIN_EMAILS`, `SUPPORT_WHATSAPP`, `TRUST_PROXY=1`, `FRONTEND_URL=https://your-domain`. Then open `https://your-domain/api/health`.
+2. **Environment variables** (hPanel → Node.js app → Environment variables): `DATABASE_URL`, `DATABASE_PASSWORD`, `JWT_SECRET` (a new long random value), `OPENROUTER_API_KEY`, `AI_MODEL`, `ADMIN_EMAILS`, `SUPPORT_WHATSAPP`, `TRUST_PROXY=1`, `FRONTEND_URL=https://your-domain`, and the mailbox for verification emails (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — see *Email verification*). Then open `https://your-domain/api/health`.
 3. **Uploads:** each deploy replaces the app folder, so point `UPLOAD_DIR` at an absolute folder outside it, and back it up together with the Supabase database (`payments` + `UPLOAD_DIR/payments` hold the receipt screenshots).
 4. **PDF export** needs Chrome/Chromium on the server (`CHROME_PATH`); without one, downloads fall back to the browser's print dialog.
 5. Schema changes ship as migrations and are applied when the API starts. Rate limiting is built in (stricter on auth and AI routes); serve the site over HTTPS.
@@ -342,6 +368,7 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 - **“Cannot reach the server”** in the UI → the backend is not running on port 3000.
 - **`/api/health` shows `"database": "misconfigured"` or `"retrying"`** → `dbError` and `dbHint` say what to change (`cd backend && npm run db:check` prints the same locally). Usual causes: a wrong password (reset it in Supabase → Project Settings → Database), a pooler user without `.<project-ref>`, or `db.<project>.supabase.co` on a host without IPv6 (use the session pooler).
 - **PDF download falls back to the print dialog** → no Chrome/Edge found; set `CHROME_PATH`.
+- **Verification emails do not arrive** → `/api/health` shows `"email"`: `off` = the `SMTP_*` settings are incomplete, `failed` = the server log line `SMTP connection failed — …` or `Could not send the verification email …` names the reason (`535` = wrong mailbox password; a timeout = wrong host or port, or the host blocks outgoing SMTP — try 587). If they arrive in spam, add SPF / DKIM for the domain.
 - **AI shows an error** → the backend log names the OpenRouter answer: `401` wrong `OPENROUTER_API_KEY`, `402` no credits left (add some at openrouter.ai), `404` unknown `AI_MODEL`, `429` rate limit (retried automatically).
 
 ---
@@ -357,4 +384,5 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 7. QR se pay karne wala user checkout par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai. Online payments admin list mein khud "Approved" aati hain.
 8. Google / Apple login: Google Cloud console mein *OAuth client ID (Web application)* banayein, redirect URI `https://aap-ka-domain.com/api/auth/oauth/google/callback` daalein, aur `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` env mein lagayein. Apple ke liye Apple Developer account (paid) mein Services ID + Sign in with Apple key (.p8) banayein, return URL `https://aap-ka-domain.com/api/auth/oauth/apple/callback`, phir `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` lagayein. Jis provider ki settings nahi, uska button nahi dikhta. Tafseel upar "Sign in with Google / Apple" section mein.
 9. 2FA (two-factor): har user Profile → *Sign-in & security* se authenticator app (Google Authenticator waghera) ke saath on kar sakta hai; login ke baad agar off ho to ek optional "on karein?" page aata hai (Skip ho sakta hai). Production mein `TWO_FACTOR_KEY` ek baar lamba random value set kar dein aur kabhi na badlein (warna `JWT_SECRET` badalne par 2FA secrets parhe nahi ja sakenge).
-10. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.
+10. Email verification: signup par password do dafa likhna hota hai, aur naya account (aur purana unverified account agli dafa login par) email confirm kiye baghair app use nahi kar sakta. Email mein 6-digit code aur ek link hota hai — dono mein se koi bhi chalega (30 minute). Is ke liye hPanel → *Emails* mein `no-reply@aap-ka-domain.com` jaisa mailbox banayein aur env mein `SMTP_HOST=smtp.hostinger.com`, `SMTP_PORT=465`, `SMTP_USER` (poora email address), `SMTP_PASS` (mailbox ka password), `MAIL_FROM=ResumeStudio <no-reply@aap-ka-domain.com>` lagayein. Domain ke SPF/DKIM records on hon, warna emails spam mein ja sakti hain. SMTP settings khali hon to verification band rehti hai. `/api/health` par `"email": "ok"` dikhna chahiye.
+11. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.
