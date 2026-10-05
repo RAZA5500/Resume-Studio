@@ -87,7 +87,7 @@ function setup() {
     sessionOrChallenge: vi.fn((user: User, devices?: readonly string[]) =>
       user.twoFactorEnabledAt && !devices?.includes('trusted-device')
         ? { twoFactorRequired: true, challenge: `challenge-for-${user.id}`, methods: ['app', 'backup'] }
-        : Promise.resolve({ accessToken: `token-for-${user.id}`, user }),
+        : Promise.resolve({ accessToken: `token-for-${user.id}`, refreshToken: `refresh-for-${user.id}`, user }),
     ),
   };
   const attempts = new AuthAttemptsService();
@@ -211,7 +211,12 @@ describe('OAuthService', () => {
     expect(users[0]).toMatchObject({ email: 'sara.khan@gmail.com', fullName: 'Sara Khan', passwordHash: null, emailVerifiedAt: expect.any(Date) });
     expect(identities[0]).toMatchObject({ provider: 'google', subject: 'google-123', userId: users[0].id });
 
-    await expect(service.exchange(outcome.code!, verifier)).resolves.toMatchObject({ accessToken: `token-for-${users[0].id}`, notice: null });
+    // The refresh token goes along too (the route moves it into the cookie, as for a password sign-in).
+    await expect(service.exchange(outcome.code!, verifier)).resolves.toMatchObject({
+      accessToken: `token-for-${users[0].id}`,
+      refreshToken: `refresh-for-${users[0].id}`,
+      notice: null,
+    });
     // One use only.
     await expect(service.exchange(outcome.code!, verifier)).rejects.toMatchObject({ response: { code: 'OAUTH_EXPIRED' } });
   });

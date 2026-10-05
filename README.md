@@ -123,7 +123,7 @@ Everything below is built in and on by default — no third-party service or key
 | Fake-account farming | At most 20 new accounts per network per hour, plus the proof of work and honeypot. |
 | Weak passwords | At least 8 characters (max 72 bytes, bcrypt's limit); refused when common (global and Pakistani lists), a repeated pattern or keyboard run, or based on the name, the email or "ResumeStudio"; and checked against the **Have I Been Pwned** breach corpus (k-anonymity: only 5 hex characters of the SHA-1 leave the server; skipped if the service is unreachable). |
 | Password storage | bcrypt cost 11 (older hashes are upgraded at the next sign-in); hashing runs at most 2 at a time with a bounded queue, so a flood of sign-ins cannot freeze the server. |
-| Stolen or old sessions | Tokens are HS256-only JWTs carrying the account's session version: **changing the password signs out every other device**, *Profile → Sign out of all devices* ends them all, and tokens of deleted accounts stop working. |
+| Stolen or old sessions | Access tokens are HS256-only JWTs that live **30 minutes** (`JWT_ACCESS_MINUTES`) and carry the account's session version. The app keeps the access token in `localStorage` and renews it with a **refresh token** in an `httpOnly` cookie (`rs_refresh`, path `/api/auth`, `Secure` over HTTPS, `SameSite=Lax`), so page scripts never see the long-lived credential. Refresh tokens are random, stored only as SHA-256 hashes (`refresh_tokens`), single use and rotated on every refresh; a replaced token used again (after a 60 s grace for parallel tabs) ends that sign-in. Password, Google and Apple sign-ins all work this way. **Changing the password signs out every other device**, *Profile → Sign out of all devices* ends them all, *Log out* ends this device's refresh token, and tokens of deleted accounts stop working. |
 | Oversized requests | Bodies over 16 KB to `/api/auth/*` are refused before they are parsed. |
 
 Behind a proxy (Hostinger) set `TRUST_PROXY=1`, otherwise every visitor shares the proxy's IP and lockouts hit everyone together — the server log warns when it sees forwarded requests without it. Emails are logged masked (`s***@gmail.com`).
@@ -215,7 +215,9 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | `DATABASE_MAX_CONNECTIONS` | `5` | Connection pool size (the Supabase free plan allows 15 in total) |
 | `DB_SYNC` | `false` | `true` lets TypeORM alter tables straight from the entities — local experiments only; migrations create the schema |
 | `JWT_SECRET` | random per start | Long random secret for signing login tokens. Without it, logins end at every restart — set it in production and keep it private |
-| `JWT_EXPIRES_IN_DAYS` | `7` | Session length |
+| `JWT_EXPIRES_IN_DAYS` | `7` | Session length: how long a device stays signed in without opening the app (refresh-token lifetime; every refresh extends it) |
+| `JWT_ACCESS_MINUTES` | `30` | Lifetime of an access token; the app renews it in the background with the refresh token |
+| `AUTH_COOKIE_SAMESITE` | `lax` | SameSite of the refresh-token cookie. `none` only when the API runs on another site than the app (`API_URL`); that needs HTTPS |
 | `AUTH_PROOF_OF_WORK` | `true` | Invisible proof-of-work check on sign-in and sign-up (`false` only to debug) |
 | `AUTH_POW_MAX_NUMBER` | `50000` | Proof-of-work difficulty (average hashes = half of it) |
 | `PASSWORD_BREACH_CHECK` | `true` | Refuse new passwords found in the Have I Been Pwned breach corpus |
@@ -254,7 +256,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 
 | Method & path | Purpose |
 | --- | --- |
-| `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, profile, password change or first password, sign out everywhere) |
+| `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `POST auth/refresh`, `POST auth/logout`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, new access token from the refresh cookie, sign out this device, profile, password change or first password, sign out everywhere) |
 | `POST auth/2fa/setup`, `POST auth/2fa/enable`, `POST auth/2fa/disable`, `POST auth/2fa/backup-codes`, `POST auth/2fa/verify` | Two-factor authentication (setup, turn on/off, new backup codes, sign-in step two) |
 | `GET auth/providers`, `GET auth/oauth/:provider/start`, `GET/POST auth/oauth/:provider/callback`, `POST auth/oauth/exchange` | Sign in with Google / Apple (`:provider` = `google` or `apple`) |
 | `GET templates`, `GET templates/meta`, `GET templates/:id` | Template catalog (public) |

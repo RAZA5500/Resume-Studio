@@ -1,8 +1,9 @@
-import { Body, Controller, Get, HttpCode, Ip, Param, Post, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Ip, Param, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/auth/auth.decorators.js';
 import { OAuthExchangeDto } from '../dto/auth.dto.js';
+import { SessionCookieInterceptor } from '../sessions/session-cookies.js';
 import { type OAuthOutcome, OAuthService } from './oauth.service.js';
 
 /** Sign in with Google / Apple. All routes are public: the person is not signed in yet. */
@@ -50,6 +51,7 @@ export class OAuthController {
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @HttpCode(200)
+  @UseInterceptors(SessionCookieInterceptor)
   @Post('oauth/exchange')
   exchange(@Body() dto: OAuthExchangeDto) {
     return this.oauth.exchange(dto.code, dto.verifier, dto.devices);

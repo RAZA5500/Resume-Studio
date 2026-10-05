@@ -1,8 +1,9 @@
-import { Body, Controller, HttpCode, Ip, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Ip, Post, UseInterceptors } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser, Public, type AuthUser } from '../../common/auth/auth.decorators.js';
 import { AuthService } from '../auth.service.js';
 import { TwoFactorCodeDto, TwoFactorVerifyDto } from '../dto/auth.dto.js';
+import { SessionCookieInterceptor } from '../sessions/session-cookies.js';
 import { TwoFactorService } from './two-factor.service.js';
 
 /** Two-factor sign-in with an authenticator app. */
@@ -47,6 +48,7 @@ export class TwoFactorController {
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(200)
+  @UseInterceptors(SessionCookieInterceptor)
   @Post('verify')
   verify(@Body() dto: TwoFactorVerifyDto, @Ip() ip: string) {
     return this.auth.verifyTwoFactor(dto, ip);

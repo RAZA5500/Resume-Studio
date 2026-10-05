@@ -36,7 +36,10 @@ export interface VerificationEmailResult {
 export type VerificationLinkResult = { verified: true; email: string } | { verified: false; needsConfirmation: true; email: string };
 
 export interface AuthResponse {
+  /** Valid for 30 minutes; the refresh token renews it. */
   accessToken: string;
+  /** Only the Android app gets it here; browsers get an httpOnly cookie instead. */
+  refreshToken?: string;
   user: User;
   /** "Remember this device" token, after a two-factor sign-in that asked for it. */
   trustedDevice?: string;
