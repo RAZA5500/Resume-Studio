@@ -11,8 +11,16 @@ export class User {
   @Column({ type: 'varchar', length: 160 })
   email: string;
 
-  @Column({ type: 'varchar', length: 100, select: false })
-  passwordHash: string;
+  /** bcrypt hash; null for accounts that only sign in with Google or Apple. */
+  @Column({ type: 'varchar', length: 100, nullable: true, select: false })
+  passwordHash: string | null;
+
+  /**
+   * When the owner proved this email address (today: by signing in with Google or Apple, whose
+   * emails are verified). Null for email + password sign-ups.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerifiedAt: Date | null;
 
   @Column({ type: 'varchar', length: 120 })
   fullName: string;

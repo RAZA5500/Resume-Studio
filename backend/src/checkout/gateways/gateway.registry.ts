@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import { siteUrlFrom } from '../../common/site-url.js';
 import type { PaymentGateway } from './gateway.types.js';
 import { MockGateway } from './mock.gateway.js';
 
@@ -25,12 +26,6 @@ const GATEWAYS: Record<string, (context: GatewayContext) => PaymentGateway> = {
     return new MockGateway(siteUrl);
   },
 };
-
-/** Public address of the site: the first FRONTEND_URL origin (same default as CORS in main.ts). */
-export function siteUrlFrom(config: ConfigService): string {
-  const first = (config.get<string>('FRONTEND_URL') ?? '').split(',')[0]?.trim();
-  return (first || 'http://localhost:4200').replace(/\/+$/, '');
-}
 
 export function createGateway(config: ConfigService, logger = new Logger('Checkout')): PaymentGateway | null {
   const key = (config.get<string>('PAYMENT_GATEWAY') ?? '').trim().toLowerCase();

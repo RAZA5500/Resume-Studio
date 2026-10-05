@@ -12,10 +12,11 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { BillingConfigService } from '../billing/billing-config.service.js';
+import { siteUrlFrom } from '../common/site-url.js';
 import { Payment } from '../billing/payment.entity.js';
 import { User } from '../users/user.entity.js';
 import { CheckoutOrder, type CheckoutOrderStatus } from './checkout-order.entity.js';
-import { PAYMENT_GATEWAY, siteUrlFrom } from './gateways/gateway.registry.js';
+import { PAYMENT_GATEWAY } from './gateways/gateway.registry.js';
 import {
   type CheckoutUrls,
   field,
