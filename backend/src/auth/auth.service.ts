@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { BillingConfigService } from '../billing/billing-config.service.js';
@@ -12,10 +12,17 @@ import { AuthAttemptsService, maskEmail } from './security/auth-attempts.service
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { breachCount, passwordProblem } from './security/password-policy.js';
 import { ProofOfWorkService } from './security/proof-of-work.service.js';
+import { RefreshTokenService, sessionExpired } from './sessions/refresh-tokens.service.js';
 import { type TwoFactorChallenge, TwoFactorService } from './two-factor/two-factor.service.js';
 
 export interface AuthResponse {
+  /** Short-lived (JWT_ACCESS_MINUTES, default 30); the app renews it with the refresh token. */
   accessToken: string;
+  /**
+   * Long-lived, single use. SessionCookieInterceptor moves it into an httpOnly cookie; only the
+   * Android app receives it in the body. Absent when a parallel refresh already replaced it.
+   */
+  refreshToken?: string;
   user: PublicUser;
   /** "Remember this device" token after a two-factor sign-in that asked for it. */
   trustedDevice?: string;
@@ -66,6 +73,7 @@ export class AuthService {
     private readonly pow: ProofOfWorkService,
     private readonly twoFactor: TwoFactorService,
     private readonly verification: EmailVerificationService,
+    private readonly sessions: RefreshTokenService,
     config: ConfigService,
   ) {
     this.breachCheck = !/^(0|false|off|no)$/i.test(config.get<string>('PASSWORD_BREACH_CHECK')?.trim() ?? '');
@@ -145,7 +153,7 @@ export class AuthService {
    * Changes the password — or sets a first one on an account that signs in with Google / Apple —
    * signs out every other session and returns a fresh token for this one.
    */
-  async changePassword(userId: string, dto: ChangePasswordDto, ip: string): Promise<{ success: true; accessToken: string }> {
+  async changePassword(userId: string, dto: ChangePasswordDto, ip: string): Promise<{ success: true; accessToken: string; refreshToken: string }> {
     // A stolen session must not be able to guess the current password either.
     const account = `user:${userId}`;
     this.attempts.assertLoginAllowed(account, ip);
@@ -166,8 +174,9 @@ export class AuthService {
 
     await this.users.update(userId, { passwordHash: await this.hasher.hash(dto.newPassword) });
     const version = await this.users.revokeSessions(userId);
+    await this.sessions.revokeAll(userId);
     this.logger.log(`Password ${user.passwordHash ? 'changed' : 'set'} for ${maskEmail(user.email)}; other sessions signed out.`);
-    return { success: true, accessToken: await this.sign(user, version) };
+    return { success: true, accessToken: await this.sign(user, version), refreshToken: await this.sessions.issue(userId, version) };
   }
 
   /**
@@ -205,6 +214,37 @@ export class AuthService {
   /** "Sign out everywhere": every token issued so far stops working, this one included. */
   async logoutEverywhere(userId: string): Promise<{ success: true }> {
     await this.users.revokeSessions(userId);
+    await this.sessions.revokeAll(userId);
+    return { success: true };
+  }
+
+  /**
+   * A new access token (and the next refresh token) for a device that is still signed in. Ends
+   * with 401 when the refresh token expired, was replaced and reused, or belongs to sessions that
+   * were signed out (password change, "sign out everywhere", deleted account).
+   */
+  async refresh(token: string | undefined): Promise<AuthResponse> {
+    const entry = await this.sessions.find(token);
+    let user: User | null;
+    try {
+      user = await this.users.findById(entry.userId);
+    } catch (error) {
+      // Only a missing account ends the session; a database hiccup must not sign anyone out.
+      if (!(error instanceof NotFoundException)) throw error;
+      user = null;
+    }
+    if (!user || (user.tokenVersion ?? 0) !== entry.tokenVersion) {
+      await this.sessions.revokeFamily(entry.familyId);
+      throw sessionExpired();
+    }
+    const refreshToken = await this.sessions.rotate(entry);
+    const session: AuthResponse = { accessToken: await this.sign(user, entry.tokenVersion), user: await this.toPublic(user) };
+    return refreshToken ? { ...session, refreshToken } : session;
+  }
+
+  /** Signing out on this device: its refresh token stops working. */
+  async logout(token: string | undefined): Promise<{ success: true }> {
+    await this.sessions.revoke(token);
     return { success: true };
   }
 
@@ -238,7 +278,12 @@ export class AuthService {
   }
 
   private async issue(user: User): Promise<AuthResponse> {
-    return { accessToken: await this.sign(user, user.tokenVersion ?? 0), user: await this.toPublic(user) };
+    const version = user.tokenVersion ?? 0;
+    return {
+      accessToken: await this.sign(user, version),
+      refreshToken: await this.sessions.issue(user.id, version),
+      user: await this.toPublic(user),
+    };
   }
 
   private sign(user: Pick<User, 'id' | 'email'>, version: number): Promise<string> {

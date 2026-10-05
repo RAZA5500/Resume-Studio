@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, firstValueFrom, from, map, Observable, switchMap, tap, throwError } from 'rxjs';
+import { catchError, finalize, firstValueFrom, from, map, Observable, shareReplay, switchMap, tap, throwError } from 'rxjs';
 import type {
   AuthResponse,
   OAuthProvider,
@@ -15,8 +15,13 @@ import { isNativeApp } from '../native/platform';
 import { type PowChallenge, sha256, solveChallenge } from '../utils/proof-of-work';
 import { apiOrigin } from './api-url.interceptor';
 
+/** The access token (30 minutes). The refresh token is an httpOnly cookie the page cannot read. */
 const TOKEN_KEY = 'rs_token';
 const USER_KEY = 'rs_user';
+/** Android app only: its web view keeps no cookies for the API's site, so the app keeps the refresh token. */
+const REFRESH_KEY = 'rs_refresh';
+/** Renew the access token this long before it runs out, so a request never leaves with an expired one. */
+const RENEW_BEFORE_MS = 60_000;
 /** The API's security checks expire after 10 minutes; a solved one is used within 8. */
 const PROOF_LIFETIME_MS = 8 * 60_000;
 /** A Google / Apple sign-in in progress: the PKCE verifier and where to go afterwards. */
@@ -36,8 +41,10 @@ export interface AfterSignIn {
 interface OAuthExtras {
   /** "password_removed": an unverified password on this email was turned off (see the API's OAuthService). */
   notice: 'password_removed' | null;
-  /** A brand-new account (no two-factor offer right after sign-up). */
+  /** A brand-new account (no two-factor offer right after sign-up; the name step comes first). */
   created: boolean;
+  /** The new account's name is the one Google / Apple shared (absent from older APIs). */
+  nameFromProvider?: boolean;
   after: AfterSignIn;
 }
 
@@ -89,10 +96,11 @@ function write(key: string, value: string | null): void {
   }
 }
 
-function tokenExpired(token: string): boolean {
+/** True when the access token has run out or will within `marginMs`. */
+export function tokenExpiring(token: string, marginMs = RENEW_BEFORE_MS): boolean {
   try {
     const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
-    return !!payload.exp && payload.exp * 1000 < Date.now();
+    return !!payload.exp && payload.exp * 1000 - marginMs < Date.now();
   } catch {
     return true;
   }
@@ -107,6 +115,8 @@ export class AuthService {
   readonly user = signal<User | null>(null);
   /** The anti-bot check being solved for the next sign-in / sign-up. */
   private proof: { answer: Promise<string>; expires: number } | null = null;
+  /** The refresh in flight: requests that need a new access token at the same time share it. */
+  private refreshing: Observable<string> | null = null;
   /** Which "Continue with …" buttons the server supports (null until loaded). */
   readonly oauthProviders = signal<Record<OAuthProvider, boolean> | null>(null);
   readonly isAuthenticated = computed(() => !!this.token());
@@ -122,18 +132,43 @@ export class AuthService {
   );
 
   constructor() {
+    // An expired access token is kept: the first API call renews it with the refresh token, and
+    // signs out only if that fails too (authInterceptor).
     const token = read(TOKEN_KEY);
-    if (token && !tokenExpired(token)) {
+    const user = this.cachedUser();
+    if (token && user) {
       this.token.set(token);
-      try {
-        this.user.set(JSON.parse(read(USER_KEY) ?? 'null') as User | null);
-      } catch {
-        this.user.set(null);
-      }
+      this.user.set(user);
     } else if (token) {
       write(TOKEN_KEY, null);
-      write(USER_KEY, null);
     }
+    // Another tab renewed the token or signed in: use the same session here.
+    addEventListener('storage', (event) => {
+      if (event.key !== TOKEN_KEY || !event.newValue || event.newValue === this.token()) return;
+      this.token.set(event.newValue);
+      const shared = this.cachedUser();
+      if (shared) this.user.set(shared);
+    });
+  }
+
+  /**
+   * A new access token from the refresh token (cookie). Concurrent callers share one request; the
+   * API answers 401 when the session is over (expired, signed out, password changed).
+   */
+  refresh(): Observable<string> {
+    if (!this.refreshing) {
+      const refreshToken = isNativeApp() ? read(REFRESH_KEY) : null;
+      this.refreshing = this.http.post<AuthResponse>('/api/auth/refresh', refreshToken ? { refreshToken } : {}).pipe(
+        // Signed out while this was on its way: do not sign back in.
+        tap((r) => {
+          if (this.token()) this.setSession(r);
+        }),
+        map((r) => r.accessToken),
+        finalize(() => (this.refreshing = null)),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+    }
+    return this.refreshing;
   }
 
   /**
@@ -299,12 +334,16 @@ export class AuthService {
    * Other devices are signed out; this one continues with the fresh token the API returns.
    * Accounts made with Google / Apple set their first password without a current one.
    */
-  changePassword(currentPassword: string | undefined, newPassword: string): Observable<{ success: true; accessToken?: string }> {
+  changePassword(
+    currentPassword: string | undefined,
+    newPassword: string,
+  ): Observable<{ success: true; accessToken?: string; refreshToken?: string }> {
     return this.http
-      .post<{ success: true; accessToken?: string }>('/api/auth/change-password', { currentPassword, newPassword })
+      .post<{ success: true; accessToken?: string; refreshToken?: string }>('/api/auth/change-password', { currentPassword, newPassword })
       .pipe(
         tap((r) => {
           if (r.accessToken) this.setToken(r.accessToken);
+          if (r.refreshToken) write(REFRESH_KEY, r.refreshToken);
         }),
       );
   }
@@ -320,11 +359,17 @@ export class AuthService {
     if (user) this.setUser({ ...user, ...patch });
   }
 
+  /** Signs this device out: the API forgets its refresh token and removes the cookie. */
   logout(redirect = true): void {
+    if (this.token()) {
+      const refreshToken = isNativeApp() ? read(REFRESH_KEY) : null;
+      this.http.post('/api/auth/logout', refreshToken ? { refreshToken } : {}).subscribe({ error: () => undefined });
+    }
     this.token.set(null);
     this.user.set(null);
     write(TOKEN_KEY, null);
     write(USER_KEY, null);
+    write(REFRESH_KEY, null);
     if (redirect) void this.router.navigateByUrl('/login');
   }
 
@@ -349,6 +394,16 @@ export class AuthService {
   private setSession(response: AuthResponse): void {
     this.setToken(response.accessToken);
     this.setUser(response.user);
+    // Only the Android app receives it; a refresh that raced another one brings none.
+    if (response.refreshToken) write(REFRESH_KEY, response.refreshToken);
+  }
+
+  private cachedUser(): User | null {
+    try {
+      return JSON.parse(read(USER_KEY) ?? 'null') as User | null;
+    } catch {
+      return null;
+    }
   }
 
   private setToken(token: string): void {

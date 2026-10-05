@@ -93,6 +93,14 @@ export class UpdateProfileDto {
   headline?: string;
 }
 
+/** Refresh and sign-out: the Android app sends its refresh token here (browsers use the cookie). */
+export class RefreshDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  refreshToken?: string;
+}
+
 /** Finishes a Google / Apple sign-in (see OAuthService). */
 export class OAuthExchangeDto {
   @IsString()

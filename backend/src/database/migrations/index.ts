@@ -4,6 +4,7 @@ import { SessionVersion1791187200000 } from './1791187200000-SessionVersion.js';
 import { SocialSignIn1791216000000 } from './1791216000000-SocialSignIn.js';
 import { TwoFactor1791230400000 } from './1791230400000-TwoFactor.js';
 import { EmailVerification1791237600000 } from './1791237600000-EmailVerification.js';
+import { RefreshTokens1791244800000 } from './1791244800000-RefreshTokens.js';
 
 /**
  * Applied in order at startup (and by `npm run migration:run`). After `npm run migration:generate`,
@@ -16,4 +17,5 @@ export const MIGRATIONS = [
   SocialSignIn1791216000000,
   TwoFactor1791230400000,
   EmailVerification1791237600000,
+  RefreshTokens1791244800000,
 ];

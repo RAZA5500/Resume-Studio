@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,7 @@ import compression from 'compression';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
+import { inlineScriptHashes } from './common/csp.js';
 import { DatabaseService } from './database/database.service.js';
 
 /** TRUST_PROXY=1 (one proxy hop), true, false, or a list of proxy IPs — see Express "trust proxy". */
@@ -60,7 +61,23 @@ async function bootstrap() {
   app.useBodyParser('urlencoded', { limit: '30mb', extended: true });
 
   app.setGlobalPrefix('api');
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // When running on unified hosts (e.g. Hostinger), serve compiled Angular frontend if present
+  const candidates = [
+    resolve(process.cwd(), '../dist/frontend/browser'),
+    resolve(process.cwd(), 'dist/frontend/browser'),
+    resolve(process.cwd(), 'public_html'),
+    resolve(process.cwd(), '../public_html'),
+  ];
+  const staticRoot = candidates.find((dir) => existsSync(dir) && existsSync(join(dir, 'index.html')));
+  // index.html sets the theme with an inline script before the first paint: the CSP allows exactly
+  // that script (by hash). Without it the page would start in the wrong theme and performance tier.
+  const inlineScripts = staticRoot ? inlineScriptHashes(readFileSync(join(staticRoot, 'index.html'), 'utf8')) : [];
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: { directives: { scriptSrc: ["'self'", ...inlineScripts] } },
+    }),
+  );
   app.use(compression());
   // The Android app (Capacitor) serves its pages from https://localhost, so that origin is always allowed.
   const origins = (config.get<string>('FRONTEND_URL') ?? 'http://localhost:4200').split(',').map((o) => o.trim());
@@ -95,14 +112,6 @@ async function bootstrap() {
   );
   app.enableShutdownHooks();
 
-  // When running on unified hosts (e.g. Hostinger), serve compiled Angular frontend if present
-  const candidates = [
-    resolve(process.cwd(), '../dist/frontend/browser'),
-    resolve(process.cwd(), 'dist/frontend/browser'),
-    resolve(process.cwd(), 'public_html'),
-    resolve(process.cwd(), '../public_html'),
-  ];
-  const staticRoot = candidates.find((dir) => existsSync(dir) && existsSync(join(dir, 'index.html')));
   if (staticRoot) {
     Logger.log(`Serving frontend from: ${staticRoot}`, 'Bootstrap');
     // Build files with a content hash in the name never change; everything else (ngsw.json, the

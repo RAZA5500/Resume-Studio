@@ -5,7 +5,7 @@ import type { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { BillingConfigService } from '../billing/billing-config.service.js';
-import type { Repository } from 'typeorm';
+import { FindOperator, type Repository } from 'typeorm';
 import { ALLOW_UNVERIFIED_KEY, IS_PUBLIC_KEY, type JwtPayload } from '../common/auth/auth.decorators.js';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard.js';
 import type { MailMessage, MailService } from '../mail/mail.service.js';
@@ -17,6 +17,8 @@ import { EmailVerificationService } from './email-verification/email-verificatio
 import { AuthAttemptsService } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { type PowChallenge, ProofOfWorkService } from './security/proof-of-work.service.js';
+import type { RefreshToken } from './sessions/refresh-token.entity.js';
+import { REUSE_GRACE_MS, RefreshTokenService } from './sessions/refresh-tokens.service.js';
 import { base32Decode, hotp, timeStep } from './two-factor/totp.js';
 import { type TwoFactorChallenge, TwoFactorService } from './two-factor/two-factor.service.js';
 
@@ -68,6 +70,42 @@ function verificationTable() {
     },
   };
   return { rows, repository: table as unknown as Repository<EmailVerification> };
+}
+
+/** In-memory stand-in for the refresh_tokens table (only what RefreshTokenService uses). */
+function refreshTable() {
+  const rows: RefreshToken[] = [];
+  const matches = (row: RefreshToken, where: Record<string, unknown>) =>
+    Object.entries(where).every(([key, value]) => {
+      const actual = row[key as keyof RefreshToken];
+      if (value instanceof FindOperator) {
+        if (value.type === 'isNull') return actual == null;
+        if (value.type === 'lessThan') return (actual as Date) < (value.value as Date);
+        throw new Error(`unsupported operator ${value.type}`);
+      }
+      return actual === value;
+    });
+  const table = {
+    insert: (entry: Omit<RefreshToken, 'id' | 'createdAt'>) => {
+      rows.push({ ...entry, id: `rt${rows.length + 1}`, createdAt: new Date() });
+      return Promise.resolve();
+    },
+    findOneBy: (where: Record<string, unknown>) => {
+      const row = rows.find((r) => matches(r, where));
+      return Promise.resolve(row ? { ...row } : null);
+    },
+    update: (where: Record<string, unknown>, patch: Partial<RefreshToken>) => {
+      const found = rows.filter((r) => matches(r, where));
+      for (const row of found) Object.assign(row, patch);
+      return Promise.resolve({ affected: found.length });
+    },
+    delete: (where: Record<string, unknown>) => {
+      const keep = rows.filter((r) => !matches(r, where));
+      rows.splice(0, rows.length, ...keep);
+      return Promise.resolve();
+    },
+  };
+  return { rows, repository: table as unknown as Repository<RefreshToken> };
 }
 
 /** The code and the link token in a verification email. */
@@ -151,6 +189,8 @@ function setup(env: Record<string, string> = {}, { mail: mailOn = false } = {}) 
   };
   const table = verificationTable();
   const verification = new EmailVerificationService(table.repository, users as unknown as UsersService, mail as unknown as MailService, config);
+  const refresh = refreshTable();
+  const sessions = new RefreshTokenService(refresh.repository, config);
   const service = new AuthService(
     users as unknown as UsersService,
     jwt,
@@ -160,14 +200,15 @@ function setup(env: Record<string, string> = {}, { mail: mailOn = false } = {}) 
     pow,
     twoFactor,
     verification,
+    sessions,
     config,
   );
-  for (const target of [service, attempts, twoFactor, verification]) {
+  for (const target of [service, attempts, twoFactor, verification, sessions]) {
     Object.assign(target, { logger: { log: () => undefined, warn: () => undefined, error: () => undefined } });
   }
   const proof = () => solve(pow.issue());
   const form = (extra: Record<string, unknown> = {}) => ({ pow: proof(), website: '', ...extra });
-  return { service, users, rows, jwt, hasher, form, twoFactor, verification, mail, outbox, table };
+  return { service, users, rows, jwt, hasher, form, twoFactor, verification, mail, outbox, table, sessions, refresh };
 }
 
 async function errorOf(promise: Promise<unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
@@ -288,6 +329,107 @@ describe('AuthService password change and sessions', () => {
     const { user } = await service.register({ fullName: 'Sara Khan', email: 'sara@example.com', password: GOOD_PASSWORD, ...form() }, IP);
     for (let i = 0; i < 5; i++) await errorOf(service.changePassword(user.id, { currentPassword: `wrong-${i}`, newPassword: 'Another-Good-Pass-9' }, IP));
     expect((await errorOf(service.changePassword(user.id, { currentPassword: GOOD_PASSWORD, newPassword: 'Another-Good-Pass-9' }, IP))).status).toBe(429);
+  });
+});
+
+describe('Refresh tokens', () => {
+  afterEach(() => vi.useRealTimers());
+
+  async function signedIn() {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-05T10:00:00Z') });
+    const ctx = setup();
+    const session = await ctx.service.register({ fullName: 'Sara Khan', email: 'sara@example.com', password: GOOD_PASSWORD, ...ctx.form() }, IP);
+    return { ...ctx, session, later: (ms: number) => vi.setSystemTime(Date.now() + ms) };
+  }
+
+  it('comes with every sign-in and is stored only as a hash', async () => {
+    const { session, refresh } = await signedIn();
+    expect(session.refreshToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(refresh.rows).toHaveLength(1);
+    expect(refresh.rows[0].tokenHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(refresh.rows)).not.toContain(session.refreshToken);
+  });
+
+  it('gives a new access token and swaps itself for a new refresh token', async () => {
+    const { service, session, jwt } = await signedIn();
+    const renewed = await service.refresh(session.refreshToken);
+    expect(await jwt.verifyAsync<JwtPayload>(renewed.accessToken)).toMatchObject({ sub: session.user.id, tv: 0 });
+    expect(renewed.user).toMatchObject({ email: 'sara@example.com' });
+    expect(renewed.refreshToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(renewed.refreshToken).not.toBe(session.refreshToken);
+    await expect(service.refresh(renewed.refreshToken)).resolves.toHaveProperty('refreshToken');
+  });
+
+  it('lets a parallel refresh through without a second replacement', async () => {
+    const { service, session } = await signedIn();
+    const first = await service.refresh(session.refreshToken);
+    const second = await service.refresh(session.refreshToken);
+    expect(second.accessToken).toEqual(expect.any(String));
+    expect(second).not.toHaveProperty('refreshToken');
+    await expect(service.refresh(first.refreshToken)).resolves.toHaveProperty('refreshToken');
+  });
+
+  it('ends the whole sign-in when a replaced token comes back later', async () => {
+    const { service, session, later } = await signedIn();
+    const renewed = await service.refresh(session.refreshToken);
+    later(REUSE_GRACE_MS + 1_000);
+    const reuse = await errorOf(service.refresh(session.refreshToken));
+    expect(reuse.status).toBe(401);
+    expect(reuse.body.code).toBe('SESSION_EXPIRED');
+    expect((await errorOf(service.refresh(renewed.refreshToken))).status).toBe(401);
+  });
+
+  it('expires after the session length, and each refresh extends it', async () => {
+    const { service, session, later } = await signedIn();
+    later(6 * 24 * 60 * 60_000);
+    const renewed = await service.refresh(session.refreshToken);
+    later(6 * 24 * 60 * 60_000);
+    const again = await service.refresh(renewed.refreshToken);
+    later(7 * 24 * 60 * 60_000 + 1_000);
+    expect((await errorOf(service.refresh(again.refreshToken))).status).toBe(401);
+  });
+
+  it('turns down missing and made-up tokens', async () => {
+    const { service } = await signedIn();
+    expect((await errorOf(service.refresh(undefined))).status).toBe(401);
+    expect((await errorOf(service.refresh('not a token'))).status).toBe(401);
+    expect((await errorOf(service.refresh('A'.repeat(43)))).status).toBe(401);
+  });
+
+  it('stops working after signing out on this device', async () => {
+    const { service, session } = await signedIn();
+    const renewed = await service.refresh(session.refreshToken);
+    await service.logout(renewed.refreshToken);
+    expect((await errorOf(service.refresh(renewed.refreshToken))).status).toBe(401);
+  });
+
+  it('ends on every device after a password change, except the token the change returns', async () => {
+    const { service, session, jwt, form } = await signedIn();
+    const other = (await service.login({ email: 'sara@example.com', password: GOOD_PASSWORD, ...form() }, IP)) as { refreshToken: string };
+    const changed = await service.changePassword(session.user.id, { currentPassword: GOOD_PASSWORD, newPassword: 'Another-Good-Pass-9' }, IP);
+    expect((await errorOf(service.refresh(session.refreshToken))).status).toBe(401);
+    expect((await errorOf(service.refresh(other.refreshToken))).status).toBe(401);
+    const renewed = await service.refresh(changed.refreshToken);
+    expect(await jwt.verifyAsync<JwtPayload>(renewed.accessToken)).toMatchObject({ tv: 1 });
+  });
+
+  it('ends on every device after "sign out everywhere"', async () => {
+    const { service, session, refresh } = await signedIn();
+    await service.logoutEverywhere(session.user.id);
+    expect(refresh.rows).toHaveLength(0);
+    expect((await errorOf(service.refresh(session.refreshToken))).status).toBe(401);
+  });
+
+  it('ends when the account is gone', async () => {
+    const { service, session, rows } = await signedIn();
+    rows.splice(0, rows.length);
+    expect((await errorOf(service.refresh(session.refreshToken))).status).toBe(401);
+  });
+
+  it('turns down a token from before the account signed out everywhere, even if its row is still there', async () => {
+    const { service, session, users } = await signedIn();
+    await users.revokeSessions(session.user.id);
+    expect((await errorOf(service.refresh(session.refreshToken))).status).toBe(401);
   });
 });
 

@@ -15,13 +15,16 @@ import { OAUTH_PROVIDERS, OAuthService } from './oauth/oauth.service.js';
 import { AuthAttemptsService } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { ProofOfWorkService } from './security/proof-of-work.service.js';
+import { RefreshToken } from './sessions/refresh-token.entity.js';
+import { RefreshTokenService } from './sessions/refresh-tokens.service.js';
+import { SessionCookieInterceptor, SessionCookies } from './sessions/session-cookies.js';
 import { TwoFactorController } from './two-factor/two-factor.controller.js';
 import { TwoFactorService } from './two-factor/two-factor.service.js';
 
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([EmailVerification]),
+    TypeOrmModule.forFeature([EmailVerification, RefreshToken]),
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
@@ -36,10 +39,11 @@ import { TwoFactorService } from './two-factor/two-factor.service.js';
         } else if (secret.length < 32) {
           logger.warn('JWT_SECRET is short — use at least 32 random characters so login tokens cannot be forged.');
         }
-        const days = Number(config.get<string>('JWT_EXPIRES_IN_DAYS') ?? 7);
+        // Access tokens are short-lived; the refresh token (JWT_EXPIRES_IN_DAYS) keeps the device signed in.
+        const minutes = Number(config.get<string>('JWT_ACCESS_MINUTES') ?? 30);
         return {
           secret,
-          signOptions: { algorithm: 'HS256', expiresIn: Math.max(1, days) * 24 * 60 * 60 },
+          signOptions: { algorithm: 'HS256', expiresIn: (Number.isFinite(minutes) ? Math.min(Math.max(1, minutes), 24 * 60) : 30) * 60 },
           // Only the algorithm we sign with is accepted (no "none", no algorithm confusion).
           verifyOptions: { algorithms: ['HS256'] },
         };
@@ -54,6 +58,9 @@ import { TwoFactorService } from './two-factor/two-factor.service.js';
     ProofOfWorkService,
     TwoFactorService,
     EmailVerificationService,
+    RefreshTokenService,
+    SessionCookies,
+    SessionCookieInterceptor,
     OAuthService,
     { provide: OAUTH_PROVIDERS, inject: [ConfigService], useFactory: (config: ConfigService) => createOAuthProviders(config) },
   ],
