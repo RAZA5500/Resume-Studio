@@ -5,11 +5,15 @@ import type { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { BillingConfigService } from '../billing/billing-config.service.js';
-import type { JwtPayload } from '../common/auth/auth.decorators.js';
+import type { Repository } from 'typeorm';
+import { ALLOW_UNVERIFIED_KEY, IS_PUBLIC_KEY, type JwtPayload } from '../common/auth/auth.decorators.js';
 import { JwtAuthGuard } from '../common/auth/jwt-auth.guard.js';
+import type { MailMessage, MailService } from '../mail/mail.service.js';
 import type { User } from '../users/user.entity.js';
-import type { UsersService } from '../users/users.service.js';
+import type { SessionState, UsersService } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
+import type { EmailVerification } from './email-verification/email-verification.entity.js';
+import { EmailVerificationService } from './email-verification/email-verification.service.js';
 import { AuthAttemptsService } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { type PowChallenge, ProofOfWorkService } from './security/proof-of-work.service.js';
@@ -33,15 +37,68 @@ function solve(challenge: PowChallenge): string {
   throw new Error('unsolvable');
 }
 
-/** AuthService with an in-memory users table and the real security services. */
-function setup(env: Record<string, string> = {}) {
+/** In-memory stand-in for the email_verifications table (only what EmailVerificationService uses). */
+function verificationTable() {
+  const rows = new Map<string, EmailVerification>();
+  const matches = (row: EmailVerification, where: Partial<EmailVerification>) =>
+    Object.entries(where).every(([key, value]) => row[key as keyof EmailVerification] === value);
+  const find = (where: Partial<EmailVerification>) => [...rows.values()].find((row) => matches(row, where));
+  const table = {
+    findOneBy: (where: Partial<EmailVerification>) => {
+      const row = find(where);
+      return Promise.resolve(row ? { ...row } : null);
+    },
+    upsert: (entry: EmailVerification) => {
+      rows.set(entry.userId, { ...rows.get(entry.userId), ...entry });
+      return Promise.resolve();
+    },
+    update: (where: Partial<EmailVerification>, patch: Partial<EmailVerification>) => {
+      const row = find(where);
+      if (row) Object.assign(row, patch);
+      return Promise.resolve();
+    },
+    increment: (where: Partial<EmailVerification>, column: 'attempts', by: number) => {
+      const row = find(where);
+      if (row) row[column] += by;
+      return Promise.resolve();
+    },
+    delete: (where: Partial<EmailVerification>) => {
+      for (const [key, row] of rows) if (matches(row, where)) rows.delete(key);
+      return Promise.resolve();
+    },
+  };
+  return { rows, repository: table as unknown as Repository<EmailVerification> };
+}
+
+/** The code and the link token in a verification email. */
+function codeOf(message: MailMessage): string {
+  return /code is: (d{6})/.exec(message.text)![1];
+}
+function tokenOf(message: MailMessage): string {
+  return /token=([A-Za-z0-9_-]{43})/.exec(message.text)![1];
+}
+
+/**
+ * AuthService with an in-memory users table and the real security services. Email is off unless
+ * `mail` is set; sent emails land in `outbox`.
+ */
+function setup(env: Record<string, string> = {}, { mail: mailOn = false } = {}) {
   const config = configOf({ AUTH_POW_MAX_NUMBER: '1000', PASSWORD_BREACH_CHECK: 'false', JWT_SECRET: 'test-secret-that-is-long-enough-1234', ...env });
   const rows: User[] = [];
   const users = {
     findByEmail: (email: string) => Promise.resolve(rows.find((u) => u.email === email.toLowerCase()) ?? null),
     findById: (id: string) => Promise.resolve(rows.find((u) => u.id === id)!),
     create: vi.fn((data: Pick<User, 'email' | 'fullName' | 'passwordHash'>) => {
-      const user = { ...data, id: `u${rows.length + 1}`, headline: null, plan: 'free', planActivatedAt: null, tokenVersion: 0, createdAt: new Date() } as User;
+      const user = {
+        emailVerifiedAt: null,
+        ...data,
+        id: `u${rows.length + 1}`,
+        headline: null,
+        plan: 'free',
+        planActivatedAt: null,
+        tokenVersion: 0,
+        createdAt: new Date(),
+      } as User;
       rows.push(user);
       return Promise.resolve(user);
     }),
@@ -50,7 +107,14 @@ function setup(env: Record<string, string> = {}) {
       return Promise.resolve(rows.find((u) => u.id === id)!);
     }),
     revokeSessions: vi.fn((id: string) => Promise.resolve(++rows.find((u) => u.id === id)!.tokenVersion)),
-    sessionVersion: (id: string) => Promise.resolve(rows.find((u) => u.id === id)?.tokenVersion ?? null),
+    changeEmail: (id: string, email: string) => {
+      Object.assign(rows.find((u) => u.id === id)!, { email, emailVerifiedAt: null });
+      return Promise.resolve(rows.find((u) => u.id === id)!);
+    },
+    session: (id: string) => {
+      const row = rows.find((u) => u.id === id);
+      return Promise.resolve(row ? { version: row.tokenVersion, emailVerified: !!row.emailVerifiedAt } : null);
+    },
     loginMethods: (id: string) => {
       const row = rows.find((u) => u.id === id);
       return Promise.resolve({ hasPassword: !!row?.passwordHash, providers: [], twoFactorEnabled: !!row?.twoFactorEnabledAt, backupCodesLeft: row?.twoFactorBackupCodes?.length ?? 0 });
@@ -77,6 +141,16 @@ function setup(env: Record<string, string> = {}) {
   const attempts = new AuthAttemptsService();
   const pow = new ProofOfWorkService(config);
   const twoFactor = new TwoFactorService(users as unknown as UsersService, attempts, config);
+  const outbox: MailMessage[] = [];
+  const mail = {
+    enabled: mailOn,
+    send: vi.fn((message: MailMessage) => {
+      outbox.push(message);
+      return Promise.resolve();
+    }),
+  };
+  const table = verificationTable();
+  const verification = new EmailVerificationService(table.repository, users as unknown as UsersService, mail as unknown as MailService, config);
   const service = new AuthService(
     users as unknown as UsersService,
     jwt,
@@ -85,12 +159,15 @@ function setup(env: Record<string, string> = {}) {
     attempts,
     pow,
     twoFactor,
+    verification,
     config,
   );
-  for (const target of [service, attempts, twoFactor]) Object.assign(target, { logger: { log: () => undefined, warn: () => undefined, error: () => undefined } });
+  for (const target of [service, attempts, twoFactor, verification]) {
+    Object.assign(target, { logger: { log: () => undefined, warn: () => undefined, error: () => undefined } });
+  }
   const proof = () => solve(pow.issue());
   const form = (extra: Record<string, unknown> = {}) => ({ pow: proof(), website: '', ...extra });
-  return { service, users, rows, jwt, hasher, form, twoFactor };
+  return { service, users, rows, jwt, hasher, form, twoFactor, verification, mail, outbox, table };
 }
 
 async function errorOf(promise: Promise<unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
@@ -311,14 +388,166 @@ describe('Two-factor sign-in', () => {
   });
 });
 
+describe('Email verification', () => {
+  afterEach(() => vi.useRealTimers());
+
+  /** A new email + password account with email on; `later(s)` moves the (fake) clock. */
+  async function signedUp() {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-05T10:00:00Z') });
+    const ctx = setup({}, { mail: true });
+    const session = await ctx.service.register({ fullName: 'Sara Khan', email: 'sara@example.com', password: GOOD_PASSWORD, ...ctx.form() }, IP);
+    const account = () => ctx.rows.find((u) => u.id === session.user.id)!;
+    const later = (seconds: number) => vi.setSystemTime(Date.now() + seconds * 1000);
+    return { ...ctx, session, account, later };
+  }
+
+  /** Any 6-digit code except this one. */
+  const wrong = (code: string) => String((Number(code) + 1) % 1_000_000).padStart(6, '0');
+
+  it('asks new email + password accounts to verify, but only while email is on', async () => {
+    const { session } = await signedUp();
+    expect(session.user).toMatchObject({ emailVerified: false, mustVerifyEmail: true });
+
+    const off = setup();
+    const { user } = await off.service.register({ fullName: 'Ali Raza', email: 'ali@example.com', password: GOOD_PASSWORD, ...off.form() }, IP);
+    expect(user).toMatchObject({ emailVerified: false, mustVerifyEmail: false });
+    expect((await errorOf(off.verification.send(off.rows[0]))).body.code).toBe('VERIFICATION_OFF');
+  });
+
+  it('emails a code and a link, stores only keyed hashes, and keeps a working code when the page opens again', async () => {
+    const { verification, account, outbox, table, later } = await signedUp();
+    await expect(verification.send(account())).resolves.toEqual({ sent: true, retryAfter: 60 });
+    expect(outbox).toHaveLength(1);
+    const [email] = outbox;
+    expect(email.to).toBe('sara@example.com');
+    expect(email.subject).toBe(`${codeOf(email)} is your ResumeStudio verification code`);
+    expect(email.html).toContain(`http://localhost:4200/verify-email?token=${tokenOf(email)}`);
+    const stored = table.rows.get(account().id)!;
+    expect(stored.codeHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(stored.linkHash).toMatch(/^[0-9a-f]{64}$/);
+    expect([stored.codeHash, stored.linkHash]).not.toContain(createHash('sha256').update(codeOf(email)).digest('hex'));
+
+    // Opening the verification page again does not replace the code that is in the inbox.
+    later(120);
+    await expect(verification.send(account())).resolves.toEqual({ sent: false, retryAfter: 0 });
+    expect(outbox).toHaveLength(1);
+    // Close to expiry it sends a fresh one.
+    later(26 * 60);
+    await expect(verification.send(account())).resolves.toEqual({ sent: true, retryAfter: 60 });
+  });
+
+  it('spaces emails a minute apart, at most five an hour, and a new email replaces the old code and link', async () => {
+    const { verification, account, outbox, later } = await signedUp();
+    await verification.send(account());
+    expect(await errorOf(verification.resend(account()))).toMatchObject({ status: 429, body: { code: 'TOO_MANY_ATTEMPTS', retryAfter: 60 } });
+    later(61);
+    await verification.resend(account());
+    expect(outbox).toHaveLength(2);
+    expect((await errorOf(verification.verifyLink(tokenOf(outbox[0]), account().id, false))).body.code).toBe('VERIFICATION_EXPIRED');
+
+    for (let i = 0; i < 3; i++) {
+      later(61);
+      await verification.resend(account());
+    }
+    later(61);
+    const capped = await errorOf(verification.resend(account()));
+    expect(capped).toMatchObject({ status: 429, body: { message: expect.stringContaining('minutes') } });
+    later(3600);
+    await expect(verification.resend(account())).resolves.toEqual({ sent: true, retryAfter: 60 });
+  });
+
+  it('verifies with the right code only; five wrong tries end the code', async () => {
+    const { service, verification, account, outbox, table, later } = await signedUp();
+    await verification.send(account());
+    const code = codeOf(outbox[0]);
+    expect(await errorOf(verification.verifyCode(account(), wrong(code)))).toMatchObject({ status: 400, body: { code: 'INVALID_VERIFICATION_CODE' } });
+    for (let i = 0; i < 3; i++) await errorOf(verification.verifyCode(account(), wrong(code)));
+    expect((await errorOf(verification.verifyCode(account(), wrong(code)))).body.code).toBe('VERIFICATION_EXPIRED');
+    expect((await errorOf(verification.verifyCode(account(), code))).body.code).toBe('VERIFICATION_EXPIRED');
+
+    later(61);
+    await verification.resend(account());
+    await verification.verifyCode(account(), codeOf(outbox[1]));
+    expect(account().emailVerifiedAt).toBeInstanceOf(Date);
+    expect(table.rows.size).toBe(0);
+    expect(await service.me(account().id)).toMatchObject({ emailVerified: true, mustVerifyEmail: false });
+    // Typing the code again (e.g. after the link already did it) is fine.
+    await expect(verification.verifyCode(account(), codeOf(outbox[1]))).resolves.toBeUndefined();
+    expect((await errorOf(verification.resend(account()))).body.code).toBe('ALREADY_VERIFIED');
+  });
+
+  it('verifies with the link: at once where its account is signed in, after a click anywhere else', async () => {
+    const { verification, account, outbox } = await signedUp();
+    await verification.send(account());
+    const token = tokenOf(outbox[0]);
+
+    // A mail scanner or someone else's browser opening the link does not verify the address.
+    await expect(verification.verifyLink(token, undefined, false)).resolves.toEqual({ verified: false, needsConfirmation: true, email: 's***@example.com' });
+    await expect(verification.verifyLink(token, 'someone-else', false)).resolves.toMatchObject({ verified: false });
+    expect(account().emailVerifiedAt).toBeNull();
+    await expect(verification.verifyLink(token, undefined, true)).resolves.toEqual({ verified: true, email: 's***@example.com' });
+    expect(account().emailVerifiedAt).toBeInstanceOf(Date);
+    expect((await errorOf(verification.verifyLink(token, account().id, true))).body.code).toBe('VERIFICATION_EXPIRED');
+
+    const other = await signedUp();
+    await other.verification.send(other.account());
+    other.later(31 * 60);
+    expect((await errorOf(other.verification.verifyLink(tokenOf(other.outbox[0]), other.account().id, false))).body.code).toBe('VERIFICATION_EXPIRED');
+    const fresh = await signedUp();
+    await fresh.verification.send(fresh.account());
+    await expect(fresh.verification.verifyLink(tokenOf(fresh.outbox[0]), fresh.account().id, false)).resolves.toMatchObject({ verified: true });
+  });
+
+  it('lets the page ask again at once when an email could not be sent, keeping the earlier code', async () => {
+    const { verification, account, outbox, mail, table, later } = await signedUp();
+    mail.send.mockRejectedValueOnce(new Error('SMTP down'));
+    expect(await errorOf(verification.send(account()))).toMatchObject({ status: 503, body: { code: 'EMAIL_NOT_SENT' } });
+    expect(table.rows.size).toBe(0);
+    await expect(verification.send(account())).resolves.toMatchObject({ sent: true });
+
+    later(61);
+    mail.send.mockRejectedValueOnce(new Error('SMTP down'));
+    expect((await errorOf(verification.resend(account()))).status).toBe(503);
+    await verification.verifyCode(account(), codeOf(outbox[0]));
+    expect(account().emailVerifiedAt).toBeInstanceOf(Date);
+  });
+
+  it('moves an unverified account to a corrected address, with its password', async () => {
+    const { service, verification, account, outbox, form } = await signedUp();
+    await verification.send(account());
+    await service.register({ fullName: 'Ali Raza', email: 'ali@example.com', password: GOOD_PASSWORD, ...form() }, IP);
+
+    expect((await errorOf(service.changeEmail(account().id, { email: 'sara.k@example.com', password: 'wrong password' }, IP))).body.code).toBe(
+      'WRONG_PASSWORD',
+    );
+    expect((await errorOf(service.changeEmail(account().id, { email: 'ali@example.com', password: GOOD_PASSWORD }, IP))).status).toBe(409);
+
+    const moved = await service.changeEmail(account().id, { email: 'sara.k@example.com', password: GOOD_PASSWORD }, IP);
+    expect(moved).toMatchObject({ email: 'sara.k@example.com', mustVerifyEmail: true });
+    // The code sent to the old address stops working; the new address gets one right away.
+    expect((await errorOf(verification.verifyCode(account(), codeOf(outbox[0])))).body.code).toBe('VERIFICATION_EXPIRED');
+    await expect(verification.send(account())).resolves.toMatchObject({ sent: true });
+    expect(outbox.at(-1)!.to).toBe('sara.k@example.com');
+
+    await verification.verifyCode(account(), codeOf(outbox.at(-1)!));
+    expect((await errorOf(service.changeEmail(account().id, { email: 'sara@example.com', password: GOOD_PASSWORD }, IP))).body.code).toBe(
+      'EMAIL_CHANGE_UNAVAILABLE',
+    );
+  });
+});
+
 describe('JwtAuthGuard', () => {
-  function guardFor(version: number | null | Error, isPublic = false) {
+  const current = (version: number): SessionState => ({ version, emailVerified: true });
+
+  function guardFor(state: SessionState | null | Error, options: { isPublic?: boolean; allowUnverified?: boolean; mail?: boolean } = {}) {
     const jwt = new JwtService({ secret: 'test-secret-that-is-long-enough-1234' });
     const users = {
-      sessionVersion: () => (version instanceof Error ? Promise.reject(version) : Promise.resolve(version)),
+      session: () => (state instanceof Error ? Promise.reject(state) : Promise.resolve(state)),
     } as unknown as UsersService;
-    const reflector = { getAllAndOverride: () => isPublic } as unknown as Reflector;
-    return { guard: new JwtAuthGuard(jwt, reflector, users), jwt };
+    const flags: Record<string, boolean | undefined> = { [IS_PUBLIC_KEY]: options.isPublic, [ALLOW_UNVERIFIED_KEY]: options.allowUnverified };
+    const reflector = { getAllAndOverride: (key: string) => flags[key] } as unknown as Reflector;
+    const mail = { enabled: options.mail ?? true } as MailService;
+    return { guard: new JwtAuthGuard(jwt, reflector, users, mail), jwt };
   }
 
   function contextWith(token?: string) {
@@ -332,20 +561,20 @@ describe('JwtAuthGuard', () => {
   }
 
   it('accepts a current token and attaches the user', async () => {
-    const { guard, jwt } = guardFor(2);
+    const { guard, jwt } = guardFor(current(2));
     const { context, request } = contextWith(await jwt.signAsync({ sub: 'u1', email: 'sara@example.com', tv: 2 }));
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.user).toEqual({ id: 'u1', email: 'sara@example.com' });
   });
 
   it('treats tokens issued before session versions as version 0', async () => {
-    const { guard, jwt } = guardFor(0);
+    const { guard, jwt } = guardFor(current(0));
     await expect(guard.canActivate(contextWith(await jwt.signAsync({ sub: 'u1', email: 'a@b.co' })).context)).resolves.toBe(true);
   });
 
   it('rejects tokens of signed-out sessions and deleted accounts', async () => {
-    for (const version of [3, null]) {
-      const { guard, jwt } = guardFor(version);
+    for (const state of [current(3), null]) {
+      const { guard, jwt } = guardFor(state);
       await expect(guard.canActivate(contextWith(await jwt.signAsync({ sub: 'u1', email: 'a@b.co', tv: 2 })).context)).rejects.toBeInstanceOf(
         UnauthorizedException,
       );
@@ -353,10 +582,24 @@ describe('JwtAuthGuard', () => {
   });
 
   it('lets public routes through as anonymous with a stale token', async () => {
-    const { guard, jwt } = guardFor(5, true);
+    const { guard, jwt } = guardFor(current(5), { isPublic: true });
     const { context, request } = contextWith(await jwt.signAsync({ sub: 'u1', email: 'a@b.co', tv: 1 }));
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(request.user).toBeUndefined();
+  });
+
+  it('keeps accounts with an unverified email to the routes that allow it, while email is on', async () => {
+    const unverified: SessionState = { version: 0, emailVerified: false };
+    const token = await guardFor(null).jwt.signAsync({ sub: 'u1', email: 'a@b.co', tv: 0 });
+
+    const blocked = await errorOf(guardFor(unverified).guard.canActivate(contextWith(token).context));
+    expect(blocked).toMatchObject({ status: 403, body: { code: 'EMAIL_NOT_VERIFIED' } });
+
+    for (const options of [{ allowUnverified: true }, { isPublic: true }, { mail: false }]) {
+      const { context, request } = contextWith(token);
+      await expect(guardFor(unverified, options).guard.canActivate(context)).resolves.toBe(true);
+      expect(request.user).toEqual({ id: 'u1', email: 'a@b.co' });
+    }
   });
 
   it('does not sign people out when the database has a hiccup', async () => {
