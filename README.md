@@ -122,13 +122,24 @@ Limits reset at midnight in `APP_TIMEZONE` (default `Asia/Karachi`). When a limi
 
 **AI fair-use cap.** Every AI model call (writing, tailoring, parsing, cover letters, ATS deep review) counts towards `AI_DAILY_LIMIT_FREE` (default 20) or `AI_DAILY_LIMIT_LIFETIME` (default 100) per user per day (**HTTP 429** when used up). The offline assistant is not counted. This protects your OpenRouter bill — a one-time PKR 99 cannot pay for unlimited AI calls.
 
-**How a payment works**
+**Checkout** (`/checkout`, a full page outside the app shell) offers two ways to pay. Every "Upgrade" / "Go lifetime" button leads there; **Plan & billing** (`/app/billing`) shows the plan, today's usage and payment status.
 
-1. Checkout shows one merchant QR code (JazzCash + Raast, so every wallet and bank app can scan it) from `public/payment/`. To change it: `npm run payment-qr -- path/to/new-qr.jpg`, then update `PAYMENT_QR` (merchant name, till ID, size) in `src/app/pages/billing/billing-page.ts`. In `backend/.env` set `ADMIN_EMAILS` and, optionally, `SUPPORT_WHATSAPP`.
-2. The user opens **Plan & billing** (`/app/billing`), sends the amount, and submits the transaction ID, the number they paid from and (optionally) a receipt screenshot.
-3. An admin (a logged-in user whose email is in `ADMIN_EMAILS`) opens **Admin** (`/app/admin`), checks the transaction in the JazzCash / Easypaisa / bank app and clicks **Approve** — the user gets lifetime access immediately — or **Reject** with a reason (the user can resubmit). Admins can also grant or revoke lifetime access from the Users tab.
+1. **Pay online (primary)** — through the payment gateway set in `PAYMENT_GATEWAY`. The buyer pays on the gateway's secure page and comes back to `/checkout/result`; lifetime access is activated automatically as soon as the gateway confirms the payment. Until a gateway is connected, checkout shows this option as *Coming soon* and selects the QR code.
+2. **Scan QR & pay (additional)** — one merchant QR code (JazzCash + Raast, so every wallet and bank app can scan it) from `public/payment/`, verified by hand:
+   1. The user scans the QR, pays, and submits the transaction ID, the number they paid from and (optionally) a receipt screenshot.
+   2. An admin (a logged-in user whose email is in `ADMIN_EMAILS`) opens **Admin** (`/app/admin`), checks the transaction in the JazzCash / Easypaisa / bank app and clicks **Approve** — the user gets lifetime access immediately — or **Reject** with a reason (the user can resubmit). Admins can also grant or revoke lifetime access from the Users tab.
 
-A transaction ID can only be used once (unless rejected), and a user can have one pending payment at a time.
+   To change the QR: `npm run payment-qr -- path/to/new-qr.jpg`, then update `PAYMENT_QR` (merchant name, till ID, size) in `src/app/pages/checkout/qr-payment.ts`. In `backend/.env` set `ADMIN_EMAILS` and, optionally, `SUPPORT_WHATSAPP`.
+
+A transaction ID can only be used once (unless rejected), and a user can have one pending QR payment at a time. Online payments land in the same payments ledger (method *Online payment*, already approved), so they show up in the admin list and the revenue total.
+
+**How an online payment is processed** (`backend/src/checkout/`)
+
+- `POST checkout/orders` creates an order (`checkout_orders` table, price locked, valid 30 minutes) and a session with the gateway, and returns a pay link. `GET checkout/orders/:id/pay` sends the browser to the gateway — a redirect, or an auto-submitted form for gateways that expect a POST. In the Android app the payment opens in the phone's browser.
+- The gateway reports back through the return URL (`checkout/return/:gateway`, GET or POST, with the buyer), its webhook (`checkout/webhook/:gateway`, server to server) and, if it has one, its status API (asked while the result page waits). Every report is verified by the gateway adapter (signature or a direct check with the gateway); the amount and currency must match the order.
+- Fulfilment runs in a database transaction with a row lock: the order becomes *paid*, one approved row is added to `payments` (method `gateway`) and the user gets lifetime access. Repeated or late reports of the same payment change nothing; a payment confirmed after the buyer cancelled or the order expired still counts.
+- **Connecting the real gateway**: implement the `PaymentGateway` interface (`backend/src/checkout/gateways/gateway.types.ts`: create a session, verify the return data and webhooks, optionally fetch a status) in a new file next to `mock.gateway.ts`, register it in `gateway.registry.ts`, and set `PAYMENT_GATEWAY` plus its credentials. Give the gateway `FRONTEND_URL/api/checkout/webhook/<key>` as the notification URL; buyers return to `FRONTEND_URL/api/checkout/return/<key>`, so the first `FRONTEND_URL` must be the public site address.
+- **Testing**: `PAYMENT_GATEWAY=mock` turns on a built-in test gateway whose page offers *Pay*, *Decline* and *Cancel*, with HMAC-signed results that go through the same verification and fulfilment. It refuses to start when `NODE_ENV=production`.
 
 ---
 
@@ -139,7 +150,7 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3000` | API port |
-| `FRONTEND_URL` | `http://localhost:4200` | Allowed CORS origins (comma separated) |
+| `FRONTEND_URL` | `http://localhost:4200` | Allowed CORS origins (comma separated). The first one is also the public site address the payment gateway returns buyers to |
 | `TRUST_PROXY` | — | `1` behind a reverse proxy (Hostinger, Nginx) so rate limits see the real visitor IP |
 | `DATABASE_URL` | — | Postgres connection string, e.g. Supabase's "Session pooler" string. May keep `[YOUR-PASSWORD]`. Overrides the individual settings |
 | `DATABASE_PASSWORD` | — | Database password, used when `DATABASE_URL` has none or the placeholder (no URL-encoding) |
@@ -160,6 +171,7 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | `FREE_DAILY_RESUMES` / `FREE_DAILY_COVER_LETTERS` / `FREE_DAILY_DOCUMENTS` | `1` / `1` / `1` | Free-plan daily limits (`-1` = unlimited) |
 | `APP_TIMEZONE` | `Asia/Karachi` | When daily limits reset (midnight) |
 | `AI_DAILY_LIMIT_FREE` / `AI_DAILY_LIMIT_LIFETIME` | `20` / `100` | AI requests per user per day (`-1` = unlimited) |
+| `PAYMENT_GATEWAY` | — (off) | Online payment gateway for checkout (adapter key from `backend/src/checkout/gateways/`). Off: checkout shows *Pay online* as coming soon and offers the QR code. `mock` = built-in test gateway (never with `NODE_ENV=production`) |
 | `SUPPORT_WHATSAPP` | — | Optional WhatsApp number for payment questions (`03001234567` or `923001234567`) |
 | `ADMIN_EMAILS` | — | Comma-separated emails that can open `/app/admin` and approve payments |
 
@@ -189,7 +201,8 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 | `POST ats/analyze-file`, `POST ats/analyze-resume`, `POST ats/analyze-text`, `GET ats/reports`, `GET/DELETE ats/reports/:id` | ATS checker |
 | `GET documents`, `POST documents/upload`, `POST documents`, `GET/PATCH/DELETE documents/:id`, `GET documents/:id/file`, `GET documents/:id/html`, `POST documents/:id/extract-text`, `POST documents/extract-text` | Documents |
 | `POST export/pdf`, `POST export/docx`, `POST export/convert`, `GET export/status` | Exports & conversions |
-| `GET billing/config` (public), `GET billing/me`, `POST billing/payments` | Price, payment accounts, today's usage, submit a payment |
+| `GET billing/config` (public), `GET billing/me`, `POST billing/payments` | Price, payment accounts, today's usage, submit a QR payment |
+| `GET checkout/config` (public), `POST checkout/orders`, `GET checkout/orders/:id` (public), `GET checkout/orders/:id/pay`, `GET/POST checkout/return/:gateway`, `POST checkout/webhook/:gateway` | Online checkout: gateway info, start a payment, order status, open the gateway, gateway return and webhook |
 | `GET admin/stats`, `GET admin/payments?status=`, `GET admin/payments/:id/screenshot`, `POST admin/payments/:id/approve`, `POST admin/payments/:id/reject`, `GET admin/users?search=`, `POST admin/users/:id/plan` | Admin (emails in `ADMIN_EMAILS` only) |
 | `GET health` | Database / AI / PDF engine status |
 
@@ -278,6 +291,6 @@ APP_VERSION_NAME=1.1.0 APP_VERSION_CODE=2 npm run apk -- --aab    # next version
 3. `backend` folder mein `npm run start:dev` — tables khud ban jati hain (migrations). Doosre terminal mein root se `npm run start:dev`.
 4. Browser mein `http://localhost:4200` kholein, account banayein, template choose karein.
 5. AI ke liye `backend/.env` mein `OPENROUTER_API_KEY` (openrouter.ai/keys, account mein credits hone chahiye) aur `AI_MODEL` daalein, phir backend restart karein — bina key ke bhi app offline AI mode mein chalti hai.
-6. Payment: checkout par merchant QR dikhta hai (`public/payment/`). Naya QR lagane ke liye `npm run payment-qr -- naya-qr.jpg` chalayein. `backend/.env` mein `ADMIN_EMAILS` mein apni email aur `SUPPORT_WHATSAPP` mein apna number daalein.
-7. User payment bhej kar **Plan & billing** page par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai.
+6. Payment: alag **Checkout** page (`/checkout`) par do tareeqe hain — **Pay online** (payment gateway, primary; payment confirm hote hi lifetime khud active) aur **Scan QR & pay** (merchant QR, `public/payment/`). Gateway jab tak connect nahi hota, `PAYMENT_GATEWAY` khali rakhein — online option "Coming soon" dikhata hai aur QR chalta rehta hai. Testing ke liye `PAYMENT_GATEWAY=mock` (production mein nahi chalta). Naya QR lagane ke liye `npm run payment-qr -- naya-qr.jpg`. `backend/.env` mein `ADMIN_EMAILS` mein apni email aur `SUPPORT_WHATSAPP` mein apna number daalein.
+7. QR se pay karne wala user checkout par Transaction ID submit karta hai. Aap **Admin** page par apne JazzCash/Easypaisa app se TID match karke **Approve** dabayein — user ko foran lifetime access mil jata hai. Online payments admin list mein khud "Approved" aati hain.
 8. Android APK: `API_URL=https://aap-ka-domain.com npm run apk` chalayein — file `dist/apk/` mein milegi. `android/keystore/` aur `android/keystore.properties` ka backup zaroor rakhein, warna app update nahi ho sakegi.
