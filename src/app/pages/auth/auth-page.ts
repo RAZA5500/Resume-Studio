@@ -55,6 +55,8 @@ export class AuthPage {
   protected readonly fullName = signal('');
   protected readonly email = signal('');
   protected readonly password = signal('');
+  /** Sign-up asks for the password twice, so a typo does not lock the person out. */
+  protected readonly confirmPassword = signal('');
   protected readonly showPassword = signal(false);
   /** Honeypot (see the hidden field in the template). */
   protected readonly website = signal('');
@@ -78,6 +80,8 @@ export class AuthPage {
   });
 
   protected readonly isRegister = computed(() => this.mode() === 'register');
+  /** Shown once the second password has been typed. */
+  protected readonly mismatch = computed(() => !!this.confirmPassword() && this.confirmPassword() !== this.password());
   protected readonly sample = SAMPLE_CONTENT;
   protected readonly sampleDesign = { ...DEFAULT_DESIGN, layout: 'modern', primaryColor: '#1e3a8a', accentColor: '#2563eb', headingStyle: 'line' as const, uppercaseHeadings: true, skillStyle: 'inline' as const };
   protected readonly features = [
@@ -148,6 +152,9 @@ export class AuthPage {
     if (!/^\S+@\S+\.\S+$/.test(this.email().trim())) return this.error.set('Please enter a valid email address.');
     if (this.password().length < (this.isRegister() ? 8 : 1)) {
       return this.error.set(this.isRegister() ? 'Password must be at least 8 characters.' : 'Please enter your password.');
+    }
+    if (this.isRegister() && this.confirmPassword() !== this.password()) {
+      return this.error.set(this.confirmPassword() ? 'The two passwords do not match.' : 'Please type your password again to confirm it.');
     }
 
     this.loading.set(true);

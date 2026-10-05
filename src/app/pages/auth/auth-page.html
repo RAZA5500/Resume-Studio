@@ -112,6 +112,23 @@
             <span class="hint">At least 8 characters. Avoid common passwords and your name or email.</span>
           }
         </div>
+        @if (isRegister()) {
+          <div class="field">
+            <label for="confirm-password">Confirm password</label>
+            <div class="input-group" [class.mismatch]="mismatch()">
+              <span class="i">lock</span>
+              <input id="confirm-password" class="input" name="confirmPassword" [type]="showPassword() ? 'text' : 'password'"
+                autocomplete="new-password" placeholder="Type it again" aria-describedby="confirm-hint" [attr.aria-invalid]="mismatch()"
+                [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" />
+            </div>
+            @if (confirmPassword()) {
+              <span id="confirm-hint" class="match" [class.bad]="mismatch()" aria-live="polite" animate.enter="is-entering">
+                <span class="i sm">{{ mismatch() ? 'close' : 'check' }}</span>
+                {{ mismatch() ? 'Passwords do not match' : 'Passwords match' }}
+              </span>
+            }
+          </div>
+        }
 
         @if (error()) {
           <div class="alert danger"><span class="i">error</span> {{ error() }}</div>

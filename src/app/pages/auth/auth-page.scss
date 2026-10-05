@@ -150,6 +150,26 @@
   }
 }
 
+.input-group.mismatch .input {
+  border-color: var(--danger-line);
+  box-shadow: 0 0 0 3px var(--danger-50);
+}
+
+.match {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success);
+  &.bad {
+    color: var(--danger);
+  }
+  &.is-entering {
+    animation: rise-in 0.3s var(--ease-out) both;
+  }
+}
+
 .submit {
   margin-top: 6px;
   height: 50px;
