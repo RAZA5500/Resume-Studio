@@ -7,7 +7,26 @@ import { User } from './user.entity.js';
 /** How long the auth guard trusts a cached session version (revocations here apply at once). */
 const SESSION_CACHE_MS = 60_000;
 
-type UserPatch = Partial<Pick<User, 'fullName' | 'headline' | 'passwordHash' | 'emailVerifiedAt'>>;
+type UserPatch = Partial<
+  Pick<
+    User,
+    | 'fullName'
+    | 'headline'
+    | 'passwordHash'
+    | 'emailVerifiedAt'
+    | 'twoFactorSecret'
+    | 'twoFactorEnabledAt'
+    | 'twoFactorLastStep'
+    | 'twoFactorBackupCodes'
+  >
+>;
+
+export interface TwoFactorState {
+  secret: string | null;
+  enabledAt: Date | null;
+  lastStep: number | null;
+  backupCodes: string[];
+}
 
 @Injectable()
 export class UsersService {
@@ -41,17 +60,62 @@ export class UsersService {
     return this.findById(id);
   }
 
-  /** What the profile shows under sign-in methods. */
-  async loginMethods(id: string): Promise<{ hasPassword: boolean; providers: IdentityProvider[] }> {
+  /** What the profile shows under sign-in & security. */
+  async loginMethods(
+    id: string,
+  ): Promise<{ hasPassword: boolean; providers: IdentityProvider[]; twoFactorEnabled: boolean; backupCodesLeft: number }> {
     const [row, identities] = await Promise.all([
       this.users
         .createQueryBuilder('u')
         .select('u.passwordHash IS NOT NULL', 'hasPassword')
+        .addSelect('u.twoFactorEnabledAt IS NOT NULL', 'twoFactorEnabled')
+        .addSelect('COALESCE(jsonb_array_length(u.twoFactorBackupCodes), 0)', 'backupCodesLeft')
         .where('u.id = :id', { id })
-        .getRawOne<{ hasPassword: boolean }>(),
+        .getRawOne<{ hasPassword: boolean; twoFactorEnabled: boolean; backupCodesLeft: number | string }>(),
       this.identities.find({ where: { userId: id }, select: { provider: true }, order: { provider: 'ASC' } }),
     ]);
-    return { hasPassword: !!row?.hasPassword, providers: [...new Set(identities.map((identity) => identity.provider))] };
+    return {
+      hasPassword: !!row?.hasPassword,
+      providers: [...new Set(identities.map((identity) => identity.provider))],
+      twoFactorEnabled: !!row?.twoFactorEnabled,
+      backupCodesLeft: Number(row?.backupCodesLeft ?? 0),
+    };
+  }
+
+  async twoFactorState(id: string): Promise<TwoFactorState> {
+    const row = await this.users.findOne({
+      where: { id },
+      select: { id: true, twoFactorSecret: true, twoFactorEnabledAt: true, twoFactorLastStep: true, twoFactorBackupCodes: true },
+    });
+    if (!row) throw new NotFoundException('User not found');
+    return {
+      secret: row.twoFactorSecret,
+      enabledAt: row.twoFactorEnabledAt,
+      lastStep: row.twoFactorLastStep,
+      backupCodes: row.twoFactorBackupCodes ?? [],
+    };
+  }
+
+  /** Records an accepted authenticator step; false if this step (or a later one) was already used. */
+  async useTotpStep(id: string, step: number): Promise<boolean> {
+    const result = await this.users
+      .createQueryBuilder()
+      .update(User)
+      .set({ twoFactorLastStep: step })
+      .where('id = :id AND ("twoFactorLastStep" IS NULL OR "twoFactorLastStep" < :step)', { id, step })
+      .execute();
+    return result.affected === 1;
+  }
+
+  /** Removes one backup code (by hash) in a single statement, so a code works only once even under races. */
+  async useBackupCode(id: string, hash: string): Promise<boolean> {
+    const result = await this.users
+      .createQueryBuilder()
+      .update(User)
+      .set({ twoFactorBackupCodes: () => `"twoFactorBackupCodes" - CAST(:hash AS text)` })
+      .where('id = :id AND jsonb_exists("twoFactorBackupCodes", :hash)', { id, hash })
+      .execute();
+    return result.affected === 1;
   }
 
   findIdentity(provider: IdentityProvider, subject: string): Promise<UserIdentity | null> {

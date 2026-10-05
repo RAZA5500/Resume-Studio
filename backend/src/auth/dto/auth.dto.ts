@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 
 const normalizeEmail = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().toLowerCase() : value);
 /** Drops invisible control/format characters and collapses whitespace. */
@@ -51,6 +51,31 @@ export class LoginDto extends BotCheckDto {
   @MinLength(1)
   @MaxLength(128)
   password: string;
+
+  /** "Remember this device" tokens kept on this device (they skip the two-factor code). */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(400, { each: true })
+  devices?: string[];
+}
+
+/** A code from the authenticator app (6 digits) or a backup code. */
+export class TwoFactorCodeDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9 -]{6,20}$/, { message: 'Enter the 6-digit code from your app or a backup code.' })
+  code: string;
+}
+
+export class TwoFactorVerifyDto extends TwoFactorCodeDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{20,64}$/)
+  challenge: string;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberDevice?: boolean;
 }
 
 export class UpdateProfileDto {
@@ -78,6 +103,13 @@ export class OAuthExchangeDto {
   @IsString()
   @Matches(/^[A-Za-z0-9_-]{43,128}$/)
   verifier: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(400, { each: true })
+  devices?: string[];
 }
 
 export class ChangePasswordDto {

@@ -7,6 +7,7 @@ import type { User } from '../../users/user.entity.js';
 import { UsersService } from '../../users/users.service.js';
 import { type AuthResponse, AuthService } from '../auth.service.js';
 import { AuthAttemptsService, maskEmail, TooManyAttemptsException } from '../security/auth-attempts.service.js';
+import type { TwoFactorChallenge } from '../two-factor/two-factor.service.js';
 import type { OAuthProfile, OAuthProvider } from './oauth-providers.js';
 
 /** Injection token: the configured providers (see createOAuthProviders). */
@@ -46,6 +47,8 @@ interface LoginCode {
   userId: string;
   clientChallenge: string;
   notice: OAuthNotice;
+  /** A new account (the app does not offer two-factor setup right after sign-up). */
+  created: boolean;
   expires: number;
 }
 
@@ -151,10 +154,10 @@ export class OAuthService {
         redirectUri: this.redirectUri(provider.key),
         user: params.user,
       });
-      const { user, notice } = await this.resolveAccount(provider, profile, ip);
+      const { user, notice, created } = await this.resolveAccount(provider, profile, ip);
       this.prune();
       const loginCode = random(32);
-      this.codes.set(loginCode, { userId: user.id, clientChallenge: flow.clientChallenge, notice, expires: Date.now() + CODE_MS });
+      this.codes.set(loginCode, { userId: user.id, clientChallenge: flow.clientChallenge, notice, created, expires: Date.now() + CODE_MS });
       return { client: flow.client, code: loginCode };
     } catch (error) {
       if (error instanceof OAuthRefusal) return { client: flow.client, error: error.code };
@@ -165,7 +168,11 @@ export class OAuthService {
   }
 
   /** Step 3: the one-time code plus the app's PKCE verifier become a session. */
-  async exchange(code: string, verifier: string): Promise<AuthResponse & { notice: OAuthNotice }> {
+  async exchange(
+    code: string,
+    verifier: string,
+    devices?: readonly string[],
+  ): Promise<(AuthResponse | TwoFactorChallenge) & { notice: OAuthNotice; created: boolean }> {
     const entry = this.codes.get(code);
     // Single use, also when the verifier is wrong: a guessed verifier gets one try.
     this.codes.delete(code);
@@ -176,7 +183,9 @@ export class OAuthService {
       throw new BadRequestException({ statusCode: 400, error: 'Bad Request', code: 'OAUTH_INVALID', message: 'This sign-in could not be completed. Please try again.' });
     }
     const user = await this.users.findById(entry.userId);
-    return { ...(await this.auth.sessionFor(user)), notice: entry.notice };
+    // With two-factor sign-in on, Google / Apple only replace the password: the code is still asked.
+    const next = await this.auth.sessionOrChallenge(user, devices);
+    return { ...next, notice: entry.notice, created: entry.created };
   }
 
   /** Where the website shows the result (/auth/callback reads code or error). */
@@ -210,13 +219,13 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
    * password and other sessions when the email's verified owner signs in: otherwise whoever created
    * it with someone else's address (a "pre-hijacked" account) would keep access.
    */
-  private async resolveAccount(provider: OAuthProvider, profile: OAuthProfile, ip: string, retried = false): Promise<{ user: User; notice: OAuthNotice }> {
+  private async resolveAccount(provider: OAuthProvider, profile: OAuthProfile, ip: string, retried = false): Promise<{ user: User; notice: OAuthNotice; created: boolean }> {
     const email = profile.email?.trim().toLowerCase() || null;
     const known = await this.users.findIdentity(provider.key, profile.subject);
     if (known) {
       await this.users.touchIdentity(known, email);
       this.logger.log(`${provider.name} sign-in for ${maskEmail(email ?? 'unknown')}.`);
-      return { user: await this.users.findById(known.userId), notice: null };
+      return { user: await this.users.findById(known.userId), notice: null, created: false };
     }
     if (!email) throw new OAuthRefusal('no_email');
     if (!profile.emailVerified) throw new OAuthRefusal('email_unverified');
@@ -226,7 +235,15 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
       if (existing) {
         let notice: OAuthNotice = null;
         if (existing.passwordHash && !existing.emailVerifiedAt) {
-          await this.users.update(existing.id, { passwordHash: null, emailVerifiedAt: new Date() });
+          // Whoever set up this account with an unverified address also chose its 2FA app: that goes too.
+          await this.users.update(existing.id, {
+            passwordHash: null,
+            emailVerifiedAt: new Date(),
+            twoFactorSecret: null,
+            twoFactorEnabledAt: null,
+            twoFactorLastStep: null,
+            twoFactorBackupCodes: null,
+          });
           await this.users.revokeSessions(existing.id);
           notice = 'password_removed';
         } else if (!existing.emailVerifiedAt) {
@@ -234,7 +251,7 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
         }
         await this.users.linkIdentity(existing.id, provider.key, profile.subject, email);
         this.logger.log(`${provider.name} linked to ${maskEmail(email)}${notice ? ' (unverified password removed)' : ''}.`);
-        return { user: await this.users.findById(existing.id), notice };
+        return { user: await this.users.findById(existing.id), notice, created: false };
       }
 
       this.attempts.assertSignupAllowed(ip);
@@ -242,7 +259,7 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
       await this.users.linkIdentity(user.id, provider.key, profile.subject, email);
       this.attempts.signupCreated(ip);
       this.logger.log(`New account ${maskEmail(email)} via ${provider.name} from ${ip}.`);
-      return { user, notice: null };
+      return { user, notice: null, created: true };
     } catch (error) {
       // Two callbacks for the same person at once: the unique indexes decide, then we look again.
       const code = (error as { driverError?: { code?: string }; code?: string }).driverError?.code ?? (error as { code?: string }).code;

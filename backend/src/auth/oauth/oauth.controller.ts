@@ -52,7 +52,7 @@ export class OAuthController {
   @HttpCode(200)
   @Post('oauth/exchange')
   exchange(@Body() dto: OAuthExchangeDto) {
-    return this.oauth.exchange(dto.code, dto.verifier);
+    return this.oauth.exchange(dto.code, dto.verifier, dto.devices);
   }
 
   private finish(res: Response, outcome: OAuthOutcome): void {

@@ -46,6 +46,7 @@
     "rxjs": "^7.8.1",
     "tesseract.js": "^7.0.0",
     "typeorm": "^1.1.1",
+    "uqr": "0.1.3",
     "word-extractor": "^1.0.4"
   },
   "devDependencies": {

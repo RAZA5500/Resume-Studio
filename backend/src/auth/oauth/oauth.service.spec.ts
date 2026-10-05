@@ -82,7 +82,7 @@ function setup() {
     }),
     revokeSessions: vi.fn((id: string) => Promise.resolve(++users.find((u) => u.id === id)!.tokenVersion)),
   };
-  const auth = { sessionFor: (user: User) => Promise.resolve({ accessToken: `token-for-${user.id}`, user }) } as unknown as AuthService;
+  const auth = { sessionOrChallenge: (user: User) => Promise.resolve({ accessToken: `token-for-${user.id}`, user }) } as unknown as AuthService;
   const attempts = new AuthAttemptsService();
   Object.assign(attempts, { logger: { warn: () => undefined } });
   const providers = new Map([['google', new GoogleProvider('google-client', 'google-secret', google.endpoints, google.fetcher)]]) as Map<

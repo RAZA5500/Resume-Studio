@@ -22,6 +22,22 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   emailVerifiedAt: Date | null;
 
+  /** Authenticator-app secret, encrypted (SecretBox). Set during setup and while two-factor sign-in is on. */
+  @Column({ type: 'varchar', length: 255, nullable: true, select: false })
+  twoFactorSecret: string | null;
+
+  /** When two-factor sign-in was turned on; null = off. */
+  @Column({ type: 'timestamptz', nullable: true })
+  twoFactorEnabledAt: Date | null;
+
+  /** Last accepted authenticator time step: every code works only once. */
+  @Column({ type: 'int', nullable: true, select: false })
+  twoFactorLastStep: number | null;
+
+  /** SHA-256 hashes of the unused backup codes. */
+  @Column({ type: 'jsonb', nullable: true, select: false })
+  twoFactorBackupCodes: string[] | null;
+
   @Column({ type: 'varchar', length: 120 })
   fullName: string;
 

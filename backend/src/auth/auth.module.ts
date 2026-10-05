@@ -11,6 +11,8 @@ import { OAUTH_PROVIDERS, OAuthService } from './oauth/oauth.service.js';
 import { AuthAttemptsService } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { ProofOfWorkService } from './security/proof-of-work.service.js';
+import { TwoFactorController } from './two-factor/two-factor.controller.js';
+import { TwoFactorService } from './two-factor/two-factor.service.js';
 
 @Module({
   imports: [
@@ -39,12 +41,13 @@ import { ProofOfWorkService } from './security/proof-of-work.service.js';
       },
     }),
   ],
-  controllers: [AuthController, OAuthController],
+  controllers: [AuthController, OAuthController, TwoFactorController],
   providers: [
     AuthService,
     AuthAttemptsService,
     PasswordHasher,
     ProofOfWorkService,
+    TwoFactorService,
     OAuthService,
     { provide: OAUTH_PROVIDERS, inject: [ConfigService], useFactory: (config: ConfigService) => createOAuthProviders(config) },
   ],

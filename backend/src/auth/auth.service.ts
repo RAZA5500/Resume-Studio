@@ -6,15 +6,18 @@ import type { JwtPayload } from '../common/auth/auth.decorators.js';
 import type { IdentityProvider } from '../users/user-identity.entity.js';
 import { User } from '../users/user.entity.js';
 import { UsersService } from '../users/users.service.js';
-import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto.js';
+import { ChangePasswordDto, LoginDto, RegisterDto, TwoFactorVerifyDto, UpdateProfileDto } from './dto/auth.dto.js';
 import { AuthAttemptsService, maskEmail } from './security/auth-attempts.service.js';
 import { PasswordHasher } from './security/password-hasher.service.js';
 import { breachCount, passwordProblem } from './security/password-policy.js';
 import { ProofOfWorkService } from './security/proof-of-work.service.js';
+import { type TwoFactorChallenge, TwoFactorService } from './two-factor/two-factor.service.js';
 
 export interface AuthResponse {
   accessToken: string;
   user: PublicUser;
+  /** "Remember this device" token after a two-factor sign-in that asked for it. */
+  trustedDevice?: string;
 }
 
 export type PublicUser = Pick<User, 'id' | 'email' | 'fullName' | 'headline' | 'plan' | 'planActivatedAt' | 'createdAt'> & {
@@ -23,6 +26,8 @@ export type PublicUser = Pick<User, 'id' | 'email' | 'fullName' | 'headline' | '
   hasPassword: boolean;
   /** Linked sign-in providers. */
   providers: IdentityProvider[];
+  twoFactorEnabled: boolean;
+  backupCodesLeft: number;
 };
 
 /** 400 with a machine-readable code next to the message (the app reacts to some codes). */
@@ -54,6 +59,7 @@ export class AuthService {
     private readonly hasher: PasswordHasher,
     private readonly attempts: AuthAttemptsService,
     private readonly pow: ProofOfWorkService,
+    private readonly twoFactor: TwoFactorService,
     config: ConfigService,
   ) {
     this.breachCheck = !/^(0|false|off|no)$/i.test(config.get<string>('PASSWORD_BREACH_CHECK')?.trim() ?? '');
@@ -88,7 +94,8 @@ export class AuthService {
     return this.issue(user);
   }
 
-  async login(dto: LoginDto, ip: string): Promise<AuthResponse> {
+  /** A session — or, with two-factor sign-in on, a challenge for POST auth/2fa/verify. */
+  async login(dto: LoginDto, ip: string): Promise<AuthResponse | TwoFactorChallenge> {
     this.checkBot(dto, ip, 'sign-in');
     this.attempts.assertLoginAllowed(dto.email, ip);
     const user = await this.users.findByEmail(dto.email, true);
@@ -99,7 +106,21 @@ export class AuthService {
     }
     this.attempts.loginSucceeded(dto.email, ip);
     if (user.passwordHash && this.hasher.needsRehash(user.passwordHash)) this.upgradeHash(user.id, dto.password);
-    return this.issue(user);
+    return this.sessionOrChallenge(user, dto.devices);
+  }
+
+  /** Step two of a sign-in with two-factor on: the app code (or a backup code) for the challenge. */
+  async verifyTwoFactor(dto: TwoFactorVerifyDto, ip: string): Promise<AuthResponse> {
+    const { userId } = await this.twoFactor.completeChallenge(dto.challenge, dto.code, ip);
+    const user = await this.users.findById(userId);
+    const session = await this.issue(user);
+    const trustedDevice = dto.rememberDevice ? this.twoFactor.deviceToken(user) : null;
+    return trustedDevice ? { ...session, trustedDevice } : session;
+  }
+
+  /** A session, unless two-factor sign-in is on and this device is not remembered (Google / Apple use this too). */
+  sessionOrChallenge(user: User, devices?: readonly string[]): Promise<AuthResponse> | TwoFactorChallenge {
+    return this.twoFactor.needsSecondStep(user, devices) ? this.twoFactor.createChallenge(user.id) : this.issue(user);
   }
 
   async me(userId: string): Promise<PublicUser> {
@@ -141,11 +162,6 @@ export class AuthService {
     const version = await this.users.revokeSessions(userId);
     this.logger.log(`Password ${user.passwordHash ? 'changed' : 'set'} for ${maskEmail(user.email)}; other sessions signed out.`);
     return { success: true, accessToken: await this.sign(user, version) };
-  }
-
-  /** A session for an account that proved who it is another way (Google / Apple sign-in). */
-  sessionFor(user: User): Promise<AuthResponse> {
-    return this.issue(user);
   }
 
   /** "Sign out everywhere": every token issued so far stops working, this one included. */
@@ -193,7 +209,7 @@ export class AuthService {
   }
 
   private async toPublic(user: User): Promise<PublicUser> {
-    const { hasPassword, providers } = await this.users.loginMethods(user.id);
+    const { hasPassword, providers, twoFactorEnabled, backupCodesLeft } = await this.users.loginMethods(user.id);
     return {
       id: user.id,
       email: user.email,
@@ -205,6 +221,8 @@ export class AuthService {
       isAdmin: this.billing.isAdmin(user.email),
       hasPassword,
       providers,
+      twoFactorEnabled,
+      backupCodesLeft,
     };
   }
 }
