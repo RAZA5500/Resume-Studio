@@ -16,11 +16,30 @@ export interface User {
   hasPassword?: boolean;
   /** Linked sign-in providers. */
   providers?: OAuthProvider[];
+  /** Two-factor sign-in with an authenticator app. */
+  twoFactorEnabled?: boolean;
+  backupCodesLeft?: number;
 }
 
 export interface AuthResponse {
   accessToken: string;
   user: User;
+  /** "Remember this device" token, after a two-factor sign-in that asked for it. */
+  trustedDevice?: string;
+}
+
+/** Sign-in step two: the password (or Google / Apple) was right, now the authenticator code. */
+export interface TwoFactorChallenge {
+  twoFactorRequired: true;
+  challenge: string;
+  methods: ('app' | 'backup')[];
+}
+
+export interface TwoFactorSetup {
+  /** base32, for typing into the app by hand. */
+  secret: string;
+  uri: string;
+  qrSvg: string;
 }
 
 export type OAuthProvider = 'google' | 'apple';

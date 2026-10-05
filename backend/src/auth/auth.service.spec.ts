@@ -277,7 +277,7 @@ describe('Two-factor sign-in', () => {
   });
 
   it('skips the code on a remembered device until the password changes', async () => {
-    const { service, login, nextCode, user } = await withTwoFactor();
+    const { service, login, nextCode, user, form } = await withTwoFactor();
     const session = await service.verifyTwoFactor({ challenge: (await login()).challenge, code: nextCode(), rememberDevice: true }, IP);
     expect(session.trustedDevice).toEqual(expect.any(String));
 
@@ -286,19 +286,20 @@ describe('Two-factor sign-in', () => {
     expect(await login({ devices: ['forged.token'] })).toMatchObject({ twoFactorRequired: true });
 
     await service.changePassword(user.id, { currentPassword: GOOD_PASSWORD, newPassword: 'Another-Good-Pass-9' }, IP);
-    const afterChange = await service.login({ email: 'sara@example.com', password: 'Another-Good-Pass-9', pow: undefined, devices: [session.trustedDevice!] } as never, IP).catch(
-      (e: unknown) => e,
+    const afterChange = await service.login(
+      { email: 'sara@example.com', password: 'Another-Good-Pass-9', ...form(), devices: [session.trustedDevice!] },
+      IP,
     );
-    expect(afterChange).toBeDefined();
+    expect(afterChange).toMatchObject({ twoFactorRequired: true });
   });
 
   it('turns off only with a valid code, and then signs in without one', async () => {
-    const { service, twoFactor, login, user, nextCode, form } = await withTwoFactor();
+    const { service, twoFactor, user, nextCode, form, rows } = await withTwoFactor();
     expect((await errorOf(twoFactor.disable(user.id, '000000', IP))).body.code).toBe('INVALID_2FA_CODE');
     await twoFactor.disable(user.id, nextCode(), IP);
+    expect(rows[0]).toMatchObject({ twoFactorSecret: null, twoFactorEnabledAt: null, twoFactorBackupCodes: null });
     const result = (await service.login({ email: 'sara@example.com', password: GOOD_PASSWORD, ...form() }, IP)) as unknown as { accessToken?: string };
     expect(result.accessToken).toEqual(expect.any(String));
-    expect(login).toBeTruthy();
   });
 
   it('replaces the backup codes on request', async () => {

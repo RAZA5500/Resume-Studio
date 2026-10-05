@@ -82,7 +82,14 @@ function setup() {
     }),
     revokeSessions: vi.fn((id: string) => Promise.resolve(++users.find((u) => u.id === id)!.tokenVersion)),
   };
-  const auth = { sessionOrChallenge: (user: User) => Promise.resolve({ accessToken: `token-for-${user.id}`, user }) } as unknown as AuthService;
+  // Like AuthService: a challenge when two-factor is on and no remembered-device token is sent.
+  const auth = {
+    sessionOrChallenge: vi.fn((user: User, devices?: readonly string[]) =>
+      user.twoFactorEnabledAt && !devices?.includes('trusted-device')
+        ? { twoFactorRequired: true, challenge: `challenge-for-${user.id}`, methods: ['app', 'backup'] }
+        : Promise.resolve({ accessToken: `token-for-${user.id}`, user }),
+    ),
+  };
   const attempts = new AuthAttemptsService();
   Object.assign(attempts, { logger: { warn: () => undefined } });
   const providers = new Map([['google', new GoogleProvider('google-client', 'google-secret', google.endpoints, google.fetcher)]]) as Map<
@@ -91,7 +98,7 @@ function setup() {
   >;
   const service = new OAuthService(
     store as unknown as UsersService,
-    auth,
+    auth as unknown as AuthService,
     attempts,
     providers,
     { get: (key: string) => (key === 'FRONTEND_URL' ? 'https://resume.example.com' : undefined) } as unknown as ConfigService,
@@ -107,7 +114,7 @@ function setup() {
     const outcome = await service.callback('google', { code, state }, IP);
     return { outcome, verifier, authorizeUrl, state };
   };
-  return { service, google, users, identities, store, signIn };
+  return { service, google, users, identities, store, signIn, auth };
 }
 
 const GOOGLE_PERSON = { sub: 'google-123', email: 'Sara.Khan@Gmail.com', email_verified: true, name: 'Sara Khan' };
@@ -214,6 +221,22 @@ describe('OAuthService', () => {
     const { outcome, verifier } = await signIn(GOOGLE_PERSON);
     await expect(service.exchange(outcome.code!, randomBytes(32).toString('base64url'))).rejects.toMatchObject({ response: { code: 'OAUTH_INVALID' } });
     await expect(service.exchange(outcome.code!, verifier)).rejects.toMatchObject({ response: { code: 'OAUTH_EXPIRED' } });
+  });
+
+  it('still asks for the two-factor code after Google / Apple, unless the device is remembered', async () => {
+    const { service, users, signIn, auth } = setup();
+    users.push({ id: 'u7', email: 'sara.khan@gmail.com', fullName: 'Sara', passwordHash: null, emailVerifiedAt: new Date(), twoFactorEnabledAt: new Date(), tokenVersion: 0 } as User);
+    let leg = await signIn(GOOGLE_PERSON);
+    await expect(service.exchange(leg.outcome.code!, leg.verifier)).resolves.toMatchObject({ twoFactorRequired: true, challenge: 'challenge-for-u7', created: false });
+    leg = await signIn(GOOGLE_PERSON);
+    await expect(service.exchange(leg.outcome.code!, leg.verifier, ['trusted-device'])).resolves.toMatchObject({ accessToken: 'token-for-u7' });
+    expect(auth.sessionOrChallenge).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'u7' }), ['trusted-device']);
+  });
+
+  it('marks brand-new accounts so the app skips the two-factor offer right after sign-up', async () => {
+    const { service, signIn } = setup();
+    const { outcome, verifier } = await signIn(GOOGLE_PERSON);
+    await expect(service.exchange(outcome.code!, verifier)).resolves.toMatchObject({ created: true });
   });
 
   it('signs a returning person into the same account', async () => {
