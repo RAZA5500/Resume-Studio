@@ -20,7 +20,7 @@ AI resume builder, ATS score checker, AI resume analyzer and PDF / image / Word 
 | **PDF & image editor** | Edit existing PDF text, add text, whiteout, draw, highlight, shapes, arrows, images, signature (draw/type), stamps, layers, align, lock, rotate/crop/flip photos, filters (brightness, contrast, saturation, hue, blur, B&W, sepia, vintage, invert), page add/duplicate/reorder/rotate/delete, undo/redo, OCR, export PDF (smart or flattened) / PNG / JPG / WebP |
 | **Rich text editor** | Word-style editor for DOCX/DOC/TXT/MD/RTF/HTML files or blank docs, AI rewrite of selected text (improve, grammar, shorten, expand, translate/custom), export PDF / DOCX / HTML / TXT |
 | **File tools** | Merge PDFs, extract pages, images → PDF, PDF → images, Word → PDF, PDF → Word, image → text (OCR) |
-| **Plans & payments** | Free: 1 new resume, 1 cover letter and 1 document edit per day. Lifetime (PKR 99, one-time): unlimited. Manual JazzCash / Easypaisa / bank payments with transaction ID + receipt screenshot, approved from the admin panel |
+| **Plans & payments** | Free: 1 new resume, 1 cover letter and 1 document edit per day. Lifetime (PKR 99, one-time): unlimited. A separate checkout (`/checkout`): online payment gateway as the primary method (activates instantly), and the merchant QR code (JazzCash / Easypaisa / bank, transaction ID + receipt screenshot, approved from the admin panel) as the alternative |
 
 > **AI works in two modes.** With `OPENROUTER_API_KEY` set, every AI feature uses the model in `AI_MODEL` through [OpenRouter](https://openrouter.ai) (structured JSON outputs). Without a key, a built-in rule-based assistant keeps all features working (summaries, bullet rewrites, skills, tailoring, cover letters, resume parsing). The deep “AI analysis” in the ATS checker requires the key.
 
@@ -37,7 +37,7 @@ One npm workspace: the Angular app lives in the project root, the API in `backen
 │   ├── shared/resume/          # the resume renderer (all 16 layouts) + styles
 │   ├── layout/                 # app shell + public header
 │   └── pages/                  # landing, auth, dashboard, templates, builder, ats, documents,
-│                               # editor (canvas + rich), cover letter, profile, billing, admin
+│                               # editor (canvas + rich), cover letter, profile, billing, checkout, admin
 ├── public/                     # static files: fonts, icons, payment QR, PWA manifest
 ├── scripts/                    # build, fonts, icons, payment QR and APK scripts
 ├── android/                    # Capacitor Android project (npm run apk)
@@ -54,7 +54,8 @@ One npm workspace: the Angular app lives in the project root, the API in `backen
         ├── extraction/         # PDF/DOCX/DOC/RTF/HTML text extraction + Tesseract OCR
         ├── documents/          # uploaded documents + editor state
         ├── export/             # HTML→PDF (puppeteer-core), HTML→DOCX, file conversion
-        ├── billing/            # plans, daily limits, AI fair-use cap, manual payments, admin API
+        ├── billing/            # plans, daily limits, AI fair-use cap, QR payments, admin API
+        ├── checkout/           # online checkout: orders, payment gateway adapters (gateways/), webhooks
         └── common/             # shared resume types, text helpers, auth guard
 ```
 

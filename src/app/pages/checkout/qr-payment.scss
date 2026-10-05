@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  /* The layout below follows the space the checkout gives this panel, not the screen width. */
+  container-type: inline-size;
 }
 
 .mono {
@@ -337,6 +339,8 @@
   position: relative;
   display: flex;
   align-items: center;
+  /* .field > label spreads its parts apart; here the icon belongs next to the text. */
+  justify-content: flex-start !important;
   gap: 8px;
   height: 46px;
   padding: 0 14px;
@@ -410,19 +414,25 @@ form .btn-lg {
   }
 }
 
-@media (max-width: 600px) {
+@container (max-width: 560px) {
   .qr-card {
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     padding: 22px 16px 18px;
   }
   .qr-poster {
-    width: min(64vw, 260px);
+    width: min(64cqi, 260px);
   }
   .qr-info {
     width: 100%;
   }
   form .btn-lg {
     align-self: stretch;
+  }
+}
+
+@container (max-width: 420px) {
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
