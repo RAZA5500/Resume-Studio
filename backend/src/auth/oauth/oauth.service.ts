@@ -49,6 +49,8 @@ interface LoginCode {
   notice: OAuthNotice;
   /** A new account (the app does not offer two-factor setup right after sign-up). */
   created: boolean;
+  /** The new account's name is the one Google / Apple shared (not made from the email address). */
+  nameFromProvider: boolean;
   expires: number;
 }
 
@@ -154,10 +156,17 @@ export class OAuthService {
         redirectUri: this.redirectUri(provider.key),
         user: params.user,
       });
-      const { user, notice, created } = await this.resolveAccount(provider, profile, ip);
+      const { user, notice, created, nameFromProvider } = await this.resolveAccount(provider, profile, ip);
       this.prune();
       const loginCode = random(32);
-      this.codes.set(loginCode, { userId: user.id, clientChallenge: flow.clientChallenge, notice, created, expires: Date.now() + CODE_MS });
+      this.codes.set(loginCode, {
+        userId: user.id,
+        clientChallenge: flow.clientChallenge,
+        notice,
+        created,
+        nameFromProvider,
+        expires: Date.now() + CODE_MS,
+      });
       return { client: flow.client, code: loginCode };
     } catch (error) {
       if (error instanceof OAuthRefusal) return { client: flow.client, error: error.code };
@@ -172,7 +181,7 @@ export class OAuthService {
     code: string,
     verifier: string,
     devices?: readonly string[],
-  ): Promise<(AuthResponse | TwoFactorChallenge) & { notice: OAuthNotice; created: boolean }> {
+  ): Promise<(AuthResponse | TwoFactorChallenge) & { notice: OAuthNotice; created: boolean; nameFromProvider: boolean }> {
     const entry = this.codes.get(code);
     // Single use, also when the verifier is wrong: a guessed verifier gets one try.
     this.codes.delete(code);
@@ -185,7 +194,7 @@ export class OAuthService {
     const user = await this.users.findById(entry.userId);
     // With two-factor sign-in on, Google / Apple only replace the password: the code is still asked.
     const next = await this.auth.sessionOrChallenge(user, devices);
-    return { ...next, notice: entry.notice, created: entry.created };
+    return { ...next, notice: entry.notice, created: entry.created, nameFromProvider: entry.nameFromProvider };
   }
 
   /** Where the website shows the result (/auth/callback reads code or error). */
@@ -219,13 +228,18 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
    * password and other sessions when the email's verified owner signs in: otherwise whoever created
    * it with someone else's address (a "pre-hijacked" account) would keep access.
    */
-  private async resolveAccount(provider: OAuthProvider, profile: OAuthProfile, ip: string, retried = false): Promise<{ user: User; notice: OAuthNotice; created: boolean }> {
+  private async resolveAccount(
+    provider: OAuthProvider,
+    profile: OAuthProfile,
+    ip: string,
+    retried = false,
+  ): Promise<{ user: User; notice: OAuthNotice; created: boolean; nameFromProvider: boolean }> {
     const email = profile.email?.trim().toLowerCase() || null;
     const known = await this.users.findIdentity(provider.key, profile.subject);
     if (known) {
       await this.users.touchIdentity(known, email);
       this.logger.log(`${provider.name} sign-in for ${maskEmail(email ?? 'unknown')}.`);
-      return { user: await this.users.findById(known.userId), notice: null, created: false };
+      return { user: await this.users.findById(known.userId), notice: null, created: false, nameFromProvider: false };
     }
     if (!email) throw new OAuthRefusal('no_email');
     if (!profile.emailVerified) throw new OAuthRefusal('email_unverified');
@@ -251,15 +265,16 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
         }
         await this.users.linkIdentity(existing.id, provider.key, profile.subject, email);
         this.logger.log(`${provider.name} linked to ${maskEmail(email)}${notice ? ' (unverified password removed)' : ''}.`);
-        return { user: await this.users.findById(existing.id), notice, created: false };
+        return { user: await this.users.findById(existing.id), notice, created: false, nameFromProvider: false };
       }
 
       this.attempts.assertSignupAllowed(ip);
-      const user = await this.users.create({ email, fullName: displayName(profile.name, email), passwordHash: null, emailVerifiedAt: new Date() });
+      const name = nameFor(profile.name, email);
+      const user = await this.users.create({ email, fullName: name.fullName, passwordHash: null, emailVerifiedAt: new Date() });
       await this.users.linkIdentity(user.id, provider.key, profile.subject, email);
       this.attempts.signupCreated(ip);
       this.logger.log(`New account ${maskEmail(email)} via ${provider.name} from ${ip}.`);
-      return { user, notice: null, created: true };
+      return { user, notice: null, created: true, nameFromProvider: name.fromProvider };
     } catch (error) {
       // Two callbacks for the same person at once: the unique indexes decide, then we look again.
       const code = (error as { driverError?: { code?: string }; code?: string }).driverError?.code ?? (error as { code?: string }).code;
@@ -285,8 +300,17 @@ a{display:inline-block;margin-top:18px;padding:13px 22px;border-radius:12px;back
 
 /** The provider's name, cleaned; otherwise one made from the email ("sara.khan@…" → "Sara Khan"). */
 export function displayName(name: string | null, email: string): string {
+  return nameFor(name, email).fullName;
+}
+
+/** displayName(), and whether it is the name the provider shared (the app asks to confirm either way). */
+export function nameFor(name: string | null, email: string): { fullName: string; fromProvider: boolean } {
   const cleaned = (name ?? '').replace(/[\p{Cc}\p{Cf}]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
-  if (cleaned.length >= 2 && PLAIN_NAME.test(cleaned)) return cleaned;
+  if (cleaned.length >= 2 && PLAIN_NAME.test(cleaned)) return { fullName: cleaned, fromProvider: true };
+  return { fullName: nameFromEmail(email), fromProvider: false };
+}
+
+function nameFromEmail(email: string): string {
   const fromEmail = email
     .split('@')[0]
     .split(/[._+-]+/)

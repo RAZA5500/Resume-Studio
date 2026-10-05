@@ -10,6 +10,15 @@ import { Logo } from '../../shared/ui/logo';
 import { NameStep } from '../../shared/ui/name-step';
 import { TwoFactorStep } from '../../shared/ui/two-factor-step';
 
+/** A new account's name step that has not been answered yet, so a reload of /auth/callback shows it again. */
+const NAME_STEP_KEY = 'rs_name_step';
+
+interface PendingNameStep {
+  userId: string;
+  after: OAuthResult['after'];
+  nameFromProvider?: boolean;
+}
+
 /** Error codes the API's OAuthService sends back (…/auth/callback?error=…). */
 const MESSAGES: Record<string, string> = {
   cancelled: 'You cancelled the sign-in.',
@@ -32,11 +41,12 @@ const MESSAGES: Record<string, string> = {
   template: `
     <div class="wrap">
       <app-logo />
-      <div class="card box" aria-live="polite">
+      <!-- The spinner and the error are announced; the interactive steps manage focus themselves. -->
+      <div class="card box" [attr.aria-live]="pending() || naming() ? null : 'polite'">
         @if (pending(); as signIn) {
           <app-two-factor-step class="step" [challenge]="signIn.challenge" (done)="finish(signIn)" (cancel)="backToLogin()" />
         } @else if (naming(); as signUp) {
-          <app-name-step class="step" (done)="proceed(signUp)" />
+          <app-name-step class="step" [nameFromProvider]="signUp.nameFromProvider" (done)="proceed(signUp)" />
         } @else if (error(); as message) {
           <span class="ic"><span class="i">error</span></span>
           <h1>Sign-in did not finish</h1>
@@ -113,6 +123,8 @@ export class OAuthCallback implements OnInit {
   protected readonly pending = signal<(OAuthResult & { challenge: string }) | null>(null);
   /** A new account: keep or change the name it got from Google / Apple before going on. */
   protected readonly naming = signal<OAuthResult | null>(null);
+  /** The sign-in flow already continued (it creates a resume for a picked template: only once). */
+  private continued = false;
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
@@ -120,6 +132,13 @@ export class OAuthCallback implements OnInit {
     const failure = params.get('error');
     // The code is single-use anyway; keep it out of the history and the address bar.
     this.location.replaceState('/auth/callback');
+    if (!failure && !code && this.auth.isAuthenticated()) {
+      // Reloaded (or a phone restored the tab) after signing in: the name step again, if unanswered.
+      const step = this.pendingNameStep();
+      if (step) this.naming.set({ created: true, notice: null, after: step.after, nameFromProvider: step.nameFromProvider } as OAuthResult);
+      else void this.router.navigateByUrl('/app/dashboard', { replaceUrl: true });
+      return;
+    }
     if (failure || !code) {
       this.error.set(MESSAGES[failure ?? 'failed'] ?? MESSAGES['failed']);
       return;
@@ -138,6 +157,7 @@ export class OAuthCallback implements OnInit {
       this.toast.info('Signed in. For your security, the password set earlier on this email was turned off — you can set a new one in Profile.');
     }
     if (result.created) {
+      this.rememberNameStep(result);
       this.naming.set(result);
       return;
     }
@@ -145,8 +165,34 @@ export class OAuthCallback implements OnInit {
   }
 
   protected proceed(result: OAuthResult): void {
+    if (this.continued) return;
+    this.continued = true;
+    this.rememberNameStep(null);
     // Returning accounts without two-factor get the optional offer; new ones go straight in.
     this.flow.continue(result.after, { offerTwoFactor: !result.created, replaceUrl: true });
+  }
+
+  private rememberNameStep(result: OAuthResult | null): void {
+    const userId = this.auth.user()?.id;
+    try {
+      if (result && userId) {
+        const step: PendingNameStep = { userId, after: result.after, nameFromProvider: result.nameFromProvider };
+        sessionStorage.setItem(NAME_STEP_KEY, JSON.stringify(step));
+      } else {
+        sessionStorage.removeItem(NAME_STEP_KEY);
+      }
+    } catch {
+      // storage unavailable: a reload then skips the step (the name can still be changed in Profile)
+    }
+  }
+
+  private pendingNameStep(): PendingNameStep | null {
+    try {
+      const step = JSON.parse(sessionStorage.getItem(NAME_STEP_KEY) ?? 'null') as PendingNameStep | null;
+      return step && step.userId === this.auth.user()?.id ? step : null;
+    } catch {
+      return null;
+    }
   }
 
   protected backToLogin(): void {

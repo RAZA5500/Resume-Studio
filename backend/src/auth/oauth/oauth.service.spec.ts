@@ -7,7 +7,7 @@ import type { AuthService } from '../auth.service.js';
 import { AuthAttemptsService } from '../security/auth-attempts.service.js';
 import { IdTokenError, JwksKeys, verifyIdToken } from './id-token.js';
 import { AppleProvider, GoogleProvider, type ProviderEndpoints } from './oauth-providers.js';
-import { displayName, OAuthService } from './oauth.service.js';
+import { displayName, nameFor, OAuthService } from './oauth.service.js';
 
 const IP = '198.51.100.4';
 
@@ -244,6 +244,16 @@ describe('OAuthService', () => {
     await expect(service.exchange(outcome.code!, verifier)).resolves.toMatchObject({ created: true });
   });
 
+  it("says whether a new account's name came from the provider, for the app's name step", async () => {
+    const { service, signIn } = setup();
+    let leg = await signIn(GOOGLE_PERSON);
+    await expect(service.exchange(leg.outcome.code!, leg.verifier)).resolves.toMatchObject({ created: true, nameFromProvider: true });
+    leg = await signIn(GOOGLE_PERSON);
+    await expect(service.exchange(leg.outcome.code!, leg.verifier)).resolves.toMatchObject({ created: false, nameFromProvider: false });
+    leg = await signIn({ ...GOOGLE_PERSON, sub: 'google-456', email: 'k7mzq2xw4p@example.com', name: undefined });
+    await expect(service.exchange(leg.outcome.code!, leg.verifier)).resolves.toMatchObject({ created: true, nameFromProvider: false });
+  });
+
   it('signs a returning person into the same account', async () => {
     const { users, signIn } = setup();
     await signIn(GOOGLE_PERSON);
@@ -305,5 +315,8 @@ describe('OAuthService', () => {
     expect(displayName(null, 'sara.khan@gmail.com')).toBe('Sara Khan');
     expect(displayName('Visit www.spam.test', 'ali_raza+cv@x.com')).toBe('Ali Raza Cv');
     expect(displayName(null, '12345@x.com')).toBe('ResumeStudio user');
+    expect(nameFor('Sara Khan', 'k7mzq2xw4p@privaterelay.appleid.com')).toEqual({ fullName: 'Sara Khan', fromProvider: true });
+    expect(nameFor(null, 'k7mzq2xw4p@privaterelay.appleid.com')).toEqual({ fullName: 'K7mzq2xw4p', fromProvider: false });
+    expect(nameFor('x', '12345@x.com')).toEqual({ fullName: 'ResumeStudio user', fromProvider: false });
   });
 });

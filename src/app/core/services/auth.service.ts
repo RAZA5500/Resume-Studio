@@ -41,8 +41,10 @@ export interface AfterSignIn {
 interface OAuthExtras {
   /** "password_removed": an unverified password on this email was turned off (see the API's OAuthService). */
   notice: 'password_removed' | null;
-  /** A brand-new account (no two-factor offer right after sign-up). */
+  /** A brand-new account (no two-factor offer right after sign-up; the name step comes first). */
   created: boolean;
+  /** The new account's name is the one Google / Apple shared (absent from older APIs). */
+  nameFromProvider?: boolean;
   after: AfterSignIn;
 }
 
