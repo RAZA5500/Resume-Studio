@@ -95,7 +95,7 @@
             <span class="i">lock</span>
             <input id="password" class="input" name="password" [type]="showPassword() ? 'text' : 'password'"
               [autocomplete]="isRegister() ? 'new-password' : 'current-password'" placeholder="••••••••"
-              [ngModel]="password()" (ngModelChange)="password.set($event)" />
+              [ngModel]="password()" (ngModelChange)="password.set($event); passwordsEdited()" />
             <button class="eye" type="button" (click)="showPassword.set(!showPassword())" aria-label="Toggle password visibility">
               <span class="i sm">{{ showPassword() ? 'visibility_off' : 'visibility' }}</span>
             </button>
@@ -119,7 +119,7 @@
               <span class="i">lock</span>
               <input id="confirm-password" class="input" name="confirmPassword" [type]="showPassword() ? 'text' : 'password'"
                 autocomplete="new-password" placeholder="Type it again" aria-describedby="confirm-hint" [attr.aria-invalid]="mismatch()"
-                [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event)" />
+                [ngModel]="confirmPassword()" (ngModelChange)="confirmPassword.set($event); passwordsEdited()" />
             </div>
             @if (confirmPassword()) {
               <span id="confirm-hint" class="match" [class.bad]="mismatch()" aria-live="polite" animate.enter="is-entering">

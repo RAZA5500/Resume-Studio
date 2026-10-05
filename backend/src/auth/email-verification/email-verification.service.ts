@@ -112,7 +112,7 @@ export class EmailVerificationService {
   async verifyLink(token: string, signedInAs: string | undefined, confirm: boolean): Promise<LinkResult> {
     const entry = await this.verifications.findOneBy({ linkHash: this.hash(token) });
     if (!entry || entry.expiresAt.getTime() < Date.now()) {
-      throw rejected('VERIFICATION_EXPIRED', 'This link has expired or was already used. Sign in to get a new email.');
+      throw rejected('VERIFICATION_EXPIRED', 'This link has expired or was already used.');
     }
     const owner = await this.users.findById(entry.userId);
     const email = maskEmail(owner.email);

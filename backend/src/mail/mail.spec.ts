@@ -41,6 +41,17 @@ describe('MailService', () => {
     mailWith({ ...SMTP, SMTP_PORT: '2525', SMTP_SECURE: 'true' });
     expect(createTransport).toHaveBeenLastCalledWith(expect.objectContaining({ port: 2525, secure: true }));
   });
+
+  it('reports its state for the health check: off, checking, then ok or failed', async () => {
+    expect(mailWith({}).status).toBe('off');
+    const mail = mailWith(SMTP);
+    expect(mail.status).toBe('checking');
+    await mail.send({ to: 'sara@example.com', subject: 'Hi', html: '<p>Hi</p>', text: 'Hi' });
+    expect(mail.status).toBe('ok');
+    sendMail.mockRejectedValueOnce(new Error('Invalid login: 535'));
+    await expect(mail.send({ to: 'sara@example.com', subject: 'Hi', html: '<p>Hi</p>', text: 'Hi' })).rejects.toThrow('535');
+    expect(mail.status).toBe('failed');
+  });
 });
 
 describe('verificationEmail', () => {

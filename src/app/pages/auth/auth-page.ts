@@ -24,6 +24,9 @@ const COMMON_WORDS = new Set([
   'football', 'sunshine', 'princess', 'lahore', 'karachi', 'islamabad', 'love', 'secret', 'master', 'shadow',
 ]);
 
+const PASSWORDS_DIFFER = 'The two passwords do not match.';
+const CONFIRM_MISSING = 'Please type your password again to confirm it.';
+
 /** Seconds to wait after an HTTP 429 (from the body of a lockout, or the rate limiter's header). */
 function retryAfterSeconds(error: unknown): number {
   if (!(error instanceof HttpErrorResponse) || error.status !== 429) return 0;
@@ -154,7 +157,7 @@ export class AuthPage {
       return this.error.set(this.isRegister() ? 'Password must be at least 8 characters.' : 'Please enter your password.');
     }
     if (this.isRegister() && this.confirmPassword() !== this.password()) {
-      return this.error.set(this.confirmPassword() ? 'The two passwords do not match.' : 'Please type your password again to confirm it.');
+      return this.error.set(this.confirmPassword() ? PASSWORDS_DIFFER : CONFIRM_MISSING);
     }
 
     this.loading.set(true);
@@ -178,6 +181,13 @@ export class AuthPage {
         if (wait) this.startWait(wait);
       },
     });
+  }
+
+  /** Typing in either password field clears the "do not match" error once they match. */
+  protected passwordsEdited(): void {
+    if ((this.error() === PASSWORDS_DIFFER || this.error() === CONFIRM_MISSING) && this.confirmPassword() === this.password()) {
+      this.error.set('');
+    }
   }
 
   private startWait(seconds: number): void {

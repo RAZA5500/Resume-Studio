@@ -4,6 +4,7 @@ import { ResumeAiService } from './ai/resume-ai.service.js';
 import { Public } from './common/auth/auth.decorators.js';
 import { DatabaseService } from './database/database.service.js';
 import { PdfRendererService } from './export/pdf-renderer.service.js';
+import { MailService } from './mail/mail.service.js';
 
 @Public()
 @Controller('health')
@@ -13,6 +14,7 @@ export class HealthController {
     private readonly database: DatabaseService,
     private readonly resumeAi: ResumeAiService,
     private readonly pdf: PdfRendererService,
+    private readonly mail: MailService,
   ) {}
 
   @Get()
@@ -41,6 +43,8 @@ export class HealthController {
       ...(dbHint ? { dbHint } : {}),
       ai: this.resumeAi.status,
       pdfEngine: this.pdf.available,
+      // off | checking | ok | failed — failed: verification emails are not going out (see the log).
+      email: this.mail.status,
       time: new Date().toISOString(),
     };
   }

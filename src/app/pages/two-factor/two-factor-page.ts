@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import type { TwoFactorSetup } from '../../core/models/app.models';
@@ -75,8 +75,8 @@ type Stage = 'offer' | 'scan' | 'confirm' | 'codes';
             <h1>Enter the code</h1>
             <p class="muted">Type the 6-digit code your app now shows for ResumeStudio.</p>
             <form class="stack full" (ngSubmit)="confirm()" novalidate>
-              <input class="input code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"
-                [ngModel]="code()" (ngModelChange)="onCode($event)" />
+              <input #codeInput class="input code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"
+                (input)="onCode(codeInput)" />
               @if (error()) {
                 <div class="alert danger"><span class="i">error</span><span>{{ error() }}</span></div>
               }
@@ -159,6 +159,7 @@ export class TwoFactorPage implements OnInit {
   protected readonly stage = signal<Stage>('offer');
   protected readonly setup = signal<TwoFactorSetup | null>(null);
   protected readonly code = signal('');
+  private readonly codeInput = viewChild<ElementRef<HTMLInputElement>>('codeInput');
   protected readonly backupCodes = signal<string[]>([]);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
@@ -200,8 +201,9 @@ export class TwoFactorPage implements OnInit {
     });
   }
 
-  protected onCode(value: string): void {
-    const digits = value.replace(/\D/g, '').slice(0, 6);
+  protected onCode(input: HTMLInputElement): void {
+    const digits = input.value.replace(/\D/g, '').slice(0, 6);
+    if (input.value !== digits) input.value = digits;
     this.code.set(digits);
     if (digits.length === 6) this.confirm();
   }
@@ -222,7 +224,13 @@ export class TwoFactorPage implements OnInit {
       },
       error: (e: unknown) => {
         this.busy.set(false);
+        // Emptied directly (see VerifyEmailPage.clearCode): the binding-free field keeps no stale digits.
         this.code.set('');
+        const input = this.codeInput()?.nativeElement;
+        if (input) {
+          input.value = '';
+          input.focus();
+        }
         this.error.set(errorMessage(e));
       },
     });

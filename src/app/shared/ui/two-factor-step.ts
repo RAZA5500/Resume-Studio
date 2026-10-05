@@ -40,8 +40,7 @@ import { errorMessage } from '../../core/utils/http';
               [attr.inputmode]="useBackup() ? 'text' : 'numeric'"
               [attr.maxlength]="useBackup() ? 11 : 6"
               [placeholder]="useBackup() ? 'xxxx-xxxx' : '123456'"
-              [ngModel]="code()"
-              (ngModelChange)="onInput($event)" />
+              (input)="onInput(codeInput)" />
           </div>
           <label class="remember">
             <input type="checkbox" name="remember" [ngModel]="remember()" (ngModelChange)="remember.set($event)" />
@@ -101,21 +100,32 @@ export class TwoFactorStep {
     afterNextRender(() => this.codeInput()?.nativeElement.focus());
   }
 
-  protected onInput(value: string): void {
+  protected onInput(input: HTMLInputElement): void {
     if (this.useBackup()) {
-      this.code.set(value);
+      this.code.set(input.value);
       return;
     }
-    const digits = value.replace(/\D/g, '').slice(0, 6);
+    const digits = input.value.replace(/\D/g, '').slice(0, 6);
+    if (input.value !== digits) input.value = digits;
     this.code.set(digits);
     if (digits.length === 6) this.submit();
   }
 
   protected toggleBackup(): void {
     this.useBackup.update((v) => !v);
-    this.code.set('');
+    this.clearCode();
     this.error.set('');
     setTimeout(() => this.codeInput()?.nativeElement.focus());
+  }
+
+  /**
+   * Empties the field directly: with signals, a code that goes '' → '123456' → '' between two
+   * renders never reaches the template, so a binding would leave the old digits in the field.
+   */
+  private clearCode(): void {
+    this.code.set('');
+    const input = this.codeInput()?.nativeElement;
+    if (input) input.value = '';
   }
 
   protected submit(): void {
@@ -132,7 +142,8 @@ export class TwoFactorStep {
       next: (session) => this.done.emit(session),
       error: (e: unknown) => {
         this.busy.set(false);
-        this.code.set('');
+        this.clearCode();
+        this.codeInput()?.nativeElement.focus();
         const reason = e instanceof HttpErrorResponse ? (e.error as { code?: string } | null)?.code : undefined;
         if (reason === 'TWO_FACTOR_EXPIRED') this.expired.set(true);
         this.error.set(errorMessage(e));

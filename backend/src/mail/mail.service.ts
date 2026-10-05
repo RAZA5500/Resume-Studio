@@ -9,6 +9,9 @@ export interface MailMessage {
   text: string;
 }
 
+/** off = not configured; failed = the last login or send went wrong (the reason is in the log). */
+export type MailStatus = 'off' | 'checking' | 'ok' | 'failed';
+
 /**
  * Sends the site's own emails (account verification) through SMTP — e.g. a Hostinger mailbox such
  * as no-reply@your-domain (smtp.hostinger.com, port 465). Without SMTP settings email is off, and
@@ -18,6 +21,7 @@ export interface MailMessage {
 export class MailService implements OnModuleInit {
   private readonly logger = new Logger('Mail');
   private transport: Pick<Transporter, 'sendMail' | 'verify'> | null = null;
+  private state: MailStatus = 'off';
   readonly from: string | null = null;
 
   constructor(config: ConfigService) {
@@ -42,10 +46,16 @@ export class MailService implements OnModuleInit {
       greetingTimeout: 10_000,
       socketTimeout: 20_000,
     });
+    this.state = 'checking';
   }
 
   get enabled(): boolean {
     return !!this.transport;
+  }
+
+  /** For /api/health (no details: those are in the log). */
+  get status(): MailStatus {
+    return this.state;
   }
 
   /** Checks the SMTP login at startup (in the background) so a wrong password shows up in the log. */
@@ -53,12 +63,24 @@ export class MailService implements OnModuleInit {
     if (!this.transport) return;
     this.transport
       .verify()
-      .then(() => this.logger.log(`Email is on: sending as ${this.from}.`))
-      .catch((error: unknown) => this.logger.error(`SMTP connection failed — verification emails cannot be sent: ${(error as Error).message}`));
+      .then(() => {
+        this.state = 'ok';
+        this.logger.log(`Email is on: sending as ${this.from}.`);
+      })
+      .catch((error: unknown) => {
+        this.state = 'failed';
+        this.logger.error(`SMTP connection failed — verification emails cannot be sent: ${(error as Error).message}`);
+      });
   }
 
   async send(message: MailMessage): Promise<void> {
     if (!this.transport) throw new Error('Email is not configured');
-    await this.transport.sendMail({ from: this.from ?? undefined, ...message });
+    try {
+      await this.transport.sendMail({ from: this.from ?? undefined, ...message });
+      this.state = 'ok';
+    } catch (error) {
+      this.state = 'failed';
+      throw error;
+    }
   }
 }
