@@ -21,7 +21,10 @@ import { UsersModule } from './users/users.module.js';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60_000, limit: 300 }],
+      errorMessage: 'Too many requests. Please wait a minute and try again.',
+    }),
     BillingModule,
     CheckoutModule,
     UsersModule,

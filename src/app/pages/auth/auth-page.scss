@@ -141,7 +141,8 @@
     }
   }
   small {
-    width: 64px;
+    min-width: 64px;
+    white-space: nowrap;
     text-align: right;
     color: var(--text-3);
     font-size: 11.5px;
@@ -153,6 +154,15 @@
   margin-top: 6px;
   height: 50px;
   border-radius: 14px;
+}
+
+/* Honeypot: moved off-screen rather than display:none, which simple bots know to skip. */
+.hp {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 }
 
 .switch-mode {

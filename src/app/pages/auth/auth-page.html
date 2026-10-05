@@ -26,6 +26,12 @@
       }
 
       <form class="stack" (ngSubmit)="submit()" novalidate>
+        <!-- Honeypot: invisible to people and skipped by keyboard and screen readers; bots fill it in. -->
+        <div class="hp" aria-hidden="true">
+          <label for="website">Website</label>
+          <input id="website" name="website" type="text" tabindex="-1" autocomplete="off"
+            [ngModel]="website()" (ngModelChange)="website.set($event)" />
+        </div>
         @if (isRegister()) {
           <div class="field">
             <label for="name">Full name</label>
@@ -63,19 +69,26 @@
               <small>{{ strengthLabel() }}</small>
             </div>
           }
+          @if (isRegister()) {
+            <span class="hint">At least 8 characters. Avoid common passwords and your name or email.</span>
+          }
         </div>
 
         @if (error()) {
           <div class="alert danger"><span class="i">error</span> {{ error() }}</div>
         }
 
-        <button class="btn btn-primary btn-lg btn-block submit" type="submit" [disabled]="loading()">
-          @if (loading()) {
-            <span class="spinner"></span>
-          }
-          {{ isRegister() ? 'Create account' : 'Log in' }}
-          @if (!loading()) {
-            <span class="i">arrow_forward</span>
+        <button class="btn btn-primary btn-lg btn-block submit" type="submit" [disabled]="loading() || waitSeconds() > 0">
+          @if (waitSeconds() > 0) {
+            <span class="i">schedule</span> Try again in {{ waitLabel() }}
+          } @else {
+            @if (loading()) {
+              <span class="spinner"></span>
+            }
+            {{ isRegister() ? 'Create account' : 'Log in' }}
+            @if (!loading()) {
+              <span class="i">arrow_forward</span>
+            }
           }
         </button>
       </form>

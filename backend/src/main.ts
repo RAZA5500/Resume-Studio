@@ -28,6 +28,32 @@ async function bootstrap() {
   // every visitor shares the proxy's IP and the rate limiter blocks them all together.
   const trustProxy = trustProxySetting(config.get<string>('TRUST_PROXY'));
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
+  const expressApp = app.getHttpAdapter().getInstance();
+  if (trustProxy === undefined) {
+    let warned = false;
+    expressApp.use((req: Request, _res: Response, next: NextFunction) => {
+      if (!warned && req.headers['x-forwarded-for']) {
+        warned = true;
+        Logger.warn(
+          'Requests come through a proxy but TRUST_PROXY is not set: every visitor shares one IP, so sign-in and rate limits lock everyone out together. Set TRUST_PROXY=1.',
+          'Bootstrap',
+        );
+      }
+      next();
+    });
+  }
+
+  // Sign-in and sign-up bodies are tiny. Refuse big ones before they are parsed (the JSON limit
+  // below is 30 MB for resumes), so the public auth routes cannot be used to burn CPU and memory.
+  expressApp.use('/api/auth', (req: Request, res: Response, next: NextFunction) => {
+    const length = Number(req.headers['content-length']);
+    const tooBig = Number.isFinite(length) ? length > 16 * 1024 : req.headers['transfer-encoding'] !== undefined;
+    if (req.method !== 'GET' && tooBig) {
+      res.status(413).json({ statusCode: 413, error: 'Payload Too Large', message: 'Request too large.' });
+      return;
+    }
+    next();
+  });
 
   // Resume photos, canvas pages and HTML exports can be several MB.
   app.useBodyParser('json', { limit: '30mb' });
@@ -41,13 +67,13 @@ async function bootstrap() {
   app.enableCors({
     origin: [...origins, 'https://localhost'],
     credentials: true,
-    exposedHeaders: ['Content-Disposition'],
+    // Retry-After: the app's countdown after too many sign-in attempts (also for the Android app).
+    exposedHeaders: ['Content-Disposition', 'Retry-After'],
   });
 
   // The database connects in the background (DatabaseService). Until it is ready, API calls get a
   // clear 503 (after CORS, so the app can read it) instead of failing inside a controller.
-  const expressApp = app.getHttpAdapter().getInstance();
-  expressApp.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  expressApp.use('/api',(req: Request, res: Response, next: NextFunction) => {
     if (database.isReady || req.path === '/health' || req.path === '/health/') return next();
     const { state } = database.status();
     res.setHeader('Retry-After', state === 'misconfigured' ? '300' : '5');

@@ -111,6 +111,23 @@ AI_MODEL=anthropic/claude-sonnet-5.5       # default; any OpenRouter model with 
 
 Restart the backend; the AI panel in the builder then shows “AI writing is active”. Every request asks for JSON that matches a schema (`backend/src/ai/ai.schemas.ts`), is routed only to providers that enforce it, and is retried on rate limits and provider errors. A model without structured-output support still works: the schema then goes into the prompt. Cheaper: `anthropic/claude-haiku-4.5` ($1 / $5 per million input / output tokens, vs $2 / $10 for Sonnet 5.5); best quality: `anthropic/claude-opus-5.5`. Without credits OpenRouter refuses paid models and the app says so; set a spending limit on the key in the OpenRouter dashboard.
 
+### Sign-up & sign-in protection
+
+Everything below is built in and on by default — no third-party service or key is needed (`backend/src/auth/security/`).
+
+| Threat | Protection |
+| --- | --- |
+| Bots and scripted attacks | Every sign-in and sign-up carries a solved **proof of work** (`GET auth/challenge`, ALTCHA-style SHA-256 puzzle, single use, 10 minutes). The app solves it in the background while the visitor types (~0.1–0.5 s, WebCrypto with a built-in fallback), so people never see it; scripts that do not run the app's code are refused. A hidden **honeypot** field catches form-filling bots. |
+| Password guessing / credential stuffing | Sliding-window **lockouts** with escalating durations: one email from one network 5 tries / 15 min, one email from any network 20 / hour, one network 50 / 15 min. The app shows a countdown (HTTP 429 with `retryAfter`). Unknown emails are locked the same way, so a lock reveals nothing. Rate limits per IP on top (10 sign-ins/sign-ups per minute). |
+| Account discovery | Wrong password and unknown email give the same answer in the same time (a bcrypt comparison runs either way). Sign-up's "email already registered" answer is limited to 10 per network per hour. |
+| Fake-account farming | At most 20 new accounts per network per hour, plus the proof of work and honeypot. |
+| Weak passwords | At least 8 characters (max 72 bytes, bcrypt's limit); refused when common (global and Pakistani lists), a repeated pattern or keyboard run, or based on the name, the email or "ResumeStudio"; and checked against the **Have I Been Pwned** breach corpus (k-anonymity: only 5 hex characters of the SHA-1 leave the server; skipped if the service is unreachable). |
+| Password storage | bcrypt cost 11 (older hashes are upgraded at the next sign-in); hashing runs at most 2 at a time with a bounded queue, so a flood of sign-ins cannot freeze the server. |
+| Stolen or old sessions | Tokens are HS256-only JWTs carrying the account's session version: **changing the password signs out every other device**, *Profile → Sign out of all devices* ends them all, and tokens of deleted accounts stop working. |
+| Oversized requests | Bodies over 16 KB to `/api/auth/*` are refused before they are parsed. |
+
+Behind a proxy (Hostinger) set `TRUST_PROXY=1`, otherwise every visitor shares the proxy's IP and lockouts hit everyone together — the server log warns when it sees forwarded requests without it. Emails are logged masked (`s***@gmail.com`).
+
 ### Pricing, payments & admin
 
 | Plan | Limits |
@@ -162,6 +179,9 @@ A transaction ID can only be used once (unless rejected), and a user can have on
 | `DB_SYNC` | `false` | `true` lets TypeORM alter tables straight from the entities — local experiments only; migrations create the schema |
 | `JWT_SECRET` | random per start | Long random secret for signing login tokens. Without it, logins end at every restart — set it in production and keep it private |
 | `JWT_EXPIRES_IN_DAYS` | `7` | Session length |
+| `AUTH_PROOF_OF_WORK` | `true` | Invisible proof-of-work check on sign-in and sign-up (`false` only to debug) |
+| `AUTH_POW_MAX_NUMBER` | `50000` | Proof-of-work difficulty (average hashes = half of it) |
+| `PASSWORD_BREACH_CHECK` | `true` | Refuse new passwords found in the Have I Been Pwned breach corpus |
 | `OPENROUTER_API_KEY` | — | Enables the AI model for all AI features (offline assistant without it) |
 | `AI_MODEL` | `anthropic/claude-sonnet-5.5` | OpenRouter model id |
 | `AI_FALLBACK_MODELS` | — | Comma-separated backup model ids |
@@ -194,7 +214,7 @@ contact info (10), sections (15), keywords (25), impact & action verbs (15), len
 
 | Method & path | Purpose |
 | --- | --- |
-| `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password` | Authentication |
+| `GET auth/challenge`, `POST auth/register`, `POST auth/login`, `GET/PATCH auth/me`, `POST auth/change-password`, `POST auth/logout-all` | Authentication (proof-of-work challenge, sign-up/in, profile, password change, sign out everywhere) |
 | `GET templates`, `GET templates/meta`, `GET templates/:id` | Template catalog (public) |
 | `GET/POST resumes`, `GET/PATCH/DELETE resumes/:id`, `POST resumes/:id/duplicate`, `GET resumes/:id/export/docx`, `GET resumes/:id/export/txt` | Resumes |
 | `GET ai/status`, `POST ai/generate-resume`, `POST ai/parse-resume`, `POST ai/summary`, `POST ai/improve`, `POST ai/bullets`, `POST ai/skills`, `POST ai/tailor`, `POST ai/cover-letter` | AI features |

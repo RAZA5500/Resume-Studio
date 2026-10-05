@@ -1,11 +1,19 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
+import { catchError, firstValueFrom, from, Observable, switchMap, tap, throwError } from 'rxjs';
 import type { AuthResponse, User } from '../models/app.models';
+import { type PowChallenge, solveChallenge } from '../utils/proof-of-work';
 
 const TOKEN_KEY = 'rs_token';
 const USER_KEY = 'rs_user';
+/** The API's security checks expire after 10 minutes; a solved one is used within 8. */
+const PROOF_LIFETIME_MS = 8 * 60_000;
+
+/** The API no longer accepts this security check (expired, used, or the server restarted). */
+function proofRejected(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && error.status === 400 && (error.error as { code?: string } | null)?.code === 'POW_INVALID';
+}
 
 function read(key: string): string | null {
   try {
@@ -40,6 +48,8 @@ export class AuthService {
 
   readonly token = signal<string | null>(null);
   readonly user = signal<User | null>(null);
+  /** The anti-bot check being solved for the next sign-in / sign-up. */
+  private proof: { answer: Promise<string>; expires: number } | null = null;
   readonly isAuthenticated = computed(() => !!this.token());
   readonly firstName = computed(() => this.user()?.fullName.split(' ')[0] ?? '');
   readonly initials = computed(() =>
@@ -65,14 +75,32 @@ export class AuthService {
     }
   }
 
-  login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>('/api/auth/login', { email, password }).pipe(tap((r) => this.setSession(r)));
+  /**
+   * Starts the invisible anti-bot check (a small proof of work) in the background, so it is ready
+   * by the time the sign-in or sign-up form is sent. The auth page calls it on open.
+   */
+  prepareProof(): void {
+    if (this.proof && this.proof.expires > Date.now()) return;
+    const answer = firstValueFrom(this.http.get<PowChallenge>('/api/auth/challenge')).then((challenge) => solveChallenge(challenge));
+    const entry = { answer, expires: Date.now() + PROOF_LIFETIME_MS };
+    // A failed fetch is not kept: the next attempt asks again.
+    answer.catch(() => {
+      if (this.proof === entry) this.proof = null;
+    });
+    this.proof = entry;
   }
 
-  register(fullName: string, email: string, password: string): Observable<AuthResponse> {
-    return this.http
-      .post<AuthResponse>('/api/auth/register', { fullName, email, password })
-      .pipe(tap((r) => this.setSession(r)));
+  /** `website` is the form's honeypot field: hidden from people, filled in only by bots. */
+  login(email: string, password: string, website = ''): Observable<AuthResponse> {
+    return this.withProof((pow) => this.http.post<AuthResponse>('/api/auth/login', { email, password, website, pow })).pipe(
+      tap((r) => this.setSession(r)),
+    );
+  }
+
+  register(fullName: string, email: string, password: string, website = ''): Observable<AuthResponse> {
+    return this.withProof((pow) =>
+      this.http.post<AuthResponse>('/api/auth/register', { fullName, email, password, website, pow }),
+    ).pipe(tap((r) => this.setSession(r)));
   }
 
   refreshProfile(): Observable<User> {
@@ -83,8 +111,20 @@ export class AuthService {
     return this.http.patch<User>('/api/auth/me', patch).pipe(tap((u) => this.setUser(u)));
   }
 
-  changePassword(currentPassword: string, newPassword: string): Observable<{ success: true }> {
-    return this.http.post<{ success: true }>('/api/auth/change-password', { currentPassword, newPassword });
+  /** Other devices are signed out; this one continues with the fresh token the API returns. */
+  changePassword(currentPassword: string, newPassword: string): Observable<{ success: true; accessToken?: string }> {
+    return this.http
+      .post<{ success: true; accessToken?: string }>('/api/auth/change-password', { currentPassword, newPassword })
+      .pipe(
+        tap((r) => {
+          if (r.accessToken) this.setToken(r.accessToken);
+        }),
+      );
+  }
+
+  /** Ends every session of this account, on all devices (this one included). */
+  logoutEverywhere(): Observable<unknown> {
+    return this.http.post('/api/auth/logout-all', {}).pipe(tap(() => this.logout()));
   }
 
   /** Updates fields of the cached user (e.g. plan after a payment is approved). */
@@ -101,10 +141,32 @@ export class AuthService {
     if (redirect) void this.router.navigateByUrl('/login');
   }
 
+  /** A solved check for one request (each works only once). */
+  private takeProof(): Promise<string> {
+    this.prepareProof();
+    const { answer } = this.proof!;
+    this.proof = null;
+    return answer;
+  }
+
+  /** Sends a public auth form with a fresh check; retries once if the API turned the check down. */
+  private withProof<T>(send: (pow: string) => Observable<T>): Observable<T> {
+    const attempt = () => from(this.takeProof()).pipe(switchMap(send));
+    return attempt().pipe(
+      catchError((error: unknown) => (proofRejected(error) ? attempt() : throwError(() => error))),
+      // After a failed try (wrong password…), have the next check ready before the next click.
+      tap({ error: () => this.prepareProof() }),
+    );
+  }
+
   private setSession(response: AuthResponse): void {
-    this.token.set(response.accessToken);
-    write(TOKEN_KEY, response.accessToken);
+    this.setToken(response.accessToken);
     this.setUser(response.user);
+  }
+
+  private setToken(token: string): void {
+    this.token.set(token);
+    write(TOKEN_KEY, token);
   }
 
   private setUser(user: User): void {

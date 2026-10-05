@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { AiService } from '../../core/services/ai.service';
 import { AuthService } from '../../core/services/auth.service';
 import { BillingService } from '../../core/services/billing.service';
-import { ToastService } from '../../core/services/ui.service';
+import { DialogService, ToastService } from '../../core/services/ui.service';
 import { errorMessage } from '../../core/utils/http';
 
 @Component({
@@ -65,7 +65,7 @@ import { errorMessage } from '../../core/utils/http';
       </section>
 
       <section class="card">
-        <div class="card-header"><h3><span class="i">lock</span> Change password</h3></div>
+        <div class="card-header"><h3><span class="i">lock</span> Password &amp; sessions</h3></div>
         <div class="card-pad stack">
           <div class="grid-2">
             <div class="field">
@@ -77,7 +77,13 @@ import { errorMessage } from '../../core/utils/http';
               <input class="input" type="password" autocomplete="new-password" [ngModel]="next()" (ngModelChange)="next.set($event)" placeholder="At least 8 characters" />
             </div>
           </div>
-          <div><button class="btn" type="button" (click)="changePassword()" [disabled]="saving()">Update password</button></div>
+          <p class="small subtle">Changing your password signs you out on every other device. Avoid common passwords and your name or email.</p>
+          <div class="row row-wrap">
+            <button class="btn" type="button" (click)="changePassword()" [disabled]="saving()">Update password</button>
+            <button class="btn btn-ghost" type="button" (click)="logoutEverywhere()" [disabled]="saving()">
+              <span class="i">devices</span> Sign out of all devices
+            </button>
+          </div>
         </div>
       </section>
 
@@ -124,6 +130,7 @@ export class ProfilePage {
   protected readonly ai = inject(AiService);
   protected readonly billing = inject(BillingService);
   private readonly toast = inject(ToastService);
+  private readonly dialogs = inject(DialogService);
 
   protected readonly fullName = signal(this.auth.user()?.fullName ?? '');
   protected readonly headline = signal(this.auth.user()?.headline ?? '');
@@ -145,6 +152,24 @@ export class ProfilePage {
     });
   }
 
+  protected async logoutEverywhere(): Promise<void> {
+    const ok = await this.dialogs.confirm({
+      title: 'Sign out of all devices?',
+      message: 'Every device signed in to this account is signed out, this one included. Use it if you think someone else knows your password.',
+      confirmText: 'Sign out everywhere',
+      danger: true,
+    });
+    if (!ok) return;
+    this.saving.set(true);
+    this.auth.logoutEverywhere().subscribe({
+      next: () => this.toast.success('Signed out of all devices'),
+      error: (e: unknown) => {
+        this.saving.set(false);
+        this.toast.error(errorMessage(e));
+      },
+    });
+  }
+
   protected changePassword(): void {
     if (this.next().length < 8) return this.toast.info('New password must be at least 8 characters.');
     this.saving.set(true);
@@ -153,7 +178,7 @@ export class ProfilePage {
         this.saving.set(false);
         this.current.set('');
         this.next.set('');
-        this.toast.success('Password updated');
+        this.toast.success('Password updated. Other devices were signed out.');
       },
       error: (e: unknown) => {
         this.saving.set(false);

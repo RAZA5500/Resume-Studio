@@ -27,6 +27,13 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   planActivatedAt: Date | null;
 
+  /**
+   * Goes up when the password changes or the user signs out everywhere; login tokens carry the
+   * value they were issued with and stop working once it no longer matches.
+   */
+  @Column({ type: 'int', default: 0 })
+  tokenVersion: number;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
