@@ -2,7 +2,15 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, firstValueFrom, from, map, Observable, switchMap, tap, throwError } from 'rxjs';
-import type { AuthResponse, OAuthProvider, TwoFactorChallenge, TwoFactorSetup, User } from '../models/app.models';
+import type {
+  AuthResponse,
+  OAuthProvider,
+  TwoFactorChallenge,
+  TwoFactorSetup,
+  User,
+  VerificationEmailResult,
+  VerificationLinkResult,
+} from '../models/app.models';
 import { isNativeApp } from '../native/platform';
 import { type PowChallenge, sha256, solveChallenge } from '../utils/proof-of-work';
 import { apiOrigin } from './api-url.interceptor';
@@ -102,6 +110,8 @@ export class AuthService {
   /** Which "Continue with …" buttons the server supports (null until loaded). */
   readonly oauthProviders = signal<Record<OAuthProvider, boolean> | null>(null);
   readonly isAuthenticated = computed(() => !!this.token());
+  /** Signed in, but the email address is not confirmed yet: only /verify-email opens. */
+  readonly mustVerifyEmail = computed(() => this.isAuthenticated() && !!this.user()?.mustVerifyEmail);
   readonly firstName = computed(() => this.user()?.fullName.split(' ')[0] ?? '');
   readonly initials = computed(() =>
     (this.user()?.fullName ?? '?')
@@ -243,6 +253,32 @@ export class AuthService {
   dismissTwoFactorOffer(): void {
     const user = this.user();
     if (user) write(OFFER_DISMISSED_KEY, JSON.stringify([user.id, ...readList(OFFER_DISMISSED_KEY)].slice(0, 20)));
+  }
+
+  // ---------------------------------------------------------------- email verification
+
+  /** Emails a code + link, unless the email sent earlier still works (the verification page calls it on open). */
+  sendVerificationEmail(): Observable<VerificationEmailResult> {
+    return this.http.post<VerificationEmailResult>('/api/auth/email/send', {});
+  }
+
+  /** "Send a new code" (the earlier email stops working). */
+  resendVerificationEmail(): Observable<VerificationEmailResult> {
+    return this.http.post<VerificationEmailResult>('/api/auth/email/resend', {});
+  }
+
+  verifyEmailCode(code: string): Observable<User> {
+    return this.http.post<User>('/api/auth/email/verify', { code }).pipe(tap((u) => this.setUser(u)));
+  }
+
+  /** The link from the email; `confirm` once the person pressed "Verify" (see VerificationLinkResult). */
+  verifyEmailLink(token: string, confirm = false): Observable<VerificationLinkResult> {
+    return this.http.post<VerificationLinkResult>('/api/auth/email/verify-link', { token, confirm });
+  }
+
+  /** "Wrong email?": moves the unverified account to another address (its password confirms it). */
+  changeEmail(email: string, password: string): Observable<User> {
+    return this.http.patch<User>('/api/auth/email', { email, password }).pipe(tap((u) => this.setUser(u)));
   }
 
   register(fullName: string, email: string, password: string, website = ''): Observable<AuthResponse> {

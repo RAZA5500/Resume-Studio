@@ -19,7 +19,21 @@ export interface User {
   /** Two-factor sign-in with an authenticator app. */
   twoFactorEnabled?: boolean;
   backupCodesLeft?: number;
+  emailVerified?: boolean;
+  /** The account still has to confirm its email address (the app shows only /verify-email until then). */
+  mustVerifyEmail?: boolean;
 }
+
+/** POST auth/email/send and auth/email/resend. */
+export interface VerificationEmailResult {
+  /** False when the code emailed earlier still works (nothing new was sent). */
+  sent: boolean;
+  /** Seconds until another email can be asked for. */
+  retryAfter: number;
+}
+
+/** POST auth/email/verify-link: links opened where their account is not signed in need one click. */
+export type VerificationLinkResult = { verified: true; email: string } | { verified: false; needsConfirmation: true; email: string };
 
 export interface AuthResponse {
   accessToken: string;
