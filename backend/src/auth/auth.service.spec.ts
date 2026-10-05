@@ -72,7 +72,7 @@ function verificationTable() {
 
 /** The code and the link token in a verification email. */
 function codeOf(message: MailMessage): string {
-  return /code is: (d{6})/.exec(message.text)![1];
+  return /code is: (\d{6})/.exec(message.text)![1];
 }
 function tokenOf(message: MailMessage): string {
   return /token=([A-Za-z0-9_-]{43})/.exec(message.text)![1];
