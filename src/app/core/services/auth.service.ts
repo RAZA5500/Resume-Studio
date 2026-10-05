@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, firstValueFrom, from, map, Observable, switchMap, tap, throwError } from 'rxjs';
-import type { AuthResponse, OAuthProvider, User } from '../models/app.models';
+import type { AuthResponse, OAuthProvider, TwoFactorChallenge, TwoFactorSetup, User } from '../models/app.models';
 import { isNativeApp } from '../native/platform';
 import { type PowChallenge, sha256, solveChallenge } from '../utils/proof-of-work';
 import { apiOrigin } from './api-url.interceptor';
@@ -14,6 +14,10 @@ const PROOF_LIFETIME_MS = 8 * 60_000;
 /** A Google / Apple sign-in in progress: the PKCE verifier and where to go afterwards. */
 const OAUTH_KEY = 'rs_oauth';
 const OAUTH_MAX_MS = 15 * 60_000;
+/** "Remember this device" tokens for two-factor sign-in (a few accounts per device at most). */
+const DEVICES_KEY = 'rs_devices';
+/** Accounts that chose "don't ask again" for the two-factor offer after signing in. */
+const OFFER_DISMISSED_KEY = 'rs_2fa_dismissed';
 
 /** Where to continue after signing in (same as the log-in page's returnUrl / template). */
 export interface AfterSignIn {
@@ -21,10 +25,27 @@ export interface AfterSignIn {
   template?: string;
 }
 
-export interface OAuthResult extends AuthResponse {
+interface OAuthExtras {
   /** "password_removed": an unverified password on this email was turned off (see the API's OAuthService). */
   notice: 'password_removed' | null;
+  /** A brand-new account (no two-factor offer right after sign-up). */
+  created: boolean;
   after: AfterSignIn;
+}
+
+export type OAuthResult = (AuthResponse | TwoFactorChallenge) & OAuthExtras;
+
+export function isTwoFactorChallenge(value: unknown): value is TwoFactorChallenge {
+  return !!value && typeof value === 'object' && (value as TwoFactorChallenge).twoFactorRequired === true;
+}
+
+function readList(key: string): string[] {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) ?? '[]') as unknown;
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 function base64url(bytes: Uint8Array): string {
@@ -157,18 +178,71 @@ export class AuthService {
     }
     const after: AfterSignIn = { returnUrl: pending.returnUrl, template: pending.template };
     return this.http
-      .post<AuthResponse & { notice: OAuthResult['notice'] }>('/api/auth/oauth/exchange', { code, verifier: pending.verifier })
+      .post<(AuthResponse | TwoFactorChallenge) & Omit<OAuthExtras, 'after'>>('/api/auth/oauth/exchange', {
+        code,
+        verifier: pending.verifier,
+        devices: readList(DEVICES_KEY),
+      })
       .pipe(
-        tap((r) => this.setSession(r)),
+        tap((r) => {
+          if (!isTwoFactorChallenge(r)) this.setSession(r);
+        }),
         map((r) => ({ ...r, after })),
       );
   }
 
-  /** `website` is the form's honeypot field: hidden from people, filled in only by bots. */
-  login(email: string, password: string, website = ''): Observable<AuthResponse> {
-    return this.withProof((pow) => this.http.post<AuthResponse>('/api/auth/login', { email, password, website, pow })).pipe(
-      tap((r) => this.setSession(r)),
+  /**
+   * A session — or, for accounts with two-factor sign-in on, a challenge that verifyTwoFactor()
+   * completes. Remembered-device tokens go along so a trusted device skips the code.
+   * `website` is the form's honeypot field: hidden from people, filled in only by bots.
+   */
+  login(email: string, password: string, website = ''): Observable<AuthResponse | TwoFactorChallenge> {
+    return this.withProof((pow) =>
+      this.http.post<AuthResponse | TwoFactorChallenge>('/api/auth/login', { email, password, website, pow, devices: readList(DEVICES_KEY) }),
+    ).pipe(
+      tap((r) => {
+        if (!isTwoFactorChallenge(r)) this.setSession(r);
+      }),
     );
+  }
+
+  /** Sign-in step two: the code from the authenticator app (or a backup code). */
+  verifyTwoFactor(challenge: string, code: string, rememberDevice: boolean): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>('/api/auth/2fa/verify', { challenge, code, rememberDevice }).pipe(
+      tap((r) => {
+        if (r.trustedDevice) write(DEVICES_KEY, JSON.stringify([r.trustedDevice, ...readList(DEVICES_KEY)].slice(0, 5)));
+        this.setSession(r);
+      }),
+    );
+  }
+
+  // ---------------------------------------------------------------- two-factor setup (signed in)
+
+  twoFactorSetup(): Observable<TwoFactorSetup> {
+    return this.http.post<TwoFactorSetup>('/api/auth/2fa/setup', {});
+  }
+
+  twoFactorEnable(code: string): Observable<{ backupCodes: string[] }> {
+    return this.http.post<{ backupCodes: string[] }>('/api/auth/2fa/enable', { code }).pipe(tap(() => this.patchUser({ twoFactorEnabled: true, backupCodesLeft: 10 })));
+  }
+
+  twoFactorDisable(code: string): Observable<unknown> {
+    return this.http.post('/api/auth/2fa/disable', { code }).pipe(tap(() => this.patchUser({ twoFactorEnabled: false, backupCodesLeft: 0 })));
+  }
+
+  twoFactorBackupCodes(code: string): Observable<{ backupCodes: string[] }> {
+    return this.http.post<{ backupCodes: string[] }>('/api/auth/2fa/backup-codes', { code }).pipe(tap(() => this.patchUser({ backupCodesLeft: 10 })));
+  }
+
+  /** After signing in, offer two-factor setup (optional) unless it is on or was dismissed on this device. */
+  shouldOfferTwoFactor(): boolean {
+    const user = this.user();
+    return !!user && user.twoFactorEnabled === false && !readList(OFFER_DISMISSED_KEY).includes(user.id);
+  }
+
+  dismissTwoFactorOffer(): void {
+    const user = this.user();
+    if (user) write(OFFER_DISMISSED_KEY, JSON.stringify([user.id, ...readList(OFFER_DISMISSED_KEY)].slice(0, 20)));
   }
 
   register(fullName: string, email: string, password: string, website = ''): Observable<AuthResponse> {
