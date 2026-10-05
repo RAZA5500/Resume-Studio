@@ -198,8 +198,8 @@ export class CheckoutService {
       if (order?.status === 'created') {
         // No signed data: ask the gateway directly. A buyer who pressed cancel gives up the order,
         // though a payment the gateway confirms later still counts.
-        const synced = await this.syncWithGateway(order, true);
-        if (synced?.status === 'created' && field(request.query, 'cancelled') === '1') {
+        const current = (await this.syncWithGateway(order, true)) ?? order;
+        if (current.status === 'created' && field(request.query, 'cancelled') === '1') {
           await this.orders.update(
             { id: order.id, status: 'created' },
             { status: 'cancelled', failureReason: 'You cancelled the payment.' },

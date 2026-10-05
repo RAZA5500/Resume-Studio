@@ -275,11 +275,16 @@ export interface BillingConfig {
 
 export type PaymentStatus = 'pending' | 'approved' | 'rejected';
 
+/** QR methods (approved by an admin) plus "gateway" for online payments, approved automatically. */
+export type PaymentMethod = PaymentMethodInfo['key'] | 'gateway';
+
 export interface PaymentRecord {
   id: string;
-  method: PaymentMethodInfo['key'];
+  method: PaymentMethod;
+  /** Gateway adapter key for online payments, null for QR payments. */
+  provider: string | null;
   transactionId: string;
-  senderNumber: string;
+  senderNumber: string | null;
   senderName: string | null;
   amount: number;
   currency: string;
@@ -301,6 +306,43 @@ export interface BillingSummary {
   price: number;
   currency: string;
   payment: PaymentRecord | null;
+}
+
+/** The online payment gateway; null while it is not connected (checkout then offers the QR code only). */
+export interface GatewayInfo {
+  key: string;
+  name: string;
+  /** Ways to pay it offers ("Visa", "JazzCash"…). */
+  brands: string[];
+  /** Sandbox / test gateway: no real money moves. */
+  testMode: boolean;
+}
+
+export interface CheckoutConfig {
+  price: number;
+  currency: string;
+  gateway: GatewayInfo | null;
+  /** Time a buyer has to finish on the gateway's page. */
+  orderMinutes: number;
+}
+
+/** "expired" = never finished on the gateway's page in time. */
+export type CheckoutOrderStatus = 'created' | 'paid' | 'failed' | 'cancelled' | 'expired';
+
+export interface CheckoutOrder {
+  id: string;
+  status: CheckoutOrderStatus;
+  plan: string;
+  amount: number;
+  currency: string;
+  provider: string;
+  providerName: string;
+  testMode: boolean;
+  transactionId: string | null;
+  failureReason: string | null;
+  expiresAt: string;
+  paidAt: string | null;
+  createdAt: string;
 }
 
 /** Body of the HTTP 402 returned when a free daily limit is reached. */
