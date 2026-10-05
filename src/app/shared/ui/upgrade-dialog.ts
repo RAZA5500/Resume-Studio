@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { BillingService, UpgradeService } from '../../core/services/billing.service';
+import { CheckoutService } from '../../core/services/checkout.service';
 
 const TITLES: Record<string, string> = {
   resume: "You've used today's free resume",
@@ -47,7 +48,12 @@ const TITLES: Record<string, string> = {
               </div>
             </div>
             <p class="small subtle">
-              One-time payment — scan our QR code with JazzCash, Easypaisa or any bank app. No subscription.
+              @if (checkout.gateway()) {
+                One-time payment — pay online by card or wallet, or scan our QR code with JazzCash, Easypaisa or any bank app.
+              } @else {
+                One-time payment — scan our QR code with JazzCash, Easypaisa or any bank app.
+              }
+              No subscription.
               @if (reason.resetsAt) {
                 Free limits reset at {{ reason.resetsAt | date: 'h:mm a' }}.
               }
@@ -100,7 +106,15 @@ const TITLES: Record<string, string> = {
 export class UpgradeDialog {
   protected readonly upgrade = inject(UpgradeService);
   protected readonly billing = inject(BillingService);
+  protected readonly checkout = inject(CheckoutService);
   private readonly router = inject(Router);
+
+  constructor() {
+    // Learn whether online payment is available the first time the dialog opens.
+    effect(() => {
+      if (this.upgrade.reason()) this.checkout.load();
+    });
+  }
 
   protected readonly title = computed(() => {
     const kind = this.upgrade.reason()?.kind;
@@ -109,7 +123,7 @@ export class UpgradeDialog {
 
   protected goToCheckout(): void {
     this.upgrade.close();
-    void this.router.navigateByUrl('/app/billing');
+    void this.router.navigateByUrl('/checkout');
   }
 
   protected onEscape(): void {

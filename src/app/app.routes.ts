@@ -114,5 +114,20 @@ export const routes: Routes = [
     canActivate: [serverGuard, authGuard],
     loadComponent: () => import('./pages/editor/doc-editor').then((m) => m.DocEditor),
   },
+  {
+    // Full-page checkout outside the app shell: online gateway first, the QR code as the alternative.
+    path: 'checkout',
+    title: 'Checkout — ResumeStudio',
+    canActivate: [serverGuard, authGuard],
+    loadComponent: () => import('./pages/checkout/checkout-page').then((m) => m.CheckoutPage),
+    data: { preload: 'signed-in' },
+  },
+  {
+    // The gateway returns the buyer here (through the API); public, see CheckoutResult.
+    path: 'checkout/result',
+    title: 'Payment status — ResumeStudio',
+    canActivate: [serverGuard],
+    loadComponent: () => import('./pages/checkout/checkout-result').then((m) => m.CheckoutResult),
+  },
   { path: '**', redirectTo: '' },
 ];

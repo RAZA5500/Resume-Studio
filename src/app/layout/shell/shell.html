@@ -40,7 +40,7 @@
 
     @if (!billing.isLifetime()) {
       @if (collapsed()) {
-        <a class="upgrade-mini" routerLink="/app/billing" title="Upgrade to lifetime"><span class="i fill">bolt</span></a>
+        <a class="upgrade-mini" routerLink="/checkout" title="Upgrade to lifetime"><span class="i fill">bolt</span></a>
       } @else {
         <div class="plan-card border-anim">
           <div class="plan-head">
@@ -56,7 +56,7 @@
               <div class="bar" [class.full]="u.full"><i [style.width.%]="u.percent"></i></div>
             </div>
           }
-          <a class="btn btn-primary btn-sm btn-block" routerLink="/app/billing">
+          <a class="btn btn-primary btn-sm btn-block" routerLink="/checkout">
             Go lifetime · PKR {{ billing.price() }}
           </a>
         </div>
@@ -101,7 +101,7 @@
       <app-logo link="/app/dashboard" />
       <span class="grow"></span>
       @if (!billing.isLifetime()) {
-        <a class="upgrade-pill" routerLink="/app/billing"><span class="i fill sm">bolt</span> Upgrade</a>
+        <a class="upgrade-pill" routerLink="/checkout"><span class="i fill sm">bolt</span> Upgrade</a>
       }
       <app-theme-toggle />
     </header>

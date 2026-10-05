@@ -3,7 +3,7 @@
     <div>
       <span class="eyebrow"><span class="i sm">admin_panel_settings</span> Payments · users</span>
       <h1>Admin</h1>
-      <p>Verify JazzCash, Easypaisa and bank payments and manage user plans.</p>
+      <p>Verify QR payments (JazzCash, Easypaisa, bank), see online payments and manage user plans.</p>
     </div>
     <button class="btn btn-sm" type="button" (click)="reload()"><span class="i">refresh</span> Refresh</button>
   </header>
@@ -93,7 +93,14 @@
                     <small>{{ p.user?.email }}</small>
                   </div>
                 </td>
-                <td>{{ methodLabels[p.method] }}</td>
+                <td>
+                  <div class="cell-user">
+                    <span>{{ methodLabels[p.method] }}</span>
+                    @if (p.provider) {
+                      <small>{{ p.provider }}</small>
+                    }
+                  </div>
+                </td>
                 <td>
                   <span class="copy">
                     <span class="mono">{{ p.transactionId }}</span>
@@ -104,7 +111,7 @@
                 </td>
                 <td>
                   <div class="cell-user">
-                    <span class="mono">{{ p.senderNumber }}</span>
+                    <span class="mono">{{ p.senderNumber || '—' }}</span>
                     @if (p.senderName) {
                       <small>{{ p.senderName }}</small>
                     }
@@ -150,6 +157,7 @@
     </div>
     <p class="subtle small">
       Before approving, open your JazzCash / Easypaisa / bank app and match the transaction ID and amount with a payment you actually received.
+      Online payments are confirmed by the payment gateway and appear here already approved.
     </p>
   } @else {
     <div class="toolbar">

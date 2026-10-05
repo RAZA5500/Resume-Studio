@@ -1,0 +1,121 @@
+<div class="checkout">
+  <div class="bg" aria-hidden="true"><div class="aurora"><i></i><i></i><i></i></div></div>
+
+  <header class="topbar">
+    <app-logo [link]="auth.isAuthenticated() ? '/app/dashboard' : '/'" />
+    <span class="secure"><span class="i sm fill">lock</span> Secure checkout</span>
+    <span class="grow"></span>
+    <app-theme-toggle />
+  </header>
+
+  <main class="result">
+    @switch (view()) {
+      @case ('loading') {
+        <div class="card state center">
+          <span class="spinner lg"></span>
+          <p class="muted">Loading your payment…</p>
+        </div>
+      }
+
+      @case ('confirming') {
+        <div class="card state center" aria-live="polite">
+          <span class="waiting" aria-hidden="true"><span class="spinner lg"></span><span class="i fill">lock</span></span>
+          <h1>Confirming your payment…</h1>
+          <p class="muted">
+            Waiting for {{ order()?.providerName }} to confirm {{ order()?.currency }} {{ order()?.amount }}.
+            This usually takes a few seconds — please keep this page open.
+          </p>
+          @if (slow()) {
+            <div class="alert warning">
+              <span class="i">schedule</span>
+              <span>
+                This is taking longer than usual. If money has left your account, lifetime access is activated automatically
+                as soon as the gateway confirms it — you can close this page.
+              </span>
+            </div>
+          }
+          @if (stopped()) {
+            <button class="btn" type="button" (click)="checkAgain()"><span class="i">refresh</span> Check again</button>
+          }
+        </div>
+      }
+
+      @case ('paid') {
+        <div class="card state center paid">
+          <div class="confetti" aria-hidden="true">
+            @for (c of confetti; track $index) {
+              <i [style.left.%]="c.x" [style.background]="c.color" [style.animation-delay.s]="c.delay" [style.--r]="c.r + 'deg'"></i>
+            }
+          </div>
+          <span class="state-ic success"><span class="i fill">check_circle</span></span>
+          <h1>Payment successful</h1>
+          <p class="muted">Lifetime access is now active on your account. Thank you for supporting ResumeStudio!</p>
+          @if (order(); as o) {
+            <dl class="details">
+              <div><dt>Amount</dt><dd>{{ o.currency }} {{ o.amount }}</dd></div>
+              <div><dt>Paid via</dt><dd>{{ o.providerName }}</dd></div>
+              <div><dt>Transaction ID</dt><dd class="mono">{{ o.transactionId }}</dd></div>
+              <div><dt>Date</dt><dd>{{ (o.paidAt ?? o.createdAt) | date: 'mediumDate' }}</dd></div>
+            </dl>
+          }
+          @if (auth.isAuthenticated()) {
+            <div class="row-wrap actions">
+              <a class="btn btn-primary" routerLink="/app/dashboard"><span class="i">rocket_launch</span> Start creating</a>
+              <a class="btn" routerLink="/app/billing"><span class="i">receipt_long</span> Plan &amp; billing</a>
+            </div>
+          } @else {
+            <p class="small subtle">Using the ResumeStudio app? Go back to it — your plan is already updated there.</p>
+            <div class="row-wrap actions">
+              <a class="btn btn-primary" routerLink="/login"><span class="i">login</span> Log in</a>
+            </div>
+          }
+        </div>
+      }
+
+      @case ('missing') {
+        <div class="card state center">
+          <span class="state-ic neutral"><span class="i">search_off</span></span>
+          <h1>We couldn't find this payment</h1>
+          <p class="muted">The link may be incomplete. Your plan and payments are always shown under Plan &amp; billing.</p>
+          <div class="row-wrap actions">
+            <a class="btn btn-primary" routerLink="/checkout">Go to checkout</a>
+            <a class="btn" routerLink="/app/billing">Plan &amp; billing</a>
+          </div>
+        </div>
+      }
+
+      @default {
+        @let o = order();
+        <div class="card state center">
+          @switch (view()) {
+            @case ('failed') {
+              <span class="state-ic danger"><span class="i">error</span></span>
+              <h1>Payment didn't go through</h1>
+              <p class="muted">{{ o?.failureReason || 'The payment was declined.' }} You can try again, or pay with the QR code.</p>
+            }
+            @case ('cancelled') {
+              <span class="state-ic neutral"><span class="i">cancel</span></span>
+              <h1>Payment cancelled</h1>
+              <p class="muted">Nothing was charged. You can try again whenever you are ready.</p>
+            }
+            @default {
+              <span class="state-ic neutral"><span class="i">schedule</span></span>
+              <h1>This payment session expired</h1>
+              <p class="muted">
+                The payment was not finished in time. If money did leave your account, lifetime access is activated
+                automatically once the gateway confirms it.
+              </p>
+            }
+          }
+          <div class="row-wrap actions">
+            <a class="btn btn-primary" routerLink="/checkout"><span class="i">refresh</span> Try again</a>
+            <a class="btn" routerLink="/checkout" [queryParams]="{ method: 'qr' }"><span class="i">qr_code_scanner</span> Pay with QR instead</a>
+          </div>
+          @if (whatsappLink(); as link) {
+            <p class="small subtle">Need help? <a [href]="link" target="_blank" rel="noopener">Message us on WhatsApp</a>.</p>
+          }
+        </div>
+      }
+    }
+  </main>
+</div>

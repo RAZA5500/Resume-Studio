@@ -107,7 +107,7 @@ export class Landing {
   protected readonly sample = SAMPLE_CONTENT;
   protected readonly year = new Date().getFullYear();
   protected readonly startLink = computed(() => (this.auth.isAuthenticated() ? '/app/templates' : '/register'));
-  protected readonly upgradeLink = computed(() => (this.auth.isAuthenticated() ? '/app/billing' : '/register'));
+  protected readonly upgradeLink = computed(() => (this.auth.isAuthenticated() ? '/checkout' : '/register'));
   protected readonly openFaq = signal<number | null>(0);
 
   protected readonly heroDesign = design({

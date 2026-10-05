@@ -48,7 +48,7 @@ import { errorMessage } from '../../core/utils/http';
       <section class="card">
         <div class="card-header">
           <h3><span class="i">workspace_premium</span> Plan</h3>
-          <a class="btn btn-sm" routerLink="/app/billing">{{ billing.isLifetime() ? 'View billing' : 'Upgrade' }}</a>
+          <a class="btn btn-sm" [routerLink]="billing.isLifetime() ? '/app/billing' : '/checkout'">{{ billing.isLifetime() ? 'View billing' : 'Upgrade' }}</a>
         </div>
         <div class="card-pad">
           @if (billing.isLifetime()) {
