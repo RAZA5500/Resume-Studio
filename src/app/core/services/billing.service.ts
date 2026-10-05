@@ -7,7 +7,7 @@ import type {
   BillingConfig,
   BillingSummary,
   LimitReached,
-  PaymentMethodInfo,
+  PaymentMethod,
   PaymentRecord,
   PaymentStatus,
   Plan,
@@ -21,10 +21,11 @@ export const USAGE_LABELS: Record<UsageKind, string> = {
   document: 'Document edits',
 };
 
-export const METHOD_LABELS: Record<PaymentMethodInfo['key'], string> = {
+export const METHOD_LABELS: Record<PaymentMethod, string> = {
   jazzcash: 'JazzCash',
   easypaisa: 'Easypaisa',
   bank: 'Bank app',
+  gateway: 'Online payment',
 };
 
 @Injectable({ providedIn: 'root' })

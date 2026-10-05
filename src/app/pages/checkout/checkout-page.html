@@ -1,0 +1,189 @@
+<div class="checkout">
+  <div class="bg" aria-hidden="true"><div class="aurora"><i></i><i></i><i></i></div></div>
+
+  <header class="topbar">
+    <button class="btn btn-ghost btn-sm back" type="button" (click)="back()" aria-label="Back">
+      <span class="i">arrow_back</span><span class="hide-sm">Back</span>
+    </button>
+    <app-logo link="/app/dashboard" />
+    <span class="secure"><span class="i sm fill">lock</span> Secure checkout</span>
+    <span class="grow"></span>
+    <app-theme-toggle />
+  </header>
+
+  <main class="layout">
+    <section class="main">
+      <ol class="progress-steps" aria-label="Checkout progress">
+        <li class="done"><span class="dot"><span class="i sm">check</span></span> Plan</li>
+        <li [class.current]="stage() === 'pay'" [class.done]="stage() !== 'pay'">
+          <span class="dot">@if (stage() === 'pay') { 2 } @else { <span class="i sm">check</span> }</span> Payment
+        </li>
+        <li [class.current]="stage() === 'verify'" [class.done]="stage() === 'done'">
+          <span class="dot">@if (stage() === 'done') { <span class="i sm">check</span> } @else { 3 }</span> Activation
+        </li>
+      </ol>
+
+      @if (!ready()) {
+        <div class="skeleton sk-title"></div>
+        <div class="skeleton sk-method"></div>
+        <div class="skeleton sk-method short"></div>
+      } @else if (billing.isLifetime()) {
+        <div class="card state done-state">
+          <span class="state-ic success"><span class="i fill">workspace_premium</span></span>
+          <h1>You're all set</h1>
+          <p class="muted">Your account has lifetime access — unlimited resumes, cover letters and document edits, with no watermark.</p>
+          <div class="row-wrap actions">
+            <a class="btn btn-primary" routerLink="/app/dashboard"><span class="i">dashboard</span> Go to dashboard</a>
+            <a class="btn" routerLink="/app/billing"><span class="i">receipt_long</span> Plan &amp; billing</a>
+          </div>
+        </div>
+      } @else if (billing.pendingPayment(); as p) {
+        <div class="card state pending-state">
+          <div class="row">
+            <span class="spinner subtle"></span>
+            <h1 class="grow">Your payment is being verified</h1>
+            <span class="badge warning">Pending</span>
+          </div>
+          <p class="muted">
+            We received your QR payment details and will activate lifetime access as soon as the transaction is confirmed —
+            usually within a few hours. This page updates automatically.
+          </p>
+          <dl class="details">
+            <div><dt>Amount</dt><dd>{{ p.currency }} {{ p.amount }}</dd></div>
+            <div><dt>Method</dt><dd>{{ methodLabels[p.method] }}</dd></div>
+            <div><dt>Transaction ID</dt><dd class="mono">{{ p.transactionId }}</dd></div>
+            <div><dt>Submitted</dt><dd>{{ p.createdAt | date: 'medium' }}</dd></div>
+          </dl>
+          @if (whatsappLink(); as link) {
+            <a class="btn btn-sm align-start" [href]="link" target="_blank" rel="noopener">
+              <span class="i">chat</span> Contact support on WhatsApp
+            </a>
+          }
+        </div>
+      } @else {
+        <div class="intro">
+          <h1>How would you like to pay?</h1>
+          <p class="muted">One payment of {{ currency() }} {{ price() }} — lifetime access, no subscription.</p>
+        </div>
+
+        <div class="methods" role="radiogroup" aria-label="Payment method">
+          <!-- Primary: online payment through the gateway -->
+          <article class="method" [class.selected]="method() === 'online'" [class.unavailable]="!gateway()">
+            <button class="method-head" type="button" role="radio" [attr.aria-checked]="method() === 'online'"
+              [attr.aria-disabled]="!gateway()" (click)="choose('online')">
+              <span class="radio" aria-hidden="true"></span>
+              <span class="mi online"><span class="i">credit_card</span></span>
+              <span class="grow text">
+                <span class="title">
+                  Pay online
+                  @if (gateway()) {
+                    <span class="badge primary">Recommended</span>
+                  } @else {
+                    <span class="badge">Coming soon</span>
+                  }
+                </span>
+                <small>
+                  @if (gateway()) {
+                    Card, bank account or mobile wallet · lifetime access activates instantly
+                  } @else {
+                    Card, bank account and wallet payments are being set up — please use the QR code for now
+                  }
+                </small>
+              </span>
+            </button>
+
+            @if (method() === 'online') {
+              @if (gateway(); as g) {
+                <div class="method-body">
+                  @if (g.brands.length) {
+                    <div class="brands">
+                      @for (b of g.brands; track b) {
+                        <span class="brand">{{ b }}</span>
+                      }
+                    </div>
+                  }
+                  @if (g.testMode) {
+                    <div class="alert warning"><span class="i">science</span><span><b>Test mode.</b> The test gateway is connected — no real money moves.</span></div>
+                  }
+                  @if (openedOrder(); as orderId) {
+                    <div class="alert">
+                      <span class="i">open_in_new</span>
+                      <span>
+                        Finish the payment in your browser. This page updates by itself when you come back —
+                        or <a [routerLink]="['/checkout/result']" [queryParams]="{ order: orderId }">check the payment status</a>.
+                      </span>
+                    </div>
+                  }
+                  @if (payError()) {
+                    <div class="alert danger"><span class="i">error</span><span>{{ payError() }}</span></div>
+                  }
+                  <button class="btn btn-primary btn-lg pay-btn" type="button" (click)="payOnline()" [disabled]="starting()">
+                    @if (starting()) {
+                      <span class="spinner"></span> Opening secure payment…
+                    } @else {
+                      <span class="i fill">lock</span> Pay {{ currency() }} {{ price() }}
+                    }
+                  </button>
+                  <p class="subtle small">
+                    You will pay on {{ g.name }}'s secure page and come straight back here. We never see or store your card details.
+                  </p>
+                </div>
+              }
+            }
+          </article>
+
+          <!-- Additional: merchant QR code, verified by hand -->
+          <article class="method" [class.selected]="method() === 'qr'">
+            <button class="method-head" type="button" role="radio" [attr.aria-checked]="method() === 'qr'" (click)="choose('qr')">
+              <span class="radio" aria-hidden="true"></span>
+              <span class="mi qr"><span class="i">qr_code_scanner</span></span>
+              <span class="grow text">
+                <span class="title">Scan QR &amp; pay</span>
+                <small>JazzCash, Easypaisa or any bank app · activated after we verify it, usually within a few hours</small>
+              </span>
+            </button>
+            @if (method() === 'qr') {
+              <div class="method-body">
+                <app-qr-payment />
+              </div>
+            }
+          </article>
+        </div>
+      }
+    </section>
+
+    <aside class="summary-col">
+      <div class="card summary">
+        <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="summary-head">
+          <span class="crown" aria-hidden="true"><span class="i fill">workspace_premium</span></span>
+          <div>
+            <span class="eyebrow">Order summary</span>
+            <h2>ResumeStudio Lifetime</h2>
+          </div>
+        </div>
+        <ul class="features">
+          @for (f of features; track f) {
+            <li><span class="i sm">check</span> {{ f }}</li>
+          }
+        </ul>
+        <dl class="totals">
+          <div><dt>Lifetime access</dt><dd>{{ currency() }} {{ price() }}</dd></div>
+          <div><dt>Renewals</dt><dd>None</dd></div>
+          <div class="total"><dt>Total</dt><dd>{{ currency() }} {{ price() }}</dd></div>
+        </dl>
+        <ul class="trust">
+          @if (gateway()) {
+            <li><span class="i">bolt</span> Online payments unlock everything instantly</li>
+          } @else {
+            <li><span class="i">schedule</span> QR payments are activated within a few hours</li>
+          }
+          <li><span class="i">verified</span> One-time payment — no subscription</li>
+          @if (whatsappLink(); as link) {
+            <li><span class="i">support_agent</span> <a [href]="link" target="_blank" rel="noopener">Questions? WhatsApp us</a></li>
+          }
+        </ul>
+      </div>
+    </aside>
+  </main>
+</div>

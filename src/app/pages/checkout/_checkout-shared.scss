@@ -1,0 +1,129 @@
+/* Frame shared by the checkout and payment result pages: full-height page with its own top bar. */
+:host {
+  display: block;
+}
+
+.checkout {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+.back {
+  margin-left: -6px;
+}
+
+.secure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--success-line);
+  background: var(--success-50);
+  color: var(--success-ink);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  .i {
+    color: var(--success);
+  }
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 6px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  div {
+    min-width: 0;
+  }
+  dt {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  dd {
+    margin: 3px 0 0;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.state-ic {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  animation: pop-in 0.5s var(--ease-spring) both;
+  .i {
+    font-size: 30px;
+  }
+  &.success {
+    background: var(--grad-mint);
+    box-shadow: 0 16px 36px -14px rgba(16, 185, 129, 0.9);
+  }
+  &.danger {
+    background: var(--grad-rose);
+    box-shadow: 0 16px 36px -14px rgba(225, 29, 72, 0.85);
+  }
+  &.neutral {
+    color: var(--text-2);
+    background: var(--surface-3);
+  }
+}
+
+@media (max-width: 800px) {
+  .details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .hide-sm {
+    display: none;
+  }
+}
+
+@media (max-width: 440px) {
+  /* Only the lock stays, so the logo and theme switch still fit. */
+  .secure {
+    padding: 6px;
+    font-size: 0;
+    gap: 0;
+  }
+}

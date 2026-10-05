@@ -1,0 +1,142 @@
+@if (rejected(); as r) {
+  <div class="alert danger">
+    <span class="i">error</span>
+    <span>
+      Your last payment (TID <b class="mono">{{ r.transactionId }}</b>) could not be verified{{ r.adminNote ? ': ' + r.adminNote : '.' }}
+      Please check the details and submit again.
+    </span>
+  </div>
+}
+
+<ol class="steps">
+  <li>
+    <h4><span class="num">1</span> Scan &amp; pay PKR {{ billing.price() }}</h4>
+    <div class="qr-card">
+      <button class="qr-poster" type="button" (click)="qrOpen.set(true)" aria-label="Show the payment QR code larger">
+        <span class="scan-me" aria-hidden="true"><span class="i sm">qr_code_scanner</span> Scan me</span>
+        <span class="frame">
+          <img
+            src="payment/payment-qr-full.webp"
+            srcset="payment/payment-qr-600.webp 600w, payment/payment-qr-full.webp 906w"
+            sizes="(max-width: 600px) 64vw, 200px"
+            [width]="qr.width"
+            [height]="qr.height"
+            [alt]="'JazzCash and Raast payment QR code for ' + qr.merchant + ', Till ID ' + qr.tillId"
+            decoding="async" />
+          <span class="scan-beam" aria-hidden="true"></span>
+        </span>
+        <span class="zoom" aria-hidden="true"><span class="i">zoom_in</span></span>
+      </button>
+
+      <div class="qr-info">
+        <p class="qr-lead">Scan with any app — it takes less than a minute.</p>
+        <div class="apps">
+          <span class="app"><i class="dot jazz"></i> JazzCash</span>
+          <span class="app"><i class="dot easy"></i> Easypaisa</span>
+          <span class="app"><i class="dot bank"></i> Any bank app</span>
+        </div>
+        <ol class="qr-steps">
+          <li><span>Open your app and tap <b>Scan QR</b></span></li>
+          <li><span>Pay <b>PKR {{ billing.price() }}</b> to <b>{{ qr.merchant }}</b></span></li>
+          <li><span>Keep the <b>Transaction ID</b> from your receipt</span></li>
+        </ol>
+        <div class="till">
+          <span>Till ID</span>
+          <b class="mono">{{ qr.tillId }}</b>
+          <button class="btn btn-ghost btn-xs" type="button" (click)="copy(qr.tillId)" aria-label="Copy Till ID">
+            <span class="i">content_copy</span>
+          </button>
+        </div>
+        <div class="qr-actions">
+          <button class="btn btn-sm btn-soft" type="button" (click)="saveQr()"><span class="i">download</span> Save QR</button>
+          <button class="btn btn-sm btn-ghost" type="button" (click)="qrOpen.set(true)"><span class="i">zoom_in</span> Enlarge</button>
+        </div>
+      </div>
+    </div>
+    <p class="phone-tip">
+      <span class="i">smartphone</span>
+      <span>
+        Paying from this phone? Tap <b>Save QR</b>, then in your app choose <b>Scan QR → Gallery</b> and pick it.
+        No app? Dial <b>*786*10#</b> and enter the Till ID.
+      </span>
+    </p>
+  </li>
+
+  <li>
+    <h4><span class="num">2</span> Submit your payment details</h4>
+    <form class="stack" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <span class="label">Paid with</span>
+        <div class="segmented block">
+          @for (m of methods; track m.key) {
+            <button type="button" [class.active]="methodKey() === m.key" (click)="methodKey.set(m.key)">{{ m.label }}</button>
+          }
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="tid">Transaction ID (TID)</label>
+          <input id="tid" class="input mono" name="tid" autocomplete="off" placeholder="e.g. 01234567890"
+            [ngModel]="transactionId()" (ngModelChange)="transactionId.set($event)" />
+        </div>
+        <div class="field">
+          <label for="sender">Paid from (number / account)</label>
+          <input id="sender" class="input" name="sender" inputmode="tel" autocomplete="off" placeholder="03xx xxxxxxx"
+            [ngModel]="senderNumber()" (ngModelChange)="senderNumber.set($event)" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="sender-name">Account holder name <span class="hint">optional</span></label>
+        <input id="sender-name" class="input" name="senderName" autocomplete="off"
+          [ngModel]="senderName()" (ngModelChange)="senderName.set($event)" />
+      </div>
+      <div class="field">
+        <span class="label">Receipt screenshot <span class="hint">optional, speeds up verification</span></span>
+        @if (screenshotUrl(); as url) {
+          <div class="shot">
+            <img [src]="url" alt="Payment receipt preview" />
+            <div class="grow">
+              <b>{{ screenshot()?.name }}</b>
+              <button class="btn btn-ghost btn-xs" type="button" (click)="clearScreenshot()">Remove</button>
+            </div>
+          </div>
+        } @else {
+          <label class="upload">
+            <input type="file" accept="image/png,image/jpeg,image/webp" (change)="pickScreenshot($event)" />
+            <span class="i">upload</span> Choose image (PNG, JPG or WebP, max 5 MB)
+          </label>
+        }
+      </div>
+
+      @if (formError()) {
+        <div class="alert danger"><span class="i">error</span><span>{{ formError() }}</span></div>
+      }
+
+      <button class="btn btn-primary btn-lg" type="submit" [disabled]="submitting()">
+        @if (submitting()) {
+          <span class="spinner"></span>
+        }
+        Submit payment
+      </button>
+      <p class="subtle small">
+        Your account is upgraded after we match the transaction ID with the payment we received — usually within a few hours.
+        @if (whatsappLink(); as link) {
+          Questions? <a [href]="link" target="_blank" rel="noopener">Message us on WhatsApp</a>.
+        }
+      </p>
+    </form>
+  </li>
+</ol>
+
+@if (qrOpen()) {
+  <div class="modal-backdrop qr-backdrop" animate.leave="is-leaving" (click)="qrOpen.set(false)">
+    <figure class="qr-lightbox" role="dialog" aria-modal="true" aria-label="Payment QR code" (click)="$event.stopPropagation()">
+      <img src="payment/payment-qr-full.webp" [width]="qr.width" [height]="qr.height"
+        [alt]="'JazzCash and Raast payment QR code for ' + qr.merchant + ', Till ID ' + qr.tillId" />
+      <figcaption>Scan with JazzCash, Easypaisa or any bank app · PKR {{ billing.price() }}</figcaption>
+      <button class="btn btn-icon btn-sm close" type="button" (click)="qrOpen.set(false)" aria-label="Close">
+        <span class="i">close</span>
+      </button>
+    </figure>
+  </div>
+}
