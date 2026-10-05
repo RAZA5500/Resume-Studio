@@ -16,8 +16,8 @@ export class User {
   passwordHash: string | null;
 
   /**
-   * When the owner proved this email address (today: by signing in with Google or Apple, whose
-   * emails are verified). Null for email + password sign-ups.
+   * When the owner proved this email address: with the code or link we emailed, or by signing in
+   * with Google or Apple (whose emails are verified). Null until then.
    */
   @Column({ type: 'timestamptz', nullable: true })
   emailVerifiedAt: Date | null;

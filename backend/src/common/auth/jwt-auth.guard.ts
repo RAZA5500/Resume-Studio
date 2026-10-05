@@ -9,8 +9,8 @@ import { ALLOW_UNVERIFIED_KEY, IS_PUBLIC_KEY, type AuthenticatedRequest, type Jw
  * Global guard: every route needs a Bearer token unless decorated with @Public(). A token must be
  * correctly signed, unexpired, and still current for its account — changing the password or
  * signing out everywhere (users.tokenVersion) ends older tokens, and so does deleting the account.
- * While an account has not verified its email (token claim ev=false), only @AllowUnverified()
- * routes are open to it.
+ * Until an account has verified its email address, only @AllowUnverified() routes are open to it
+ * (while the site can send email at all).
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -41,15 +41,15 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     // A database error here propagates (a 5xx): a hiccup must not sign people out.
-    const version = await this.users.sessionVersion(payload.sub);
-    if (version === null || (payload.tv ?? 0) !== version) {
+    const session = await this.users.session(payload.sub);
+    if (!session || (payload.tv ?? 0) !== session.version) {
       if (isPublic) return true;
       throw new UnauthorizedException('You were signed out. Please sign in again.');
     }
 
-    // Unverified email: only the verification flow and the profile basics until it is confirmed
-    // (and not at all when email is switched off — then nobody could verify).
-    if (payload.ev === false && !isPublic && this.mail.enabled && !this.reflector.getAllAndOverride<boolean>(ALLOW_UNVERIFIED_KEY, targets)) {
+    // Read from the account (not the token), so verifying on another device unlocks this one too.
+    // Not enforced while email is off: nobody could receive a code then.
+    if (!session.emailVerified && !isPublic && this.mail.enabled && !this.reflector.getAllAndOverride<boolean>(ALLOW_UNVERIFIED_KEY, targets)) {
       throw new ForbiddenException({
         statusCode: 403,
         error: 'Forbidden',

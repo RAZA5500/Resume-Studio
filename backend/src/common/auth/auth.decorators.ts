@@ -6,11 +6,6 @@ export interface JwtPayload {
   email: string;
   /** The user's tokenVersion when the token was issued (absent in tokens older than it, meaning 0). */
   tv?: number;
-  /**
-   * false while the account still has to verify its email address: such a token only opens
-   * routes marked @AllowUnverified(). Absent in older tokens (treated as verified).
-   */
-  ev?: boolean;
 }
 
 export interface AuthUser {
