@@ -2022,6 +2022,13 @@ h2 .serif-i {
   border-top: 1px solid var(--border);
   color: var(--text-3);
   font-size: 13px;
+  a {
+    color: var(--text-2);
+    transition: color 0.2s var(--ease);
+    &:hover {
+      color: var(--text);
+    }
+  }
 }
 
 .mega-word {

@@ -61,6 +61,12 @@ export const routes: Routes = [
     data: { public: true, preload: true },
   },
   {
+    // Public on purpose (no serverGuard): Google / Apple sign-in link to it from their consent screens.
+    path: 'privacy',
+    title: 'Privacy Policy — ResumeStudio',
+    loadComponent: () => import('./pages/legal/privacy-page').then((m) => m.PrivacyPage),
+  },
+  {
     path: 'app',
     canActivate: [serverGuard, authGuard, verifiedGuard],
     loadComponent: () => import('./layout/shell/shell').then((m) => m.Shell),

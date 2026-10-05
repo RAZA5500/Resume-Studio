@@ -1,0 +1,134 @@
+<app-public-header />
+<div class="public-bg" aria-hidden="true">
+  <div class="aurora"><i></i><i></i><i></i></div>
+  <div class="grid-bg"></div>
+</div>
+
+<div class="page legal">
+  <header class="legal-head">
+    <span class="eyebrow"><span class="i sm">verified_user</span> Legal</span>
+    <h1>Privacy Policy</h1>
+    <p class="muted">Last updated: 6 October 2026</p>
+  </header>
+
+  <article class="card prose">
+    <p>
+      ResumeStudio (<a href="https://resumestudio.site">resumestudio.site</a> and the ResumeStudio Android app) helps you build
+      resumes, check them against applicant tracking systems (ATS) and edit documents. This page explains what information we
+      collect, why we use it, who processes it for us and the choices you have.
+    </p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li>
+        <strong>Your account:</strong> email address, name and, if you add it, a headline. If you set a password we store only a
+        secure hash of it, never the password itself. If you turn on two-factor authentication, its secret is stored encrypted
+        and its backup codes only as hashes.
+      </li>
+      <li>
+        <strong>Sign in with Google or Apple:</strong> if you choose it, we receive your name, your email address, whether that
+        address is verified and an account identifier from Google or Apple. We do not receive your Google or Apple password and
+        get no access to your contacts, files, email or any other data in those accounts.
+      </li>
+      <li>
+        <strong>What you create:</strong> resumes, cover letters, ATS reports (including the job descriptions you paste) and the
+        documents and files you upload or edit.
+      </li>
+      <li>
+        <strong>Payments:</strong> you pay in your own JazzCash, Easypaisa or bank app, or on the page of an online payment
+        provider. We keep the plan, amount, method, transaction ID and, for manual payments, the sender number, sender name and
+        receipt screenshot you give us, so that we can confirm the payment. We never see your card details, PINs or wallet
+        passwords.
+      </li>
+      <li>
+        <strong>Technical information:</strong> your IP address is used for a short time to protect sign-in and to limit abuse;
+        it is not stored with your account. We also count how many resumes, documents and AI requests you use each day to
+        apply the limits of your plan.
+      </li>
+    </ul>
+
+    <h2>How we use it</h2>
+    <ul>
+      <li>To run the service: your account, saving your work and exporting it.</li>
+      <li>To keep accounts safe: verification emails, two-factor authentication and protection against abuse.</li>
+      <li>To confirm payments and apply your plan's limits.</li>
+      <li>To answer you when you contact us.</li>
+    </ul>
+    <p>
+      We do <strong>not</strong> sell your information, we do not use it for advertising, and ResumeStudio has no advertising or
+      analytics trackers.
+    </p>
+
+    <h2>Who processes data for us</h2>
+    <ul>
+      <li><strong>Hostinger</strong> hosts the website and the mailbox that sends our emails.</li>
+      <li><strong>Supabase</strong> hosts our database (servers in Singapore).</li>
+      <li>
+        <strong>OpenRouter</strong> and the AI model provider it sends the request to (for example Anthropic) receive the text you
+        give an AI feature, such as a resume section or a job description, only when you use that feature. Your password and
+        payment details are never sent to them.
+      </li>
+      <li><strong>Google</strong> and <strong>Apple</strong>, only if you choose to sign in with them.</li>
+      <li>
+        <strong>Have I Been Pwned</strong>: when you choose a password, we send only the first five characters of its SHA-1
+        hash to check whether it has appeared in a known data breach. Your password itself never leaves our server.
+      </li>
+    </ul>
+    <p>These providers may process data outside Pakistan. They act on our behalf and may use it only to provide their service to us.</p>
+
+    <h2>Information from Google</h2>
+    <p>
+      If you sign in with Google, we use only your basic profile (name, email address and account identifier) to create your
+      account and sign you in. We do not share it with others, use it for advertising or use it to train AI models.
+      ResumeStudio's use and transfer of information received from Google APIs adheres to the
+      <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
+      including the Limited Use requirements.
+    </p>
+
+    <h2>Cookies and storage on your device</h2>
+    <p>
+      We use one essential cookie that keeps you signed in; scripts on the page cannot read it, and it is sent only to our
+      sign-in routes. Your browser's storage remembers your session and preferences on that device, such as the theme and
+      sidebar. We use no advertising or tracking cookies.
+    </p>
+
+    <h2>How long we keep it and how to delete it</h2>
+    <ul>
+      <li>Your work stays in your account until you delete it. You can delete resumes, documents and ATS reports in the app at any time.</li>
+      <li>You can change your name and sign-in settings under Profile.</li>
+      <li>
+        To delete your whole account, contact us (see below) with the email address of the account; we may ask you to confirm
+        that it is yours. We delete the account and its content within 30 days, except payment records we have to keep for
+        accounting.
+      </li>
+    </ul>
+
+    <h2>Security</h2>
+    <p>
+      All traffic is encrypted with HTTPS, passwords are hashed, two-factor secrets are encrypted and sign-in is protected
+      against repeated guessing. No online service can be completely secure, so please use a strong password and keep it to yourself.
+    </p>
+
+    <h2>Children</h2>
+    <p>ResumeStudio is not meant for children under 13, and we do not knowingly collect their information.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes, we will update this page and the date at the top.</p>
+
+    <h2>Contact</h2>
+    @if (whatsappLink(); as link) {
+      <p>
+        Questions or requests about your data:
+        <a [href]="link" target="_blank" rel="noopener">message us on WhatsApp</a>.
+      </p>
+    } @else {
+      <p>Questions or requests about your data: use the support contact under Plan &amp; billing in the app.</p>
+    }
+  </article>
+
+  <p class="legal-back">
+    <a class="btn btn-ghost btn-sm" [routerLink]="auth.isAuthenticated() ? '/app/dashboard' : '/'">
+      <span class="i">arrow_back</span> Back to ResumeStudio
+    </a>
+  </p>
+</div>

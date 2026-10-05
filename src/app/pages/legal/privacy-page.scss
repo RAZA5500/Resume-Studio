@@ -1,0 +1,73 @@
+:host {
+  position: relative;
+  display: block;
+}
+
+.public-bg {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 620px;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  .grid-bg {
+    -webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, #000 20%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, #000 20%, transparent 75%);
+  }
+}
+
+.legal {
+  position: relative;
+  z-index: 1;
+  max-width: 860px;
+  padding-top: 24px;
+}
+
+.legal-head {
+  margin-bottom: 24px;
+  h1 {
+    margin: 10px 0 6px;
+    font-size: clamp(30px, 3.4vw, 44px);
+  }
+}
+
+.prose {
+  padding: clamp(20px, 4vw, 40px);
+  color: var(--text-2);
+  line-height: 1.7;
+  overflow-wrap: break-word;
+  h2 {
+    margin: 30px 0 10px;
+    color: var(--text);
+    font-size: 19px;
+    letter-spacing: -0.02em;
+  }
+  p {
+    margin: 10px 0;
+  }
+  ul {
+    margin: 10px 0;
+    padding-left: 20px;
+  }
+  li + li {
+    margin-top: 8px;
+  }
+  strong {
+    color: var(--text);
+  }
+  a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  > :first-child {
+    margin-top: 0;
+  }
+  > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+.legal-back {
+  margin-top: 20px;
+}
