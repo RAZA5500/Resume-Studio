@@ -114,7 +114,10 @@ async function bootstrap() {
         res.setHeader('Cache-Control', hashed.test(filePath) ? 'public, max-age=31536000, immutable' : 'no-cache');
       },
     });
-    expressApp.get(/^(?!\/api(\/|$)).*/, (_req: unknown, res: { sendFile: (p: string) => void }) => {
+    // index.html names the current build's files, so browsers and host caches must revalidate it.
+    type IndexResponse = { setHeader: (name: string, value: string) => void; sendFile: (p: string) => void };
+    expressApp.get(/^(?!\/api(\/|$)).*/, (_req: unknown, res: IndexResponse) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(join(staticRoot, 'index.html'));
     });
   }
